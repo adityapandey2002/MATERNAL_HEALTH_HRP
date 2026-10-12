@@ -1,0 +1,46 @@
+{
+  "name": "@hrp/client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "check:fast": "tsc --noEmit && biome check --error-on-warnings .",
+    "test": "vitest run",
+    "test:e2e": "playwright test",
+    "check:bundle": "size-limit"
+  },
+  "dependencies": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-router-dom": "6.26.1",
+    "zod": "3.23.8",
+    "@hrp/shared": "*",
+    "idb": "8.0.0",
+    "dexie": "4.0.7"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.4",
+    "@types/react-dom": "18.3.0",
+    "@vitejs/plugin-react": "4.3.1",
+    "@playwright/test": "1.46.1",
+    "vite": "5.4.2",
+    "vite-plugin-pwa": "0.20.1",
+    "workbox-window": "7.1.0",
+    "typescript": "5.5.4",
+    "vitest": "2.0.5",
+    "@vitest/coverage-v8": "2.0.5",
+    "size-limit": "11.1.6",
+    "@size-limit/preset-app": "11.1.6",
+    "biome": "1.8.3"
+  },
+  "size-limit": [
+    {
+      "path": "dist/assets/index-*.js",
+      "limit": "170 kB",
+      "gzip": true
+    }
+  ]
+}

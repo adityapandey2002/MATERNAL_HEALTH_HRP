@@ -1,0 +1,49 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hrp
+      POSTGRES_PASSWORD: ${PREVIEW_DB_PASSWORD}
+      POSTGRES_DB: hrp
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./packages/server/migrations:/docker-entrypoint-initdb.d:ro
+
+  server:
+    build:
+      context: ./packages/server
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgresql://hrp:${PREVIEW_DB_PASSWORD}@db:5432/hrp
+      JWT_SECRET: ${PREVIEW_JWT_SECRET}
+      NODE_ENV: production
+      PORT: "3000"
+    depends_on:
+      - db
+    expose:
+      - "3000"
+
+  client:
+    build:
+      context: ./packages/client
+      dockerfile: Dockerfile
+    environment:
+      VITE_API_URL: https://${PREVIEW_HOST}/api
+    depends_on:
+      - server
+    expose:
+      - "80"
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.preview.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - client
+      - server
+
+volumes:
+  pgdata:

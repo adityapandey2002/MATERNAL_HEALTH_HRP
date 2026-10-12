@@ -1,0 +1,153 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast:
+    name: Fast Checks (types, lint, secrets, floor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+
+      - name: Install
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Biome lint
+        run: npx biome check --error-on-warnings .
+
+      - name: Gitleaks secrets scan
+        run: npx gitleaks detect --redact --no-banner --source .
+
+  task:
+    name: Task Checks (fast + coverage on changed lines)
+    needs: fast
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hrp
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: hrp
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U hrp -d hrp"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+
+      - name: Install
+        run: npm ci
+
+      - name: Run tests with coverage
+        run: npm run check:task
+        env:
+          DATABASE_URL: postgresql://hrp:test@localhost:5432/hrp
+          JWT_SECRET: test-secret-for-ci-only
+
+  full:
+    name: Full Checks (all + security)
+    needs: task
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+
+      - name: Install
+        run: npm ci
+
+      - name: Semgrep code scan
+        run: npx semgrep scan --config p/default --config p/owasp-top-ten --json=semgrep.json --error
+        continue-on-error: true
+
+      - name: OSV dependency scan
+        run: npx osv-scanner scan source -r . --format json --output osv.json
+        continue-on-error: true
+
+      - name: Upload security artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            semgrep.json
+            osv.json
+
+  preview:
+    name: Preview Deploy + Perf/A11y/Bundle
+    needs: full
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with: { node-version: '20', cache: 'npm' }
+
+      - name: Install
+        run: npm ci
+
+      - name: Build client
+        run: npm run build --workspace=packages/client
+
+      - name: Deploy to Netlify Preview
+        uses: netlify/actions/cli@master
+        with:
+          args: deploy --dir=packages/client/dist --alias=pr-${{ github.event.number }}
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      - name: Wait for deploy
+        run: sleep 30
+
+      - name: Lighthouse CI
+        run: |
+          PREVIEW_URL=https://pr-${{ github.event.number }}.netlify.app
+          npx lighthouse $PREVIEW_URL --output=json --quiet --only-categories=performance --output-path=lighthouse.json
+        continue-on-error: true
+
+      - name: Axe accessibility
+        run: |
+          PREVIEW_URL=https://pr-${{ github.event.number }}.netlify.app
+          npx axe $PREVIEW_URL --tags wcag2a,wcag2aa,wcag21aa --exit
+        continue-on-error: true
+
+      - name: Bundle size
+        run: npx size-limit --json
+        continue-on-error: true

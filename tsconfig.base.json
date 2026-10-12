@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "@hrp/shared/*": ["packages/shared/src/*"],
+      "@hrp/client/*": ["packages/client/src/*"],
+      "@hrp/server/*": ["packages/server/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", "build"]
+}

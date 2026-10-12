@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hrp
+      POSTGRES_PASSWORD: hrp_dev
+      POSTGRES_DB: hrp
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./packages/server/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hrp -d hrp"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  server:
+    build:
+      context: ./packages/server
+      dockerfile: Dockerfile.dev
+    environment:
+      DATABASE_URL: postgresql://hrp:hrp_dev@db:5432/hrp
+      JWT_SECRET: dev-secret-change-in-production
+      NODE_ENV: development
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ./packages/server:/app
+      - /app/node_modules
+
+  client:
+    build:
+      context: ./packages/client
+      dockerfile: Dockerfile.dev
+    environment:
+      VITE_API_URL: http://localhost:3000
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
+    volumes:
+      - ./packages/client:/app
+      - /app/node_modules
+
+volumes:
+  pgdata:

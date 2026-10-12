@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /
+
+# HRP Tracker is a private PWA for health workers
+# No public pages to index

@@ -1,0 +1,42 @@
+{
+  "name": "hrp-tracking-platform",
+  "version": "0.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "dev:client": "npm run dev --workspace=packages/client",
+    "dev:server": "npm run dev --workspace=packages/server",
+    "build": "npm run build --workspaces --if-present",
+    "check:fast": "npm run check:fast --workspaces --if-present",
+    "check:task": "npm run check:task --workspaces --if-present",
+    "check:full": "npm run check:full --workspaces --if-present",
+    "check:perf": "npm run check:perf --workspaces --if-present",
+    "check:a11y": "npm run check:a11y --workspaces --if-present",
+    "check:bundle": "npm run check:bundle --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace=packages/client",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:migrate": "npm run db:migrate --workspace=packages/server",
+    "db:seed": "npm run db:seed --workspace=packages/server"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "1.8.3",
+    "@axe-core/cli": "4.9.1",
+    "@vitest/coverage-v8": "2.0.5",
+    "gitleaks": "8.18.2",
+    "lighthouse": "12.1.0",
+    "osv-scanner": "1.7.1",
+    "semgrep": "1.95.0",
+    "size-limit": "11.1.6",
+    "typescript": "5.5.4",
+    "vitest": "2.0.5"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "npm@10.8.1"
+}
