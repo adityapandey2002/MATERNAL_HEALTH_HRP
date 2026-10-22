@@ -1,34 +1,20 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-export const FacilityLevel = z.enum([
-  'VILLAGE',
-  'HWC',
-  'PHC',
-  'CHC',
-  'DISTRICT',
-  'STATE',
-]);
+export const FacilityLevel = z.enum(["VILLAGE", "HWC", "PHC", "CHC", "DISTRICT", "STATE"]);
 
-export const UserRole = z.enum([
-  'ANM',
-  'ASHA',
-  'CHO',
-  'MO',
-  'DISTRICT_ADMIN',
-  'STATE_ADMIN',
-]);
+export const UserRole = z.enum(["ANM", "ASHA", "CHO", "MO", "DISTRICT_ADMIN", "STATE_ADMIN"]);
 
-export const RiskLevel = z.enum(['GREEN', 'AMBER', 'RED']);
+export const RiskLevel = z.enum(["GREEN", "AMBER", "RED"]);
 
 export const DangerSign = z.enum([
-  'HYPERTENSION',
-  'GESTATIONAL_DIABETES',
-  'SEVERE_ANEMIA',
-  'VAGINAL_BLEEDING',
-  'REDUCED_FETAL_MOVEMENT',
-  'SEVERE_HEADACHE',
-  'VISION_DISTURBANCE',
-  'EPILEPSY',
+  "HYPERTENSION",
+  "GESTATIONAL_DIABETES",
+  "SEVERE_ANEMIA",
+  "VAGINAL_BLEEDING",
+  "REDUCED_FETAL_MOVEMENT",
+  "SEVERE_HEADACHE",
+  "VISION_DISTURBANCE",
+  "EPILEPSY",
 ]);
 
 export const FacilitySchema = z.object({
@@ -52,7 +38,7 @@ export const UserSchema = z.object({
   phone: z.string().min(10),
   role: UserRole,
   facilityId: z.string().uuid(),
-  language: z.string().default('hi'),
+  language: z.string().default("hi"),
   isActive: z.boolean().default(true),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -73,7 +59,7 @@ export const PatientSchema = z.object({
   para: z.number().int().min(0).default(0),
   abortions: z.number().int().min(0).default(0),
   riskFactors: z.array(DangerSign).default([]),
-  riskLevel: RiskLevel.default('GREEN'),
+  riskLevel: RiskLevel.default("GREEN"),
   riskScore: z.number().default(0),
   isHighRisk: z.boolean().default(false),
   createdAt: z.date(),
@@ -118,7 +104,7 @@ export const ReferralSchema = z.object({
   referredBy: z.string().uuid(),
   reason: z.string(),
   urgency: RiskLevel,
-  status: z.enum(['PENDING', 'ACCEPTED', 'REJECTED', 'COMPLETED']).default('PENDING'),
+  status: z.enum(["PENDING", "ACCEPTED", "REJECTED", "COMPLETED"]).default("PENDING"),
   respondedAt: z.date().nullable(),
   respondedBy: z.string().uuid().nullable(),
   createdAt: z.date(),
@@ -127,11 +113,11 @@ export const ReferralSchema = z.object({
 
 export const SyncQueueSchema = z.object({
   id: z.string().uuid(),
-  entityType: z.enum(['PATIENT', 'VISIT', 'REFERRAL']),
+  entityType: z.enum(["PATIENT", "VISIT", "REFERRAL"]),
   entityId: z.string().uuid(),
-  operation: z.enum(['CREATE', 'UPDATE', 'DELETE']),
+  operation: z.enum(["CREATE", "UPDATE", "DELETE"]),
   payload: z.record(z.unknown()),
-  status: z.enum(['PENDING', 'SYNCING', 'COMPLETED', 'FAILED', 'CONFLICT']).default('PENDING'),
+  status: z.enum(["PENDING", "SYNCING", "COMPLETED", "FAILED", "CONFLICT"]).default("PENDING"),
   retryCount: z.number().int().default(0),
   lastError: z.string().nullable(),
   createdAt: z.date(),
@@ -141,7 +127,7 @@ export const SyncQueueSchema = z.object({
 export const SupervisionAlertSchema = z.object({
   id: z.string().uuid(),
   facilityId: z.string().uuid(),
-  type: z.enum(['ANM_OFFLINE', 'VISIT_OVERDUE', 'SYNC_FAILED', 'HIGH_RISK_UNATTENDED']),
+  type: z.enum(["ANM_OFFLINE", "VISIT_OVERDUE", "SYNC_FAILED", "HIGH_RISK_UNATTENDED"]),
   severity: RiskLevel,
   message: z.string(),
   relatedEntityId: z.string().uuid().nullable(),

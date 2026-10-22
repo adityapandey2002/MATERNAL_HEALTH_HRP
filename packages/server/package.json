@@ -13,26 +13,27 @@
     "db:seed": "tsx src/db/seed.ts"
   },
   "dependencies": {
-    "fastify": "4.28.1",
-    "fastify-cors": "6.1.0",
-    "fastify-jwt": "8.0.1",
-    "fastify-zod": "1.4.0",
-    "zod": "3.23.8",
-    "pg": "8.12.0",
-    "kysely": "0.27.3",
-    "bcryptjs": "2.4.3",
+    "@fastify/cookie": "^9.4.0",
+    "@fastify/cors": "^9.0.1",
+    "@fastify/jwt": "^8.0.1",
     "@hrp/shared": "*",
-    "date-fns": "3.6.0"
+    "bcryptjs": "^2.4.3",
+    "date-fns": "^3.6.0",
+    "fastify": "^4.28.1",
+    "kysely": "^0.27.3",
+    "pg": "^8.12.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "@types/node": "22.1.0",
-    "@types/pg": "8.11.6",
-    "@types/bcryptjs": "2.4.6",
-    "typescript": "5.5.4",
-    "tsx": "4.16.5",
-    "vitest": "2.0.5",
-    "@vitest/coverage-v8": "2.0.5",
-    "biome": "1.8.3",
-    "testcontainers": "10.12.0"
+    "@biomejs/biome": "^1.9.0",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/fastify-cors": "^0.1.0",
+    "@types/node": "^22.7.0",
+    "@types/pg": "^8.11.6",
+    "@vitest/coverage-v8": "^2.1.0",
+    "testcontainers": "^10.12.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
   }
 }

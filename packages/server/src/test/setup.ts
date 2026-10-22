@@ -1,6 +1,6 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
-vi.mock('../db/client', () => ({
+vi.mock("../db/client", () => ({
   db: {
     selectFrom: vi.fn(() => ({
       selectAll: vi.fn(() => ({
@@ -10,11 +10,11 @@ vi.mock('../db/client', () => ({
         offset: vi.fn().mockReturnThis(),
         execute: vi.fn().mockResolvedValue([]),
         executeTakeFirst: vi.fn().mockResolvedValue(null),
-        executeTakeFirstOrThrow: vi.fn().mockRejectedValue(new Error('Not found')),
+        executeTakeFirstOrThrow: vi.fn().mockRejectedValue(new Error("Not found")),
       })),
       select: vi.fn(() => ({
         where: vi.fn().mockReturnThis(),
-        executeTakeFirstOrThrow: vi.fn().mockResolvedValue({ count: '0' }),
+        executeTakeFirstOrThrow: vi.fn().mockResolvedValue({ count: "0" }),
       })),
     })),
     insertInto: vi.fn(() => ({
@@ -25,7 +25,7 @@ vi.mock('../db/client', () => ({
           })),
         })),
         returningAll: vi.fn(() => ({
-          executeTakeFirstOrThrow: vi.fn().mockResolvedValue({ id: 'test-id' }),
+          executeTakeFirstOrThrow: vi.fn().mockResolvedValue({ id: "test-id" }),
         })),
       })),
     })),
@@ -33,7 +33,7 @@ vi.mock('../db/client', () => ({
       set: vi.fn(() => ({
         where: vi.fn(() => ({
           returningAll: vi.fn(() => ({
-            executeTakeFirst: vi.fn().mockResolvedValue({ id: 'test-id' }),
+            executeTakeFirst: vi.fn().mockResolvedValue({ id: "test-id" }),
           })),
         })),
       })),

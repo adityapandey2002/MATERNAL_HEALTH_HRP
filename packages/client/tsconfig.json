@@ -1,19 +1,25 @@
 {
-  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
-    "jsx": "react-jsx",
+    "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "types": ["react", "react-dom", "vite/client"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@hrp/shared/*": ["../shared/src/*"],
+      "@hrp/shared": ["../../packages/shared/dist/index.d.ts"],
+      "@hrp/shared/*": ["../../packages/shared/dist/*"],
       "@hrp/client/*": ["src/*"]
     }
   },
-  "include": ["src/**/*", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"],
+  "include": ["src/**/*", "vite-env.d.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts", "**/*.spec.ts"]
 }

@@ -14,8 +14,11 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@hrp/shared/*": ["packages/shared/src/*"],
+      "@hrp/shared": ["packages/shared/dist/index.d.ts"],
+      "@hrp/shared/*": ["packages/shared/dist/*"],
+      "@hrp/client": ["packages/client/src/index.ts"],
       "@hrp/client/*": ["packages/client/src/*"],
+      "@hrp/server": ["packages/server/src/index.ts"],
       "@hrp/server/*": ["packages/server/src/*"]
     }
   },

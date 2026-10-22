@@ -18,8 +18,8 @@ services:
 
   server:
     build:
-      context: ./packages/server
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: packages/server/Dockerfile.dev
     environment:
       DATABASE_URL: postgresql://hrp:hrp_dev@db:5432/hrp
       JWT_SECRET: dev-secret-change-in-production
@@ -36,10 +36,13 @@ services:
 
   client:
     build:
-      context: ./packages/client
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: packages/client/Dockerfile.dev
     environment:
-      VITE_API_URL: http://localhost:3000
+      # The client uses the relative "/api" base and Vite proxies it to the
+      # server, so requests stay same-origin. That keeps the httpOnly refresh
+      # cookie working without cross-origin cookie rules.
+      VITE_API_URL: ""
     ports:
       - "5173:5173"
     depends_on:

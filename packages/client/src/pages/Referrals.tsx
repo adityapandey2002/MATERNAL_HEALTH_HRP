@@ -1,25 +1,25 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
-import { Referral, RiskLevel, Pagination } from '@hrp/shared';
-import { format } from 'date-fns';
+import type { Pagination, Referral, ReferralFilter, RiskLevel } from "@hrp/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { useState } from "react";
+import { api } from "../lib/api";
 
 function RiskBadge({ level }: { level: RiskLevel }) {
   const config = {
-    RED: { class: 'badge-red', label: 'Urgent' },
-    AMBER: { class: 'badge-amber', label: 'Within 48h' },
-    GREEN: { class: 'badge-green', label: 'Routine' },
+    RED: { class: "badge-red", label: "Urgent" },
+    AMBER: { class: "badge-amber", label: "Within 48h" },
+    GREEN: { class: "badge-green", label: "Routine" },
   };
   const c = config[level];
   return <span className={`badge ${c.class}`}>{c.label}</span>;
 }
 
-function StatusBadge({ status }: { status: Referral['status'] }) {
+function StatusBadge({ status }: { status: Referral["status"] }) {
   const config = {
-    PENDING: { class: 'badge-amber', label: 'Pending' },
-    ACCEPTED: { class: 'badge-green', label: 'Accepted' },
-    REJECTED: { class: 'badge-red', label: 'Rejected' },
-    COMPLETED: { class: 'badge-gray', label: 'Completed' },
+    PENDING: { class: "badge-amber", label: "Pending" },
+    ACCEPTED: { class: "badge-green", label: "Accepted" },
+    REJECTED: { class: "badge-red", label: "Rejected" },
+    COMPLETED: { class: "badge-gray", label: "Completed" },
   };
   const c = config[status];
   return <span className={`badge ${c.class}`}>{c.label}</span>;
@@ -28,12 +28,14 @@ function StatusBadge({ status }: { status: Referral['status'] }) {
 export default function ReferralsPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const [statusFilter, setStatusFilter] = useState<Referral['status'] | ''>('');
+  const [statusFilter, setStatusFilter] = useState<Referral["status"] | "">("");
   const limit = 20;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['referrals', 'list', { page, statusFilter }],
-    queryFn: () => api.referrals.list({ page, limit, status: statusFilter || undefined }),
+    queryKey: ["referrals", "list", { page, statusFilter }],
+    queryFn: () =>
+      api.referrals.list({ page, limit, status: statusFilter || undefined } as ReferralFilter &
+        Pagination),
     placeholderData: (prev) => prev,
   });
 
@@ -42,8 +44,9 @@ export default function ReferralsPage() {
   const totalPages = Math.ceil(total / limit);
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<Referral> }) => api.referrals.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['referrals'] }),
+    mutationFn: ({ id, data }: { id: string; data: Partial<Referral> }) =>
+      api.referrals.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["referrals"] }),
   });
 
   return (
@@ -58,7 +61,10 @@ export default function ReferralsPage() {
           <select
             className="input w-auto"
             value={statusFilter}
-            onChange={e => { setStatusFilter(e.target.value as Referral['status']); setPage(1); }}
+            onChange={(e) => {
+              setStatusFilter(e.target.value as Referral["status"]);
+              setPage(1);
+            }}
           >
             <option value="">All Statuses</option>
             <option value="PENDING">Pending</option>
@@ -91,43 +97,64 @@ export default function ReferralsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {referrals.length > 0 ? referrals.map(r => (
-                    <tr key={r.id}>
-                      <td className="font-medium">{r.patientId}</td>
-                      <td>{r.fromFacilityId} → {r.toFacilityId}</td>
-                      <td className="max-w-xs truncate">{r.reason}</td>
-                      <td className="text-center"><RiskBadge level={r.urgency} /></td>
-                      <td className="text-center"><StatusBadge status={r.status} /></td>
-                      <td>{format(new Date(r.createdAt), 'MMM d, HH:mm')}</td>
-                      <td className="text-right">
-                        {r.status === 'PENDING' && (
-                          <div className="flex items-center justify-end gap-2">
+                  {referrals.length > 0 ? (
+                    referrals.map((r) => (
+                      <tr key={r.id}>
+                        <td className="font-medium">{r.patientId}</td>
+                        <td>
+                          {r.fromFacilityId} → {r.toFacilityId}
+                        </td>
+                        <td className="max-w-xs truncate">{r.reason}</td>
+                        <td className="text-center">
+                          <RiskBadge level={r.urgency} />
+                        </td>
+                        <td className="text-center">
+                          <StatusBadge status={r.status} />
+                        </td>
+                        <td>{format(new Date(r.createdAt), "MMM d, HH:mm")}</td>
+                        <td className="text-right">
+                          {r.status === "PENDING" && (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                type="button"
+                                className="btn btn-success btn-sm"
+                                onClick={() =>
+                                  updateMutation.mutate({ id: r.id, data: { status: "ACCEPTED" } })
+                                }
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                className="btn btn-danger btn-sm"
+                                onClick={() =>
+                                  updateMutation.mutate({ id: r.id, data: { status: "REJECTED" } })
+                                }
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          )}
+                          {r.status === "ACCEPTED" && (
                             <button
-                              className="btn btn-success btn-sm"
-                              onClick={() => updateMutation.mutate({ id: r.id, data: { status: 'ACCEPTED' } })}
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() =>
+                                updateMutation.mutate({ id: r.id, data: { status: "COMPLETED" } })
+                              }
                             >
-                              Accept
+                              Complete
                             </button>
-                            <button
-                              className="btn btn-danger btn-sm"
-                              onClick={() => updateMutation.mutate({ id: r.id, data: { status: 'REJECTED' } })}
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                        {r.status === 'ACCEPTED' && (
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => updateMutation.mutate({ id: r.id, data: { status: 'COMPLETED' } })}
-                          >
-                            Complete
-                          </button>
-                        )}
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="text-center py-12 text-gray-500">
+                        No referrals
                       </td>
                     </tr>
-                  )) : (
-                    <tr><td colSpan={7} className="text-center py-12 text-gray-500">No referrals</td></tr>
                   )}
                 </tbody>
               </table>
@@ -139,8 +166,22 @@ export default function ReferralsPage() {
                   Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}
                 </p>
                 <div className="flex gap-2">
-                  <button className="btn btn-outline btn-sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
-                  <button className="btn btn-outline btn-sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
             )}

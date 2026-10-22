@@ -1,9 +1,26 @@
-import '@testing-library/jest-dom';
-import { vi } from 'vitest';
+import "@testing-library/jest-dom";
+import { vi } from "vitest";
 
-Object.defineProperty(window, 'matchMedia', {
+const localStorageMock = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+};
+
+Object.defineProperty(window, "localStorage", {
+  value: localStorageMock,
   writable: true,
-  value: vi.fn().mockImplementation(query => ({
+});
+
+Object.defineProperty(globalThis, "localStorage", {
+  value: localStorageMock,
+  writable: true,
+});
+
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: vi.fn().mockImplementation((query) => ({
     matches: false,
     media: query,
     onchange: null,
@@ -15,17 +32,12 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 });
 
-Object.defineProperty(navigator, 'onLine', {
+Object.defineProperty(navigator, "onLine", {
   writable: true,
   value: true,
 });
 
 window.Notification = {
-  permission: 'granted',
-  requestPermission: vi.fn().mockResolvedValue('granted'),
-} as any;
-
-localStorage.setItem = vi.fn();
-localStorage.getItem = vi.fn();
-localStorage.removeItem = vi.fn();
-localStorage.clear = vi.fn();
+  permission: "granted",
+  requestPermission: vi.fn().mockResolvedValue("granted"),
+} as unknown as typeof Notification;

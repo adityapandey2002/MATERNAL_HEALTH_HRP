@@ -1,25 +1,25 @@
-import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '../lib/api';
-import { SupervisionAlert, RiskLevel, Pagination } from '@hrp/shared';
-import { format } from 'date-fns';
+import { Pagination, type RiskLevel, type SupervisionAlert } from "@hrp/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { useState } from "react";
+import { api } from "../lib/api";
 
 function RiskBadge({ level }: { level: RiskLevel }) {
   const config = {
-    RED: { class: 'badge-red', label: 'Critical' },
-    AMBER: { class: 'badge-amber', label: 'Warning' },
-    GREEN: { class: 'badge-green', label: 'Info' },
+    RED: { class: "badge-red", label: "Critical" },
+    AMBER: { class: "badge-amber", label: "Warning" },
+    GREEN: { class: "badge-green", label: "Info" },
   };
   const c = config[level];
   return <span className={`badge ${c.class}`}>{c.label}</span>;
 }
 
-function TypeBadge({ type }: { type: SupervisionAlert['type'] }) {
-  const labels: Record<SupervisionAlert['type'], string> = {
-    ANM_OFFLINE: 'ANM Offline',
-    VISIT_OVERDUE: 'Visit Overdue',
-    SYNC_FAILED: 'Sync Failed',
-    HIGH_RISK_UNATTENDED: 'High-Risk Unattended',
+function TypeBadge({ type }: { type: SupervisionAlert["type"] }) {
+  const labels: Record<SupervisionAlert["type"], string> = {
+    ANM_OFFLINE: "ANM Offline",
+    VISIT_OVERDUE: "Visit Overdue",
+    SYNC_FAILED: "Sync Failed",
+    HIGH_RISK_UNATTENDED: "High-Risk Unattended",
   };
   return <span className="badge badge-gray">{labels[type]}</span>;
 }
@@ -27,19 +27,25 @@ function TypeBadge({ type }: { type: SupervisionAlert['type'] }) {
 export default function SupervisionPage() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
-  const [typeFilter, setTypeFilter] = useState<SupervisionAlert['type'] | ''>('');
-  const [severityFilter, setSeverityFilter] = useState<RiskLevel | ''>('');
+  const [typeFilter, setTypeFilter] = useState<SupervisionAlert["type"] | "">("");
+  const [severityFilter, setSeverityFilter] = useState<RiskLevel | "">("");
   const [showAcknowledged, setShowAcknowledged] = useState(false);
   const limit = 20;
 
   const { data, isLoading } = useQuery({
-    queryKey: ['supervision', 'alerts', { page, typeFilter, severityFilter, acknowledged: showAcknowledged }],
-    queryFn: () => api.supervision.alerts({
-      page, limit,
-      type: typeFilter || undefined,
-      severity: severityFilter || undefined,
-      acknowledged: showAcknowledged,
-    }),
+    queryKey: [
+      "supervision",
+      "alerts",
+      { page, typeFilter, severityFilter, acknowledged: showAcknowledged },
+    ],
+    queryFn: () =>
+      api.supervision.alerts({
+        page,
+        limit,
+        type: typeFilter || undefined,
+        severity: severityFilter || undefined,
+        acknowledged: showAcknowledged,
+      }),
     placeholderData: (prev) => prev,
   });
 
@@ -49,10 +55,10 @@ export default function SupervisionPage() {
 
   const ackMutation = useMutation({
     mutationFn: api.supervision.acknowledge,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['supervision'] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["supervision"] }),
   });
 
-  const unacknowledgedCount = alerts.filter(a => !a.acknowledged).length;
+  const unacknowledgedCount = alerts.filter((a) => !a.acknowledged).length;
 
   return (
     <div className="space-y-6">
@@ -63,7 +69,15 @@ export default function SupervisionPage() {
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-2 text-sm text-gray-600">
-            <input type="checkbox" checked={showAcknowledged} onChange={e => { setShowAcknowledged(e.target.checked); setPage(1); }} className="w-4 h-4 text-green-600 rounded border-gray-300" />
+            <input
+              type="checkbox"
+              checked={showAcknowledged}
+              onChange={(e) => {
+                setShowAcknowledged(e.target.checked);
+                setPage(1);
+              }}
+              className="w-4 h-4 text-green-600 rounded border-gray-300"
+            />
             Show acknowledged
           </label>
           {unacknowledgedCount > 0 && (
@@ -75,14 +89,28 @@ export default function SupervisionPage() {
       <div className="card">
         <div className="card-body p-4">
           <div className="flex flex-col sm:flex-row gap-4">
-            <select className="input w-auto" value={typeFilter} onChange={e => { setTypeFilter(e.target.value as SupervisionAlert['type']); setPage(1); }}>
+            <select
+              className="input w-auto"
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value as SupervisionAlert["type"]);
+                setPage(1);
+              }}
+            >
               <option value="">All Types</option>
               <option value="ANM_OFFLINE">ANM Offline</option>
               <option value="VISIT_OVERDUE">Visit Overdue</option>
               <option value="SYNC_FAILED">Sync Failed</option>
               <option value="HIGH_RISK_UNATTENDED">High-Risk Unattended</option>
             </select>
-            <select className="input w-auto" value={severityFilter} onChange={e => { setSeverityFilter(e.target.value as RiskLevel); setPage(1); }}>
+            <select
+              className="input w-auto"
+              value={severityFilter}
+              onChange={(e) => {
+                setSeverityFilter(e.target.value as RiskLevel);
+                setPage(1);
+              }}
+            >
               <option value="">All Severities</option>
               <option value="RED">Critical</option>
               <option value="AMBER">Warning</option>
@@ -114,34 +142,45 @@ export default function SupervisionPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {alerts.length > 0 ? alerts.map(a => (
-                    <tr key={a.id} className={a.acknowledged ? 'opacity-60' : ''}>
-                      <td className="text-center"><TypeBadge type={a.type} /></td>
-                      <td className="max-w-md truncate">{a.message}</td>
-                      <td>{a.facilityId}</td>
-                      <td className="text-center"><RiskBadge level={a.severity} /></td>
-                      <td>{format(new Date(a.createdAt), 'MMM d, HH:mm')}</td>
-                      <td className="text-center">
-                        {a.acknowledged ? (
-                          <span className="badge badge-green">Acknowledged</span>
-                        ) : (
-                          <span className="badge badge-amber">Pending</span>
-                        )}
-                      </td>
-                      <td className="text-right">
-                        {!a.acknowledged && (
-                          <button
-                            className="btn btn-primary btn-sm"
-                            onClick={() => ackMutation.mutate(a.id)}
-                            disabled={ackMutation.isPending}
-                          >
-                            Acknowledge
-                          </button>
-                        )}
+                  {alerts.length > 0 ? (
+                    alerts.map((a) => (
+                      <tr key={a.id} className={a.acknowledged ? "opacity-60" : ""}>
+                        <td className="text-center">
+                          <TypeBadge type={a.type} />
+                        </td>
+                        <td className="max-w-md truncate">{a.message}</td>
+                        <td>{a.facilityId}</td>
+                        <td className="text-center">
+                          <RiskBadge level={a.severity} />
+                        </td>
+                        <td>{format(new Date(a.createdAt), "MMM d, HH:mm")}</td>
+                        <td className="text-center">
+                          {a.acknowledged ? (
+                            <span className="badge badge-green">Acknowledged</span>
+                          ) : (
+                            <span className="badge badge-amber">Pending</span>
+                          )}
+                        </td>
+                        <td className="text-right">
+                          {!a.acknowledged && (
+                            <button
+                              type="button"
+                              className="btn btn-primary btn-sm"
+                              onClick={() => ackMutation.mutate(a.id)}
+                              disabled={ackMutation.isPending}
+                            >
+                              Acknowledge
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={7} className="text-center py-12 text-gray-500">
+                        No alerts
                       </td>
                     </tr>
-                  )) : (
-                    <tr><td colSpan={7} className="text-center py-12 text-gray-500">No alerts</td></tr>
                   )}
                 </tbody>
               </table>
@@ -149,10 +188,26 @@ export default function SupervisionPage() {
 
             {totalPages > 1 && (
               <div className="flex items-center justify-between border-t border-gray-200 pt-4">
-                <p className="text-sm text-gray-500">Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}</p>
+                <p className="text-sm text-gray-500">
+                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}
+                </p>
                 <div className="flex gap-2">
-                  <button className="btn btn-outline btn-sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>Previous</button>
-                  <button className="btn btn-outline btn-sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>Next</button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    Previous
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-sm"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                  >
+                    Next
+                  </button>
                 </div>
               </div>
             )}

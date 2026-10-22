@@ -1,10 +1,10 @@
-import { Kysely, PostgresDialect } from 'kysely';
-import { Pool } from 'pg';
-import { DB } from './types.js';
+import { Kysely, PostgresDialect } from "kysely";
+import { Pool } from "pg";
+import type { DB } from "./types.js";
 
 const dialect = new PostgresDialect({
   pool: new Pool({
-    connectionString: process.env.DATABASE_URL ?? 'postgresql://hrp:hrp_dev@localhost:5432/hrp',
+    connectionString: process.env.DATABASE_URL ?? "postgresql://hrp:hrp_dev@localhost:5432/hrp",
     max: 10,
   }),
 });

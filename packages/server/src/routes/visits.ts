@@ -1,95 +1,104 @@
-import { FastifyPluginAsync } from 'fastify';
-import { db } from '../db/client.js';
-import { CreateVisitSchema, VisitFilterSchema, PaginationSchema } from '@hrp/shared';
+import { CreateVisitSchema, UpdateVisitSchema } from "@hrp/shared/schemas";
+import type { CreateVisit, UpdateVisit } from "@hrp/shared/schemas";
+import type { FastifyPluginAsync } from "fastify";
+import { sql } from "kysely";
+import { db } from "../db/client.js";
+import { mapVisitChanges, mapVisitToRow } from "../lib/mappers.js";
+import { parsePagination } from "../lib/pagination.js";
+import { serializeVisit } from "../lib/serializers.js";
+import { validateBody } from "../lib/validate.js";
+import { recalculatePatientRisk } from "../services/risk.js";
+
+const SORTABLE_COLUMNS = ["visit_date", "created_at", "gestational_weeks"] as const;
 
 export const visitRoutes: FastifyPluginAsync = async (app) => {
-  app.addHook('preHandler', app.authenticate);
+  app.addHook("preHandler", app.authenticate);
 
-  app.get('/', {
-    schema: { querystring: VisitFilterSchema.merge(PaginationSchema) },
-  }, async (request) => {
-    const { page = 1, limit = 20, sortBy = 'visit_date', sortOrder = 'desc', ...filters } = request.query;
+  app.get("/", async (request) => {
+    const query = request.query as Record<string, unknown>;
+    const { page, limit, offset, sort } = parsePagination(query, SORTABLE_COLUMNS, "visit_date");
 
-    let query = db.selectFrom('visits').selectAll();
+    let base = db.selectFrom("visits");
 
-    if (filters.patientId) query = query.where('patient_id', '=', filters.patientId);
-    if (filters.facilityId) query = query.where('facility_id', '=', filters.facilityId);
-    if (filters.conductedBy) query = query.where('conducted_by', '=', filters.conductedBy);
-    if (filters.dateFrom) query = query.where('visit_date', '>=', filters.dateFrom);
-    if (filters.dateTo) query = query.where('visit_date', '<=', filters.dateTo);
+    if (typeof query.patientId === "string") base = base.where("patient_id", "=", query.patientId);
+    if (typeof query.facilityId === "string")
+      base = base.where("facility_id", "=", query.facilityId);
+    if (typeof query.conductedBy === "string")
+      base = base.where("conducted_by", "=", query.conductedBy);
+    if (typeof query.dateFrom === "string")
+      base = base.where("visit_date", ">=", new Date(query.dateFrom));
+    if (typeof query.dateTo === "string")
+      base = base.where("visit_date", "<=", new Date(query.dateTo));
 
-    const total = await query.select(db.fn.count('id').as('count')).executeTakeFirstOrThrow();
-    const data = await query
-      .orderBy(sortBy, sortOrder as 'asc' | 'desc')
-      .limit(limit)
-      .offset((page - 1) * limit)
-      .execute();
+    const totalRow = await base
+      .clearSelect()
+      .select((eb) => eb.fn.count("id").as("count"))
+      .executeTakeFirstOrThrow();
 
-    return { data, total: Number(total.count), page, limit };
-  });
-
-  app.get('/by-patient/:patientId', async (request) => {
-    const { patientId } = request.params as { patientId: string };
-    return db.selectFrom('visits')
+    const data = await base
       .selectAll()
-      .where('patient_id', '=', patientId)
-      .orderBy('visit_number', 'asc')
+      .orderBy(sql`${sql.ref(sort.column)} ${sql.raw(sort.order === "asc" ? "asc" : "desc")}`)
+      .limit(limit)
+      .offset(offset)
       .execute();
+
+    return { data: data.map(serializeVisit), total: Number(totalRow.count), page, limit };
   });
 
-  app.post('/', {
-    schema: { body: CreateVisitSchema },
-  }, async (request, reply) => {
-    const data = request.body;
+  app.get("/by-patient/:patientId", async (request) => {
+    const { patientId } = request.params as { patientId: string };
+    const visits = await db
+      .selectFrom("visits")
+      .selectAll()
+      .where("patient_id", "=", patientId)
+      .orderBy("visit_number", "asc")
+      .execute();
+    return visits.map(serializeVisit);
+  });
+
+  app.post("/", { preValidation: validateBody(CreateVisitSchema) }, async (request, reply) => {
+    const data = request.body as CreateVisit;
     const user = request.user;
 
-    const result = await db.insertInto('visits')
-      .values({
-        ...data,
-        facility_id: user.facilityId,
-        conducted_by: user.sub,
-        visit_date: new Date(data.visitDate),
-      })
+    const row = mapVisitToRow(data, {
+      facilityId: user.facilityId,
+      conductedBy: user.sub,
+    });
+
+    const result = await db
+      .insertInto("visits")
+      .values(row)
       .returningAll()
       .executeTakeFirstOrThrow();
 
-    const patient = await db.selectFrom('patients')
-      .selectAll()
-      .where('id', '=', data.patientId)
-      .executeTakeFirst();
+    // Danger signs recorded at this visit change the patient's clinical risk.
+    await recalculatePatientRisk(data.patientId);
 
-    if (patient) {
-      const visits = await db.selectFrom('visits')
-        .selectAll()
-        .where('patient_id', '=', data.patientId)
-        .execute();
-      const latestVisit = visits.sort((a, b) => b.visit_number - a.visit_number)[0];
-      if (latestVisit) {
-        const allSigns = new Set([...patient.risk_factors, ...latestVisit.danger_signs]);
-        const { score, level } = await import('@hrp/shared/rules').then(m =>
-          m.calculateRiskScore({ ...patient, risk_factors: Array.from(allSigns) } as any, latestVisit as any)
-        );
-        await db.updateTable('patients')
-          .set({ risk_score: score, risk_level: level, is_high_risk: level !== 'GREEN', updated_at: new Date() })
-          .where('id', '=', data.patientId)
-          .execute();
-      }
-    }
-
-    return reply.code(201).send(result);
+    return reply.code(201).send(serializeVisit(result));
   });
 
-  app.patch('/:id', async (request, reply) => {
+  app.patch("/:id", { preValidation: validateBody(UpdateVisitSchema) }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const data = request.body;
+    const data = request.body as UpdateVisit;
 
-    const result = await db.updateTable('visits')
-      .set({ ...data, updated_at: new Date() })
-      .where('id', '=', id)
-      .returningAll()
+    const existing = await db
+      .selectFrom("visits")
+      .selectAll()
+      .where("id", "=", id)
       .executeTakeFirst();
+    if (!existing) return reply.code(404).send({ message: "Visit not found" });
 
-    if (!result) return reply.code(404).send({ message: 'Visit not found' });
-    return result;
+    const row = mapVisitChanges(data);
+
+    const result = await db
+      .updateTable("visits")
+      .set({ ...row, updated_at: new Date() })
+      .where("id", "=", id)
+      .returningAll()
+      .executeTakeFirstOrThrow();
+
+    await recalculatePatientRisk(result.patient_id);
+
+    return serializeVisit(result);
   });
 };

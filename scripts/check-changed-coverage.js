@@ -2,13 +2,14 @@
 // check-changed-coverage.js
 // Intersects lcov coverage with git diff to enforce coverage on changed lines only
 
-import { execSync } from 'child_process';
-import { readFileSync, writeFileSync } from 'fs';
-import { resolve } from 'path';
+import { execSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 function getChangedLines(): Map<string, Set<number>> {
-  const diff = execSync('git diff --unified=0 HEAD', { encoding: 'utf8' });
-  const files = new Map<string, Set<number>>();
+  const _diff = execSync('git diff --unified=0 HEAD', { encoding: 'utf8' });
+  const _files = new Map<string
+  const _Set<number>>();
 
   let currentFile = '';
   const lines = diff.split('\n');

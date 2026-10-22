@@ -1,9 +1,14 @@
-import { useQuery } from '@tanstack/react-query';
-import { api } from '../lib/api';
-import { Patient, RiskLevel } from '@hrp/shared';
-import { format } from 'date-fns';
+import { Patient, type RiskLevel, type SupervisionAlert } from "@hrp/shared";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { api } from "../lib/api";
 
-function StatCard({ label, value, icon, color }: { label: string; value: string | number; icon: React.ReactNode; color: string }) {
+function StatCard({
+  label,
+  value,
+  icon,
+  color,
+}: { label: string; value: string | number; icon: React.ReactNode; color: string }) {
   return (
     <div className="card p-6">
       <div className="flex items-start justify-between">
@@ -17,54 +22,124 @@ function StatCard({ label, value, icon, color }: { label: string; value: string 
   );
 }
 
+const riskColors: Record<RiskLevel, string> = {
+  RED: "text-red-600",
+  AMBER: "text-amber-600",
+  GREEN: "text-green-600",
+};
+
+const riskBgColors: Record<RiskLevel, string> = {
+  RED: "bg-red-100",
+  AMBER: "bg-amber-100",
+  GREEN: "bg-green-100",
+};
+
 function RiskIcon({ level, className }: { level: RiskLevel; className?: string }) {
-  const colors = { RED: 'text-red-600', AMBER: 'text-amber-600', GREEN: 'text-green-600' };
-  const bgColors = { RED: 'bg-red-100', AMBER: 'bg-amber-100', GREEN: 'bg-green-100' };
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${bgColors[level]} ${colors[level]} ${className ?? ''}`}>
-      {level === 'RED' && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
-      {level === 'AMBER' && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
-      {level === 'GREEN' && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+    <span
+      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${riskBgColors[level]} ${riskColors[level]} ${className ?? ""}`}
+    >
+      {level === "RED" && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+      {level === "AMBER" && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+      {level === "GREEN" && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
       {level}
     </span>
   );
 }
 
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
+      />
+    </svg>
+  );
+}
+
+function AlertTriangleIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+      />
+    </svg>
+  );
+}
+
+function CalendarIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+      />
+    </svg>
+  );
+}
+
 export default function Dashboard() {
   const { data: patientsData, isLoading: patientsLoading } = useQuery({
-    queryKey: ['patients', 'dashboard'],
-    queryFn: () => api.patients.list({ limit: 100 }),
+    queryKey: ["patients", "dashboard"],
+    queryFn: () => api.patients.list({ page: 1, limit: 100 }),
   });
 
   const { data: visitsData, isLoading: visitsLoading } = useQuery({
-    queryKey: ['visits', 'dashboard'],
-    queryFn: () => api.visits.list({ limit: 50 }),
+    queryKey: ["visits", "dashboard"],
+    queryFn: () => api.visits.list({ page: 1, limit: 50 }),
   });
 
   const { data: alertsData, isLoading: alertsLoading } = useQuery({
-    queryKey: ['supervision', 'alerts'],
-    queryFn: () => api.supervision.alerts({ limit: 10, acknowledged: false }),
+    queryKey: ["supervision", "alerts"],
+    queryFn: () => api.supervision.alerts({ page: 1, limit: 10, acknowledged: false }),
   });
 
   const patients = patientsData?.data ?? [];
   const visits = visitsData?.data ?? [];
-  const alerts = alertsData?.data ?? [];
+  const alerts = (alertsData?.data as SupervisionAlert[]) ?? [];
 
-  const highRiskCount = patients.filter(p => p.riskLevel === 'RED').length;
-  const mediumRiskCount = patients.filter(p => p.riskLevel === 'AMBER').length;
-  const lowRiskCount = patients.filter(p => p.riskLevel === 'GREEN').length;
+  const highRiskCount = patients.filter((p) => p.riskLevel === "RED").length;
+  const mediumRiskCount = patients.filter((p) => p.riskLevel === "AMBER").length;
+  const _lowRiskCount = patients.filter((p) => p.riskLevel === "GREEN").length;
 
-  const dueVisits = visits.filter(v => {
-    const today = new Date();
-    // Simplified - in real app, compute from visit schedule
-    return new Date(v.visitDate) <= today;
-  }).slice(0, 5);
+  const dueVisits = visits
+    .filter((v) => {
+      const today = new Date();
+      return new Date(v.visitDate) <= today;
+    })
+    .slice(0, 5);
 
   if (patientsLoading || visitsLoading || alertsLoading) {
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => (
+          {[1, 2, 3, 4].map((i) => (
             <div key={i} className="card p-6 animate-pulse">
               <div className="h-4 bg-gray-200 rounded w-1/4 mb-2" />
               <div className="h-8 bg-gray-200 rounded w-1/2" />
@@ -76,7 +151,7 @@ export default function Dashboard() {
             <div className="h-4 bg-gray-200 rounded w-1/4" />
           </div>
           <div className="p-4 space-y-4">
-            {[1,2,3].map(i => (
+            {[1, 2, 3].map((i) => (
               <div key={i} className="h-12 bg-gray-200 rounded animate-pulse" />
             ))}
           </div>
@@ -125,7 +200,9 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">High-Risk Patients</h2>
-            <a href="/patients" className="text-sm text-green-600 hover:text-green-700">View all</a>
+            <a href="/patients" className="text-sm text-green-600 hover:text-green-700">
+              View all
+            </a>
           </div>
           <div className="card-body p-0">
             <div className="table-container">
@@ -141,23 +218,35 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {patients
-                    .filter(p => p.riskLevel !== 'GREEN')
+                    .filter((p) => p.riskLevel !== "GREEN")
                     .sort((a, b) => {
-                      const riskOrder = { RED: 0, AMBER: 1, GREEN: 2 };
+                      const riskOrder: Record<RiskLevel, number> = { RED: 0, AMBER: 1, GREEN: 2 };
                       return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
                     })
                     .slice(0, 10)
-                    .map(p => (
+                    .map((p) => (
                       <tr key={p.id}>
                         <td className="font-medium">{p.name}</td>
                         <td>{p.age}</td>
-                        <td>{p.edd ? Math.round((new Date(p.edd).getTime() - Date.now()) / (1000*60*60*24*7)) : '—'}</td>
-                        <td className="text-center"><RiskIcon level={p.riskLevel} /></td>
-                        <td>{p.updatedAt ? format(new Date(p.updatedAt), 'MMM d') : '—'}</td>
+                        <td>
+                          {p.edd
+                            ? Math.round(
+                                (new Date(p.edd).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 7)
+                              )
+                            : "—"}
+                        </td>
+                        <td className="text-center">
+                          <RiskIcon level={p.riskLevel} />
+                        </td>
+                        <td>{p.updatedAt ? format(new Date(p.updatedAt), "MMM d") : "—"}</td>
                       </tr>
                     ))}
-                  {patients.filter(p => p.riskLevel !== 'GREEN').length === 0 && (
-                    <tr><td colSpan={5} className="text-center py-8 text-gray-500">No high-risk patients</td></tr>
+                  {patients.filter((p) => p.riskLevel !== "GREEN").length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-gray-500">
+                        No high-risk patients
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -168,7 +257,9 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Upcoming Visits Due</h2>
-            <a href="/patients" className="text-sm text-green-600 hover:text-green-700">View all</a>
+            <a href="/patients" className="text-sm text-green-600 hover:text-green-700">
+              View all
+            </a>
           </div>
           <div className="card-body p-0">
             <div className="table-container">
@@ -183,18 +274,24 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {dueVisits.length > 0 ? dueVisits.map(v => (
-                    <tr key={v.id}>
-                      <td className="font-medium">{v.patientId}</td>
-                      <td>Visit {v.visitNumber}</td>
-                      <td>{v.gestationalWeeks}</td>
-                      <td>{format(new Date(v.visitDate), 'MMM d, yyyy')}</td>
-                      <td className="text-center">
-                        <span className="badge badge-amber">Due</span>
+                  {dueVisits.length > 0 ? (
+                    dueVisits.map((v) => (
+                      <tr key={v.id}>
+                        <td className="font-medium">{v.patientId}</td>
+                        <td>Visit {v.visitNumber}</td>
+                        <td>{v.gestationalWeeks}</td>
+                        <td>{format(new Date(v.visitDate), "MMM d, yyyy")}</td>
+                        <td className="text-center">
+                          <span className="badge badge-amber">Due</span>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-gray-500">
+                        No visits due
                       </td>
                     </tr>
-                  )) : (
-                    <tr><td colSpan={5} className="text-center py-8 text-gray-500">No visits due</td></tr>
                   )}
                 </tbody>
               </table>
@@ -205,7 +302,9 @@ export default function Dashboard() {
         <div className="lg:col-span-2 card">
           <div className="card-header flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Supervision Alerts</h2>
-            <a href="/supervision" className="text-sm text-green-600 hover:text-green-700">View all</a>
+            <a href="/supervision" className="text-sm text-green-600 hover:text-green-700">
+              View all
+            </a>
           </div>
           <div className="card-body p-0">
             <div className="table-container">
@@ -220,16 +319,26 @@ export default function Dashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {alerts.length > 0 ? alerts.slice(0, 10).map(a => (
-                    <tr key={a.id}>
-                      <td className="text-sm font-medium capitalize">{a.type.replace(/_/g, ' ')}</td>
-                      <td className="max-w-xs truncate">{a.message}</td>
-                      <td>{a.facilityId}</td>
-                      <td className="text-center"><RiskIcon level={a.severity} /></td>
-                      <td>{format(new Date(a.createdAt), 'MMM d, HH:mm')}</td>
+                  {alerts.length > 0 ? (
+                    alerts.slice(0, 10).map((a) => (
+                      <tr key={a.id}>
+                        <td className="text-sm font-medium capitalize">
+                          {a.type.replace(/_/g, " ")}
+                        </td>
+                        <td className="max-w-xs truncate">{a.message}</td>
+                        <td>{a.facilityId}</td>
+                        <td className="text-center">
+                          <RiskIcon level={a.severity} />
+                        </td>
+                        <td>{format(new Date(a.createdAt), "MMM d, HH:mm")}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="text-center py-8 text-gray-500">
+                        No alerts
+                      </td>
                     </tr>
-                  )) : (
-                    <tr><td colSpan={5} className="text-center py-8 text-gray-500">No alerts</td></tr>
                   )}
                 </tbody>
               </table>
@@ -239,14 +348,4 @@ export default function Dashboard() {
       </div>
     </div>
   );
-}
-
-function UsersIcon({ className }: { className?: string }) {
-  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>;
-}
-function AlertTriangleIcon({ className }: { className?: string }) {
-  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>;
-}
-function CalendarIcon({ className }: { className?: string }) {
-  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
 }

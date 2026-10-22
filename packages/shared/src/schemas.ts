@@ -1,17 +1,17 @@
-import { z } from 'zod';
+import { z } from "zod";
 import {
-  FacilitySchema,
-  UserSchema,
-  PatientSchema,
-  VisitSchema,
-  ReferralSchema,
-  SyncQueueSchema,
-  SupervisionAlertSchema,
   DangerSign,
-  RiskLevel,
   FacilityLevel,
+  FacilitySchema,
+  PatientSchema,
+  ReferralSchema,
+  RiskLevel,
+  SupervisionAlertSchema,
+  SyncQueueSchema,
   UserRole,
-} from './types.js';
+  UserSchema,
+  VisitSchema,
+} from "./types.js";
 
 export const CreatePatientSchema = PatientSchema.omit({
   id: true,
@@ -55,7 +55,7 @@ export const PaginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).optional(),
+  sortOrder: z.enum(["asc", "desc"]).optional(),
 });
 
 export const PatientFilterSchema = z.object({
@@ -84,6 +84,13 @@ export const SupervisionFilterSchema = z.object({
   dateTo: z.coerce.date().optional(),
 });
 
+export const ReferralFilterSchema = z.object({
+  status: z.enum(["PENDING", "ACCEPTED", "REJECTED", "COMPLETED"]).optional(),
+  patientId: z.string().uuid().optional(),
+  fromFacilityId: z.string().uuid().optional(),
+  toFacilityId: z.string().uuid().optional(),
+});
+
 export const SyncPayloadSchema = z.object({
   patients: z.array(CreatePatientSchema).optional(),
   visits: z.array(CreateVisitSchema).optional(),
@@ -96,12 +103,16 @@ export const SyncResponseSchema = z.object({
   visits: z.array(VisitSchema).optional(),
   referrals: z.array(ReferralSchema).optional(),
   serverTimestamp: z.date(),
-  conflicts: z.array(z.object({
-    entityType: z.string(),
-    entityId: z.string(),
-    serverVersion: z.unknown(),
-    clientVersion: z.unknown(),
-  })).optional(),
+  conflicts: z
+    .array(
+      z.object({
+        entityType: z.string(),
+        entityId: z.string(),
+        serverVersion: z.unknown(),
+        clientVersion: z.unknown(),
+      })
+    )
+    .optional(),
 });
 
 export type CreatePatient = z.infer<typeof CreatePatientSchema>;
@@ -115,13 +126,18 @@ export type Pagination = z.infer<typeof PaginationSchema>;
 export type PatientFilter = z.infer<typeof PatientFilterSchema>;
 export type VisitFilter = z.infer<typeof VisitFilterSchema>;
 export type SupervisionFilter = z.infer<typeof SupervisionFilterSchema>;
+export type ReferralFilter = z.infer<typeof ReferralFilterSchema>;
 export type SyncPayload = z.infer<typeof SyncPayloadSchema>;
 export type SyncResponse = z.infer<typeof SyncResponseSchema>;
 
 export const apiSchemas = {
-  patient: { create: CreatePatientSchema, update: UpdatePatientSchema, filter: PatientFilterSchema },
+  patient: {
+    create: CreatePatientSchema,
+    update: UpdatePatientSchema,
+    filter: PatientFilterSchema,
+  },
   visit: { create: CreateVisitSchema, update: UpdateVisitSchema, filter: VisitFilterSchema },
-  referral: { create: CreateReferralSchema },
+  referral: { create: CreateReferralSchema, filter: ReferralFilterSchema },
   auth: { login: LoginSchema, refresh: RefreshTokenSchema },
   pagination: PaginationSchema,
   supervision: { filter: SupervisionFilterSchema },
