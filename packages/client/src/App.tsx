@@ -8,7 +8,6 @@ import Login from "./pages/Login";
 import NewVisit from "./pages/NewVisit";
 import Offline from "./pages/Offline";
 import PatientDetail from "./pages/PatientDetail";
-import Patients from "./pages/Patients";
 import Referrals from "./pages/Referrals";
 import Settings from "./pages/Settings";
 import Supervision from "./pages/Supervision";
@@ -87,7 +86,6 @@ export default function App() {
           }
         >
           <Route path="/" element={<Dashboard />} />
-          <Route path="/patients" element={<Patients />} />
           <Route path="/patients/new" element={<AddPatient />} />
           <Route path="/patients/:id" element={<PatientDetail />} />
           <Route path="/patients/:id/visit" element={<NewVisit />} />
