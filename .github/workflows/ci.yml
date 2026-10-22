@@ -26,14 +26,14 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: TypeScript check
-        run: npx tsc --noEmit
-
-      - name: Biome lint
-        run: npx biome check --error-on-warnings .
+      - name: Types, lint and local secret scan
+        run: npm run check:fast
 
       - name: Gitleaks secrets scan
-        run: npx gitleaks detect --redact --no-banner --source .
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
 
   task:
     name: Task Checks (fast + coverage on changed lines)
@@ -65,8 +65,24 @@ jobs:
       - name: Install
         run: npm ci
 
+      - name: Migrate and seed the test database
+        run: |
+          npm run db:migrate
+          npm run db:seed
+        env:
+          DATABASE_URL: postgresql://hrp:test@localhost:5432/hrp
+
       - name: Run tests with coverage
         run: npm run check:task
+        env:
+          DATABASE_URL: postgresql://hrp:test@localhost:5432/hrp
+          JWT_SECRET: test-secret-for-ci-only
+
+      - name: End-to-end smoke test
+        run: |
+          npm run dev:server &
+          npx wait-on tcp:3000 --timeout 60000
+          npm run test:smoke
         env:
           DATABASE_URL: postgresql://hrp:test@localhost:5432/hrp
           JWT_SECRET: test-secret-for-ci-only
@@ -76,6 +92,19 @@ jobs:
     needs: task
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: hrp
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: hrp
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U hrp -d hrp"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,22 +117,20 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Semgrep code scan
-        run: npx semgrep scan --config p/default --config p/owasp-top-ten --json=semgrep.json --error
-        continue-on-error: true
+      - name: Install security scanners
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install semgrep
+          curl -sSfL https://raw.githubusercontent.com/google/osv-scanner/main/install.sh | sh -s -- -b /usr/local/bin v1.9.1
+          semgrep --version
+          osv-scanner --version
 
-      - name: OSV dependency scan
-        run: npx osv-scanner scan source -r . --format json --output osv.json
-        continue-on-error: true
-
-      - name: Upload security artifacts
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-reports
-          path: |
-            semgrep.json
-            osv.json
+      - name: Full gate (types, lint, secrets, coverage, semgrep, osv)
+        run: npm run check:full
+        env:
+          CI: "true"
+          DATABASE_URL: postgresql://hrp:test@localhost:5432/hrp
+          JWT_SECRET: test-secret-for-ci-only
 
   preview:
     name: Preview Deploy + Perf/A11y/Bundle
@@ -140,14 +167,11 @@ jobs:
         run: |
           PREVIEW_URL=https://pr-${{ github.event.number }}.netlify.app
           npx lighthouse $PREVIEW_URL --output=json --quiet --only-categories=performance --output-path=lighthouse.json
-        continue-on-error: true
 
       - name: Axe accessibility
         run: |
           PREVIEW_URL=https://pr-${{ github.event.number }}.netlify.app
           npx axe $PREVIEW_URL --tags wcag2a,wcag2aa,wcag21aa --exit
-        continue-on-error: true
 
       - name: Bundle size
         run: npx size-limit --json
-        continue-on-error: true

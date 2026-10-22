@@ -21,50 +21,68 @@ export const patientRoutes: FastifyPluginAsync = async (app) => {
     const query = request.query as Record<string, unknown>;
     const { page, limit, offset, sort } = parsePagination(query, SORTABLE_COLUMNS, "created_at");
 
-    let base = db.selectFrom("patients");
+    // The block-level dashboard shows which ANM registered each woman, and
+    // supervisors filter by ANM name. Joining keeps that lookup in one query.
+    let base = db
+      .selectFrom("patients")
+      .leftJoin("users as anm", "anm.id", "patients.registered_by");
     const isHighRisk = toBool(query.isHighRisk);
     const riskLevel = oneOf(query.riskLevel, RISK_LEVELS);
 
     if (typeof query.facilityId === "string")
-      base = base.where("facility_id", "=", query.facilityId);
-    if (riskLevel !== undefined) base = base.where("risk_level", "=", riskLevel);
-    if (isHighRisk !== undefined) base = base.where("is_high_risk", "=", isHighRisk);
+      base = base.where("patients.facility_id", "=", query.facilityId);
+    if (riskLevel !== undefined) base = base.where("patients.risk_level", "=", riskLevel);
+    if (isHighRisk !== undefined) base = base.where("patients.is_high_risk", "=", isHighRisk);
+    if (typeof query.registeredBy === "string" && query.registeredBy.length > 0)
+      base = base.where("patients.registered_by", "=", query.registeredBy);
+    if (typeof query.anmName === "string" && query.anmName.trim().length > 0)
+      base = base.where("anm.name", "ilike", `%${query.anmName.trim()}%`);
     if (typeof query.search === "string" && query.search.length > 0) {
       const term = `%${query.search}%`;
       base = base.where((eb) =>
-        eb.or([eb("name", "ilike", term), eb("phone", "ilike", term)])
+        eb.or([eb("patients.name", "ilike", term), eb("patients.phone", "ilike", term)])
       );
       // `id` is a uuid, so it can only be matched by an exact uuid. Casting
       // the column to text would make the term an untyped literal and fail.
       if (UUID_PATTERN.test(query.search)) {
-        base = base.where("id", "=", query.search);
+        base = base.where("patients.id", "=", query.search);
       }
     }
 
     const totalRow = await base
       .clearSelect()
-      .select((eb) => eb.fn.count("id").as("count"))
+      .select((eb) => eb.fn.count("patients.id").as("count"))
       .executeTakeFirstOrThrow();
 
     const data = await base
-      .selectAll()
-      .orderBy(sql`${sql.ref(sort.column)} ${sql.raw(sort.order === "asc" ? "asc" : "desc")}`)
+      .selectAll("patients")
+      .select("anm.name as anm_name")
+      .orderBy(
+        sql`${sql.ref("patients")}.${sql.ref(sort.column)} ${sql.raw(sort.order === "asc" ? "asc" : "desc")}`
+      )
       .limit(limit)
       .offset(offset)
       .execute();
 
-    return { data: data.map(serializePatient), total: Number(totalRow.count), page, limit };
+    return {
+      data: data.map((row) => serializePatient(row, row.anm_name)),
+      total: Number(totalRow.count),
+      page,
+      limit,
+    };
   });
 
   app.get("/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
     const patient = await db
       .selectFrom("patients")
-      .selectAll()
-      .where("id", "=", id)
+      .leftJoin("users as anm", "anm.id", "patients.registered_by")
+      .selectAll("patients")
+      .select("anm.name as anm_name")
+      .where("patients.id", "=", id)
       .executeTakeFirst();
     if (!patient) return reply.code(404).send({ message: "Patient not found" });
-    return serializePatient(patient);
+    return serializePatient(patient, patient.anm_name);
   });
 
   app.post("/", { preValidation: validateBody(CreatePatientSchema) }, async (request, reply) => {
@@ -75,6 +93,7 @@ export const patientRoutes: FastifyPluginAsync = async (app) => {
       name: data.name,
       age: data.age,
       riskFactors: data.riskFactors ?? [],
+      hrpReason: data.hrpReason ?? null,
     });
 
     const row = mapPatientToRow(data, {
@@ -114,7 +133,12 @@ export const patientRoutes: FastifyPluginAsync = async (app) => {
 
       const existingPatient = serializePatient(existing);
       const riskFactors = data.riskFactors ?? existingPatient.riskFactors;
-      const { score, level } = calculateRiskScore({ ...existingPatient, riskFactors }, null);
+      // An explicit null clears the reason; undefined keeps the stored one.
+      const hrpReason = data.hrpReason === undefined ? existingPatient.hrpReason : data.hrpReason;
+      const { score, level } = calculateRiskScore(
+        { ...existingPatient, hrpReason, riskFactors },
+        null
+      );
 
       const result = await db
         .updateTable("patients")

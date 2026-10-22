@@ -1,0 +1,17 @@
+# Dependencies and build output must never enter the build context: the
+# image installs its own dependencies, and a copied node_modules would be
+# built for the wrong platform.
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+**/coverage
+.git
+.github
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode
+.idea

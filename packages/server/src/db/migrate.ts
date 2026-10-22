@@ -59,6 +59,15 @@ export async function migrate() {
     .addColumn("updated_at", "timestamptz", (col) => col.notNull().defaultTo(sql`now()`))
     .execute();
 
+  // Registration details captured by the ANM. `if not exists` keeps the
+  // migration idempotent for databases created before these columns existed.
+  await sql`alter table patients add column if not exists hrp_reason varchar(40)`.execute(db);
+  await sql`alter table patients add column if not exists asha_name varchar(255)`.execute(db);
+  await sql`alter table patients add column if not exists asha_phone varchar(20)`.execute(db);
+  await sql`alter table patients add column if not exists referred boolean not null default false`.execute(
+    db
+  );
+
   await db.schema
     .createTable("visits")
     .ifNotExists()

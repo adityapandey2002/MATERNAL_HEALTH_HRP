@@ -16,10 +16,14 @@ services:
       timeout: 3s
       retries: 10
 
+  # The whole repository is mounted so that the npm workspace symlinks
+  # (node_modules/@hrp/shared -> packages/shared) keep resolving. The
+  # anonymous volume masks the host's node_modules with the image's.
   server:
     build:
       context: .
       dockerfile: packages/server/Dockerfile.dev
+    working_dir: /app/packages/server
     environment:
       DATABASE_URL: postgresql://hrp:hrp_dev@db:5432/hrp
       JWT_SECRET: dev-secret-change-in-production
@@ -31,25 +35,29 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./packages/server:/app
+      - .:/app
       - /app/node_modules
+    command: npm run dev
 
   client:
     build:
       context: .
       dockerfile: packages/client/Dockerfile.dev
+    working_dir: /app/packages/client
     environment:
       # The client uses the relative "/api" base and Vite proxies it to the
       # server, so requests stay same-origin. That keeps the httpOnly refresh
       # cookie working without cross-origin cookie rules.
       VITE_API_URL: ""
+      VITE_PROXY_TARGET: http://server:3000
     ports:
       - "5173:5173"
     depends_on:
       - server
     volumes:
-      - ./packages/client:/app
+      - .:/app
       - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0
 
 volumes:
   pgdata:

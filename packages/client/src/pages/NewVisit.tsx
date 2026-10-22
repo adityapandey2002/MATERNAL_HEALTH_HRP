@@ -105,8 +105,6 @@ export default function NewVisitPage() {
     e.preventDefault();
     const payload: CreateVisit = {
       patientId: id ?? "",
-      facilityId: "current-facility-id",
-      conductedBy: "current-user-id",
       visitNumber,
       gestationalWeeks,
       visitDate: new Date(visitDate),

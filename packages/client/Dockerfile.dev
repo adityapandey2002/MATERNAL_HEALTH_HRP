@@ -1,7 +1,17 @@
 FROM node:20-alpine
 WORKDIR /app
-COPY package*.json ./
-RUN npm install
+
+# The root manifest declares the npm workspaces, so the workspace manifests
+# must be present before install. Without them npm reports
+# "No workspaces found!" and tries to fetch @hrp/* from the registry.
+COPY package.json package-lock.json ./
+COPY packages/shared/package.json packages/shared/package.json
+COPY packages/server/package.json packages/server/package.json
+COPY packages/client/package.json packages/client/package.json
+
+RUN npm ci
+
 COPY . .
+
 EXPOSE 5173
 CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]

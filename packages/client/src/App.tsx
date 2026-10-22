@@ -1,8 +1,8 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import { api } from "./lib/api";
+import AddPatient from "./pages/AddPatient";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import NewVisit from "./pages/NewVisit";
@@ -16,7 +16,6 @@ import { isOnline, onOnlineChange } from "./utils/sw";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const _queryClient = useQueryClient();
 
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
@@ -69,8 +68,6 @@ function OnlineGuard({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const _location = useLocation();
-
   return (
     <OnlineGuard>
       <Routes>
@@ -91,7 +88,7 @@ export default function App() {
         >
           <Route path="/" element={<Dashboard />} />
           <Route path="/patients" element={<Patients />} />
-          <Route path="/patients/new" element={<PatientDetail />} />
+          <Route path="/patients/new" element={<AddPatient />} />
           <Route path="/patients/:id" element={<PatientDetail />} />
           <Route path="/patients/:id/visit" element={<NewVisit />} />
           <Route path="/referrals" element={<Referrals />} />

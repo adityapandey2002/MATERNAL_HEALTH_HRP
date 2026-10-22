@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "check:fast": "tsc --noEmit && biome check --error-on-warnings .",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "check:bundle": "size-limit"
   },

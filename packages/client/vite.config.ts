@@ -52,7 +52,12 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": { target: "http://localhost:3000", changeOrigin: true },
+      // In Docker the API is a separate service, so the target has to be
+      // configurable. Locally it falls back to the host's port 3000.
+      "/api": {
+        target: process.env.VITE_PROXY_TARGET ?? "http://localhost:3000",
+        changeOrigin: true,
+      },
     },
   },
   build: {

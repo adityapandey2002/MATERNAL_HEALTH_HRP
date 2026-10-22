@@ -1,10 +1,33 @@
 import { z } from "zod";
+import { HrpReason } from "./hrp-reasons.js";
 
 export const FacilityLevel = z.enum(["VILLAGE", "HWC", "PHC", "CHC", "DISTRICT", "STATE"]);
-
 export const UserRole = z.enum(["ANM", "ASHA", "CHO", "MO", "DISTRICT_ADMIN", "STATE_ADMIN"]);
 
 export const RiskLevel = z.enum(["GREEN", "AMBER", "RED"]);
+
+/**
+ * Date field that accepts a Date (in-process) or an ISO date string (JSON
+ * over the wire). JSON has no date type, so a request body always carries
+ * dates as strings; validating with `z.date()` alone would reject every
+ * legitimate request.
+ */
+export const DateInput = z.union([z.date(), z.string().min(1)]).transform((value, ctx) => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid date" });
+    return z.NEVER;
+  }
+  return date;
+});
+
+/**
+ * Boolean field that accepts a real boolean or the string form used in query
+ * parameters. `z.coerce.boolean()` would turn the string "false" into true.
+ */
+export const BooleanInput = z
+  .union([z.boolean(), z.enum(["true", "false", "1", "0"])])
+  .transform((value) => (typeof value === "boolean" ? value : value === "true" || value === "1"));
 
 export const DangerSign = z.enum([
   "HYPERTENSION",
@@ -27,8 +50,8 @@ export const FacilitySchema = z.object({
   state: z.string().min(1),
   district: z.string().min(1),
   block: z.string().min(1),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: DateInput,
+  updatedAt: DateInput,
 });
 
 export const UserSchema = z.object({
@@ -40,21 +63,26 @@ export const UserSchema = z.object({
   facilityId: z.string().uuid(),
   language: z.string().default("hi"),
   isActive: z.boolean().default(true),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: DateInput,
+  updatedAt: DateInput,
 });
 
 export const PatientSchema = z.object({
   id: z.string().uuid(),
-  abhaId: z.string().nullable(), // 14-digit ABHA, nullable for v1
+  abhaId: z.string().nullable().optional(), // 14-digit ABHA, nullable for v1
   facilityId: z.string().uuid(),
   registeredBy: z.string().uuid(), // ANM user ID
+  anmName: z.string().nullable().optional(), // joined from users for block-level views
   name: z.string().min(1),
   age: z.number().int().min(15).max(55),
-  phone: z.string().nullable(),
-  address: z.string().nullable(),
-  lmp: z.date().nullable(), // Last Menstrual Period
-  edd: z.date().nullable(), // Expected Date of Delivery
+  phone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  hrpReason: HrpReason.nullable().optional(), // why this pregnancy is high-risk
+  ashaName: z.string().nullable().optional(),
+  ashaPhone: z.string().nullable().optional(),
+  referred: z.boolean().default(false), // referred to a higher facility at registration
+  lmp: DateInput.nullable().optional(), // Last Menstrual Period
+  edd: DateInput.nullable().optional(), // Expected Date of Delivery
   gravida: z.number().int().min(0).default(0),
   para: z.number().int().min(0).default(0),
   abortions: z.number().int().min(0).default(0),
@@ -62,8 +90,8 @@ export const PatientSchema = z.object({
   riskLevel: RiskLevel.default("GREEN"),
   riskScore: z.number().default(0),
   isHighRisk: z.boolean().default(false),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: DateInput,
+  updatedAt: DateInput,
 });
 
 export const VisitSchema = z.object({
@@ -73,14 +101,14 @@ export const VisitSchema = z.object({
   conductedBy: z.string().uuid(),
   visitNumber: z.number().int().min(1),
   gestationalWeeks: z.number().min(0).max(45),
-  visitDate: z.date(),
+  visitDate: DateInput,
   // Vitals
-  bpSystolic: z.number().int().nullable(),
-  bpDiastolic: z.number().int().nullable(),
-  hb: z.number().nullable(), // Hemoglobin g/dL
-  weight: z.number().nullable(), // kg
-  fundalHeight: z.number().nullable(), // cm
-  fetalHeartRate: z.number().int().nullable(),
+  bpSystolic: z.number().int().nullable().optional(),
+  bpDiastolic: z.number().int().nullable().optional(),
+  hb: z.number().nullable().optional(), // Hemoglobin g/dL
+  weight: z.number().nullable().optional(), // kg
+  fundalHeight: z.number().nullable().optional(), // cm
+  fetalHeartRate: z.number().int().nullable().optional(),
   // Danger signs observed this visit
   dangerSigns: z.array(DangerSign).default([]),
   // Supplements given
@@ -89,11 +117,11 @@ export const VisitSchema = z.object({
   albendazoleGiven: z.boolean().default(false),
   // Referral
   referred: z.boolean().default(false),
-  referralReason: z.string().nullable(),
-  referralFacilityId: z.string().uuid().nullable(),
-  notes: z.string().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  referralReason: z.string().nullable().optional(),
+  referralFacilityId: z.string().uuid().nullable().optional(),
+  notes: z.string().nullable().optional(),
+  createdAt: DateInput,
+  updatedAt: DateInput,
 });
 
 export const ReferralSchema = z.object({
@@ -105,10 +133,10 @@ export const ReferralSchema = z.object({
   reason: z.string(),
   urgency: RiskLevel,
   status: z.enum(["PENDING", "ACCEPTED", "REJECTED", "COMPLETED"]).default("PENDING"),
-  respondedAt: z.date().nullable(),
+  respondedAt: DateInput.nullable(),
   respondedBy: z.string().uuid().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: DateInput,
+  updatedAt: DateInput,
 });
 
 export const SyncQueueSchema = z.object({
@@ -120,8 +148,8 @@ export const SyncQueueSchema = z.object({
   status: z.enum(["PENDING", "SYNCING", "COMPLETED", "FAILED", "CONFLICT"]).default("PENDING"),
   retryCount: z.number().int().default(0),
   lastError: z.string().nullable(),
-  createdAt: z.date(),
-  updatedAt: z.date(),
+  createdAt: DateInput,
+  updatedAt: DateInput,
 });
 
 export const SupervisionAlertSchema = z.object({
@@ -133,8 +161,8 @@ export const SupervisionAlertSchema = z.object({
   relatedEntityId: z.string().uuid().nullable(),
   acknowledged: z.boolean().default(false),
   acknowledgedBy: z.string().uuid().nullable(),
-  acknowledgedAt: z.date().nullable(),
-  createdAt: z.date(),
+  acknowledgedAt: DateInput.nullable(),
+  createdAt: DateInput,
 });
 
 export type Facility = z.infer<typeof FacilitySchema>;

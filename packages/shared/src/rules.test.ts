@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import type { Patient, Visit } from "./types.js";
 import {
   calculateGestationalWeeks,
   calculateRiskScore,
@@ -8,6 +7,7 @@ import {
   getUrgencyLabel,
   isVisitOverdue,
 } from "./rules.js";
+import type { Patient, Visit } from "./types.js";
 
 function makePatient(overrides: Partial<Patient> = {}): Patient {
   return {
@@ -19,6 +19,10 @@ function makePatient(overrides: Partial<Patient> = {}): Patient {
     age: 26,
     phone: "9988776655",
     address: "Pasunj Village",
+    hrpReason: null,
+    ashaName: null,
+    ashaPhone: null,
+    referred: false,
     lmp: null,
     edd: null,
     gravida: 2,
@@ -173,6 +177,34 @@ describe("calculateRiskScore", () => {
 
     expect(result.factors).not.toContain("HTN + Severe Anemia");
     expect(result.score).toBe(30);
+  });
+
+  it("scores the reason recorded at registration even without current danger signs", () => {
+    const patient = makePatient({ hrpReason: "PREVIOUS_C_SECTION" });
+
+    const result = calculateRiskScore(patient, null);
+
+    expect(result.score).toBe(30);
+    expect(result.level).toBe("AMBER");
+    expect(result.factors).toContain("Previous C-section");
+  });
+
+  it("never scores a registered HRP as GREEN when the LMP is unknown", () => {
+    const result = calculateRiskScore(makePatient({ hrpReason: "CARDIAC_DISEASE" }), null);
+
+    expect(result.score).toBe(50);
+    expect(result.level).toBe("AMBER");
+  });
+
+  it("adds the registration reason to danger signs from a visit", () => {
+    const patient = makePatient({ hrpReason: "HYPERTENSION" });
+    const visit = makeVisit({ gestationalWeeks: 20, dangerSigns: ["SEVERE_ANEMIA"] });
+
+    const result = calculateRiskScore(patient, visit);
+
+    // 20 (anemia) + 40 (reason) = 60
+    expect(result.score).toBe(60);
+    expect(result.level).toBe("RED");
   });
 
   it("does not discount the score when the gestational age is unknown", () => {

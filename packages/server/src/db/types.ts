@@ -46,6 +46,10 @@ export interface Patient {
   age: number;
   phone: string | null;
   address: string | null;
+  hrp_reason: string | null;
+  asha_name: string | null;
+  asha_phone: string | null;
+  referred: Generated<boolean>;
   lmp: Date | null;
   edd: Date | null;
   gravida: Generated<number>;

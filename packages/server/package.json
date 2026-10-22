@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "check:fast": "tsc --noEmit && biome check --error-on-warnings .",
     "test": "vitest run",
+    "coverage": "vitest run --coverage",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts"
   },

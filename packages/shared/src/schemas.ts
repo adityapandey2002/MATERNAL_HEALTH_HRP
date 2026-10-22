@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { HrpReason } from "./hrp-reasons.js";
 import {
+  BooleanInput,
   DangerSign,
+  DateInput,
   FacilityLevel,
   FacilitySchema,
   PatientSchema,
@@ -13,6 +16,13 @@ import {
   VisitSchema,
 } from "./types.js";
 
+/**
+ * Create payloads.
+ *
+ * `facility_id` and the acting user are derived from the access token on the
+ * server, so they are not part of the client-supplied contract. Accepting
+ * them would let a client record data against another facility.
+ */
 export const CreatePatientSchema = PatientSchema.omit({
   id: true,
   createdAt: true,
@@ -20,6 +30,9 @@ export const CreatePatientSchema = PatientSchema.omit({
   riskLevel: true,
   riskScore: true,
   isHighRisk: true,
+  facilityId: true,
+  registeredBy: true,
+  anmName: true,
 });
 
 export const UpdatePatientSchema = CreatePatientSchema.partial();
@@ -28,6 +41,8 @@ export const CreateVisitSchema = VisitSchema.omit({
   id: true,
   createdAt: true,
   updatedAt: true,
+  facilityId: true,
+  conductedBy: true,
 });
 
 export const UpdateVisitSchema = CreateVisitSchema.partial();
@@ -39,6 +54,8 @@ export const CreateReferralSchema = ReferralSchema.omit({
   status: true,
   respondedAt: true,
   respondedBy: true,
+  fromFacilityId: true,
+  referredBy: true,
 });
 
 export const LoginSchema = z.object({
@@ -60,8 +77,11 @@ export const PaginationSchema = z.object({
 
 export const PatientFilterSchema = z.object({
   facilityId: z.string().uuid().optional(),
+  registeredBy: z.string().uuid().optional(),
+  anmName: z.string().optional(),
+  hrpReason: HrpReason.optional(),
   riskLevel: RiskLevel.optional(),
-  isHighRisk: z.coerce.boolean().optional(),
+  isHighRisk: BooleanInput.optional(),
   search: z.string().optional(),
   gestationalWeeksMin: z.coerce.number().optional(),
   gestationalWeeksMax: z.coerce.number().optional(),
@@ -71,17 +91,17 @@ export const VisitFilterSchema = z.object({
   patientId: z.string().uuid().optional(),
   facilityId: z.string().uuid().optional(),
   conductedBy: z.string().uuid().optional(),
-  dateFrom: z.coerce.date().optional(),
-  dateTo: z.coerce.date().optional(),
+  dateFrom: DateInput.optional(),
+  dateTo: DateInput.optional(),
 });
 
 export const SupervisionFilterSchema = z.object({
   facilityId: z.string().uuid().optional(),
   type: SupervisionAlertSchema.shape.type.optional(),
   severity: RiskLevel.optional(),
-  acknowledged: z.coerce.boolean().optional(),
-  dateFrom: z.coerce.date().optional(),
-  dateTo: z.coerce.date().optional(),
+  acknowledged: BooleanInput.optional(),
+  dateFrom: DateInput.optional(),
+  dateTo: DateInput.optional(),
 });
 
 export const ReferralFilterSchema = z.object({
@@ -95,7 +115,7 @@ export const SyncPayloadSchema = z.object({
   patients: z.array(CreatePatientSchema).optional(),
   visits: z.array(CreateVisitSchema).optional(),
   referrals: z.array(CreateReferralSchema).optional(),
-  lastSyncTimestamp: z.coerce.date().optional(),
+  lastSyncTimestamp: DateInput.optional(),
 });
 
 export const SyncResponseSchema = z.object({

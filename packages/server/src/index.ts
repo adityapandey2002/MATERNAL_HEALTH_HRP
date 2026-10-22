@@ -21,6 +21,22 @@ app.register(cors, {
 
 app.register(cookie);
 
+// Tolerate an empty JSON body. Fastify's default parser rejects a request
+// that declares a JSON content type but sends no body, which would turn a
+// bodyless DELETE into a 400.
+app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
+  const raw = typeof body === "string" ? body.trim() : "";
+  if (raw === "") {
+    done(null, undefined);
+    return;
+  }
+  try {
+    done(null, JSON.parse(raw));
+  } catch (error) {
+    done(error as Error, undefined);
+  }
+});
+
 app.register(jwt, {
   secret: process.env.JWT_SECRET ?? "dev-secret-change-in-production",
   cookie: { cookieName: "refreshToken", signed: false },

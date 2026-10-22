@@ -1,16 +1,22 @@
 import {
   type CreatePatient,
   type DangerSign,
+  type FollowUpItem,
+  type FollowUpStatus,
+  HRP_REASONS,
+  type HrpReason,
   type Patient,
   RiskLevel,
   type UpdatePatient,
   Visit,
+  getFollowUpPlan,
+  getHrpReasonLabel,
 } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { RiskBadge } from "../components/ui";
+import { RiskBadge, Select } from "../components/ui";
 import { api } from "../lib/api";
 
 const DANGER_SIGNS: { value: DangerSign; label: string }[] = [
@@ -67,12 +73,37 @@ export default function PatientDetailPage() {
     age: 25,
     phone: "",
     address: "",
+    hrpReason: null,
+    ashaName: "",
+    ashaPhone: "",
+    referred: false,
     lmp: null,
     gravida: 0,
     para: 0,
     abortions: 0,
     riskFactors: [],
   });
+
+  const startEditing = () => {
+    if (patient) {
+      setForm({
+        name: patient.name,
+        age: patient.age,
+        phone: patient.phone ?? "",
+        address: patient.address ?? "",
+        hrpReason: patient.hrpReason ?? null,
+        ashaName: patient.ashaName ?? "",
+        ashaPhone: patient.ashaPhone ?? "",
+        referred: patient.referred,
+        lmp: patient.lmp ?? null,
+        gravida: patient.gravida,
+        para: patient.para,
+        abortions: patient.abortions,
+        riskFactors: patient.riskFactors,
+      });
+    }
+    setEditing(true);
+  };
 
   const handleChange = (field: string, value: unknown) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -89,15 +120,18 @@ export default function PatientDetailPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    // The facility and the registering user are derived from the access
+    // token on the server, so they are not sent by the client.
     const payload = {
       ...form,
       age: Number(form.age),
       gravida: Number(form.gravida),
       para: Number(form.para),
       abortions: Number(form.abortions),
+      ashaName: form.ashaName?.trim() || null,
+      ashaPhone: form.ashaPhone?.replace(/\D/g, "") || null,
+      hrpReason: form.hrpReason || null,
       lmp: form.lmp ? new Date(form.lmp) : null,
-      facilityId: "current-facility-id", // Would come from user context
-      registeredBy: "current-user-id",
     };
     saveMutation.mutate(payload as CreatePatient);
   };
@@ -112,6 +146,7 @@ export default function PatientDetailPage() {
 
   const p = patient ?? ({ ...form } as Patient);
   const visits = visitsData ?? [];
+  const followUpPlan = isNew ? [] : getFollowUpPlan(p, visits.length, 3);
 
   return (
     <div className="space-y-6">
@@ -128,7 +163,7 @@ export default function PatientDetailPage() {
         </div>
         {!isNew && !editing && (
           <div className="flex gap-2">
-            <button type="button" onClick={() => setEditing(true)} className="btn btn-outline">
+            <button type="button" onClick={startEditing} className="btn btn-outline">
               Edit
             </button>
             <button
@@ -173,40 +208,8 @@ export default function PatientDetailPage() {
               </div>
             </div>
 
-            <div className="card">
-              <div className="card-header">
-                <h2 className="text-lg font-semibold">Patient Details</h2>
-              </div>
-              <div className="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
-                <DetailRow label="Name" value={p.name} />
-                <DetailRow label="Age" value={`${p.age} years`} />
-                <DetailRow label="Phone" value={p.phone ?? "Not provided"} />
-                <DetailRow label="Address" value={p.address ?? "Not provided"} />
-                <DetailRow label="Gravida" value={String(p.gravida)} />
-                <DetailRow label="Para" value={String(p.para)} />
-                <DetailRow label="Abortions" value={String(p.abortions)} />
-                <DetailRow
-                  label="LMP"
-                  value={p.lmp ? format(new Date(p.lmp), "MMM d, yyyy") : "Not set"}
-                />
-                <DetailRow
-                  label="EDD"
-                  value={p.edd ? format(new Date(p.edd), "MMM d, yyyy") : "Not set"}
-                />
-                <DetailRow
-                  label="GA"
-                  value={
-                    p.edd
-                      ? `${Math.max(0, Math.round((new Date(p.edd).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 7)))} weeks`
-                      : "Unknown"
-                  }
-                />
-                <DetailRow
-                  label="Registered"
-                  value={p.createdAt ? format(new Date(p.createdAt), "MMM d, yyyy") : "—"}
-                />
-              </div>
-            </div>
+            <PatientDetailsCard patient={p} />
+            <FollowUpPlanCard plan={followUpPlan} />
           </>
         ) : (
           <>
@@ -325,6 +328,65 @@ export default function PatientDetailPage() {
 
             <div className="card">
               <div className="card-header">
+                <h2 className="text-lg font-semibold">HRP Details</h2>
+              </div>
+              <div className="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <Select
+                    label="Reason for high-risk pregnancy"
+                    id="field-hrp-reason"
+                    options={[
+                      { value: "", label: "Not recorded" },
+                      ...HRP_REASONS.map((reason) => ({
+                        value: reason.value,
+                        label: reason.label,
+                      })),
+                    ]}
+                    value={form.hrpReason ?? ""}
+                    onChange={(e) =>
+                      handleChange("hrpReason", (e.target.value || null) as HrpReason | null)
+                    }
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="field-asha-name">
+                    ASHA name
+                  </label>
+                  <input
+                    id="field-asha-name"
+                    className="input"
+                    value={form.ashaName ?? ""}
+                    onChange={(e) => handleChange("ashaName", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor="field-asha-phone">
+                    ASHA mobile number
+                  </label>
+                  <input
+                    id="field-asha-phone"
+                    type="tel"
+                    className="input"
+                    value={form.ashaPhone ?? ""}
+                    onChange={(e) => handleChange("ashaPhone", e.target.value)}
+                  />
+                </div>
+                <label className="md:col-span-2 flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition">
+                  <input
+                    type="checkbox"
+                    checked={form.referred ?? false}
+                    onChange={(e) => handleChange("referred", e.target.checked)}
+                    className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                  />
+                  <span className="text-sm font-medium text-gray-900">
+                    Referred to a higher facility
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            <div className="card">
+              <div className="card-header">
                 <h2 className="text-lg font-semibold">Risk Factors (Danger Signs)</h2>
               </div>
               <div className="card-body">
@@ -419,6 +481,95 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     <div>
       <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
       <p className="mt-1 text-gray-900">{value}</p>
+    </div>
+  );
+}
+
+function PatientDetailsCard({ patient }: { patient: Patient }) {
+  const asha = [patient.ashaName, patient.ashaPhone].filter(Boolean).join(" · ") || "Not recorded";
+  const ga = patient.edd
+    ? `${Math.max(0, Math.round((new Date(patient.edd).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 7)))} weeks`
+    : "Unknown";
+
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h2 className="text-lg font-semibold">Patient Details</h2>
+      </div>
+      <div className="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
+        <DetailRow label="Name" value={patient.name} />
+        <DetailRow label="Age" value={`${patient.age} years`} />
+        <DetailRow label="Reason for High-Risk" value={getHrpReasonLabel(patient.hrpReason)} />
+        <DetailRow label="Referred" value={patient.referred ? "Yes" : "No"} />
+        <DetailRow label="ASHA Worker" value={asha} />
+        <DetailRow label="Registered By (ANM)" value={patient.anmName ?? "—"} />
+        <DetailRow label="Phone" value={patient.phone ?? "Not provided"} />
+        <DetailRow label="Address" value={patient.address ?? "Not provided"} />
+        <DetailRow label="Gravida" value={String(patient.gravida)} />
+        <DetailRow label="Para" value={String(patient.para)} />
+        <DetailRow label="Abortions" value={String(patient.abortions)} />
+        <DetailRow
+          label="LMP"
+          value={patient.lmp ? format(new Date(patient.lmp), "MMM d, yyyy") : "Not set"}
+        />
+        <DetailRow
+          label="EDD"
+          value={patient.edd ? format(new Date(patient.edd), "MMM d, yyyy") : "Not set"}
+        />
+        <DetailRow label="GA" value={ga} />
+        <DetailRow
+          label="Registered"
+          value={patient.createdAt ? format(new Date(patient.createdAt), "MMM d, yyyy") : "—"}
+        />
+      </div>
+    </div>
+  );
+}
+
+const FOLLOW_UP_BADGE: Record<FollowUpStatus, string> = {
+  OVERDUE: "badge-red",
+  DUE: "badge-amber",
+  UPCOMING: "badge-gray",
+};
+
+const FOLLOW_UP_LABEL: Record<FollowUpStatus, string> = {
+  OVERDUE: "Overdue",
+  DUE: "Due",
+  UPCOMING: "Upcoming",
+};
+
+function FollowUpPlanCard({ plan }: { plan: FollowUpItem[] }) {
+  return (
+    <div className="card">
+      <div className="card-header">
+        <h2 className="text-lg font-semibold">Follow-up Plan</h2>
+      </div>
+      <div className="card-body">
+        {plan.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            Add an LMP date to generate follow-up dates for this pregnancy.
+          </p>
+        ) : (
+          <ol className="space-y-3">
+            {plan.map((item) => (
+              <li
+                key={item.visitNumber}
+                className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4 rounded-lg border border-gray-200 p-3"
+              >
+                <span className={`badge ${FOLLOW_UP_BADGE[item.status]}`}>
+                  {FOLLOW_UP_LABEL[item.status]}
+                </span>
+                <div>
+                  <p className="font-medium text-gray-900">
+                    Visit {item.visitNumber} · due {format(item.dueDate, "MMM d, yyyy")}
+                  </p>
+                  <p className="text-sm text-gray-500">{item.tests.join(", ")}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
     </div>
   );
 }

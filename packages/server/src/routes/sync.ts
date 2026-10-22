@@ -143,7 +143,7 @@ export const syncRoutes: FastifyPluginAsync = async (app) => {
       .execute();
 
     return {
-      patients: syncedPatients.map(serializePatient),
+      patients: syncedPatients.map((row) => serializePatient(row)),
       visits: syncedVisits.map(serializeVisit),
       referrals: syncedReferrals.map(serializeReferral),
       serverTimestamp,
@@ -176,7 +176,7 @@ export const syncRoutes: FastifyPluginAsync = async (app) => {
       .execute();
 
     return {
-      patients: patients.map(serializePatient),
+      patients: patients.map((row) => serializePatient(row)),
       visits: visits.map(serializeVisit),
       referrals: referrals.map(serializeReferral),
       serverTimestamp: new Date(),

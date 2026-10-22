@@ -59,6 +59,7 @@ export function scoreUnregisteredPatient(input: {
   name: string;
   age: number;
   riskFactors: Patient["riskFactors"];
+  hrpReason?: Patient["hrpReason"];
 }): { score: number; level: RiskLevel } {
   const patient: Patient = {
     id: "",
@@ -69,6 +70,10 @@ export function scoreUnregisteredPatient(input: {
     age: input.age,
     phone: null,
     address: null,
+    hrpReason: input.hrpReason ?? null,
+    ashaName: null,
+    ashaPhone: null,
+    referred: false,
     lmp: null,
     edd: null,
     gravida: 0,

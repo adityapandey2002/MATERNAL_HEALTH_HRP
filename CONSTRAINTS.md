@@ -17,7 +17,7 @@ Last reviewed: 2026-10-12 by @aditya
 | Types | Zero TypeScript errors | `tsc --noEmit` | every edit (fast) |
 | Lint | Zero errors from Biome config | `biome check --error-on-warnings` | every edit (fast) |
 | Secrets | No secrets in source | `gitleaks detect --redact --no-banner` | every edit (fast) |
-| Coverage | Changed lines ≥ 80% covered | `vitest run --coverage` + git diff | task end (verify) |
+| Coverage | Changed lines ≥ 80% covered | `vitest run --coverage` + git diff (`scripts/check-changed-coverage.mjs`) | task end (verify) |
 | Security: code | No high/critical Semgrep findings | `semgrep scan --config p/default --config p/owasp-top-ten --json=semgrep.json` | CI (review) |
 | Security: deps | No high/critical vulnerabilities | `osv-scanner scan source -r . --format json` | CI (review) |
 | Performance: page | LCP ≤ 2500ms, CLS ≤ 0.1, Perf score ≥ 90 | `lighthouse $PREVIEW_URL --output=json --quiet --only-categories=performance` | preview deploy (review) |
@@ -40,6 +40,7 @@ Last reviewed: 2026-10-12 by @aditya
 | ID | Rule | Path | Reason | Owner | Expires |
 |----|------|------|--------|-------|---------|
 | W1 | `no-explicit-any` | `src/legacy/**` | Legacy integration, rewrite tracked in ENG-XXX | @aditya | 2027-01-12 |
+| W2 | `noExcessiveCognitiveComplexity` max 35 | src/pages/PatientDetail.tsx | Large page pending Phase 4 decomposition | @aditya | 2026-12-31 |
 
 ---
 
@@ -81,6 +82,10 @@ At review, the reviewer (human or agent) verifies the diff does not contain:
 
 ## Notes for this project
 
+- **gitleaks** runs in CI only (not installed locally); local `check:fast` relies on `npm run security:secrets` (`scripts/scan-secrets.mjs`) for the secrets floor, with CI adding gitleaks on top.
+
+- **Coverage scope** — the changed-line bar applies to application code. It excludes build/tool configuration (`*.config.*`), package entrypoints (`server/src/index.ts`, `client/src/main.tsx`), the migration and seed CLI scripts (`server/src/db/{migrate,seed}.ts`), the service worker (`client/src/utils/sw.ts`), and test files. Those are exercised by Docker healthchecks, `npm run db:migrate` / `db:seed`, and the smoke test rather than by unit tests. Lines that are not executable (comments, blank lines, type-only declarations) are not counted; every executable changed line is.
+- **Secrets** — `scripts/scan-secrets.mjs` is the local scanner (AWS/GitHub/Slack/Stripe/Google/OpenAI/Anthropic keys, private-key blocks, JWTs, generic assigned secrets). gitleaks runs on top in CI.
 - **Offline-first PWA** means Playwright E2E tests must run against a local dev server with Service Worker registered; `check:task` should include `playwright test --project=offline` once E2E suite exists.
 - **IndexedDB / RxDB** code paths are hard to unit-test; prioritize E2E coverage for sync engine.
 - **ABDM/FHIR integration (v2)** will add schema validation tests; budget for them in coverage.

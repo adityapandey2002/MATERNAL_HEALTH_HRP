@@ -33,9 +33,15 @@ class ApiError extends Error {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
     ...(options.headers as Record<string, string>),
   };
+
+  // Only send a JSON content type when there is a body. Fastify rejects an
+  // empty body with a JSON content type, which would break DELETE and any
+  // other bodyless request.
+  if (options.body !== undefined && !headers["Content-Type"]) {
+    headers["Content-Type"] = "application/json";
+  }
 
   const token = localStorage.getItem("accessToken");
   if (token) headers.Authorization = `Bearer ${token}`;

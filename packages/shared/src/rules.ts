@@ -1,3 +1,4 @@
+import { getHrpReasonOption } from "./hrp-reasons.js";
 import type { DangerSign, Patient, RiskLevel, Visit } from "./types.js";
 
 export interface RiskRule {
@@ -118,6 +119,16 @@ export function calculateRiskScore(
       score += Math.round(baseWeight * (rule.multiplier - 1));
       factors.push(rule.description);
     }
+  }
+
+  // The reason recorded at registration is what makes this an HRP. It is
+  // scored separately from the danger signs so a woman with a known history
+  // (previous C-section, stillbirth, cardiac disease) never scores GREEN just
+  // because she has no current symptoms.
+  const hrpReason = getHrpReasonOption(patient.hrpReason);
+  if (hrpReason) {
+    score += hrpReason.weight;
+    factors.push(hrpReason.label);
   }
 
   // Gestational age is only used to adjust the score when it is actually

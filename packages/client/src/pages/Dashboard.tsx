@@ -1,6 +1,7 @@
-import { Patient, type RiskLevel, type SupervisionAlert } from "@hrp/shared";
+import { Patient, type RiskLevel, type SupervisionAlert, getFollowUpPlan } from "@hrp/shared";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 
 function StatCard({
@@ -104,6 +105,20 @@ function CalendarIcon({ className }: { className?: string }) {
   );
 }
 
+function PlusIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  );
+}
+
 export default function Dashboard() {
   const { data: patientsData, isLoading: patientsLoading } = useQuery({
     queryKey: ["patients", "dashboard"],
@@ -112,7 +127,7 @@ export default function Dashboard() {
 
   const { data: visitsData, isLoading: visitsLoading } = useQuery({
     queryKey: ["visits", "dashboard"],
-    queryFn: () => api.visits.list({ page: 1, limit: 50 }),
+    queryFn: () => api.visits.list({ page: 1, limit: 100 }),
   });
 
   const { data: alertsData, isLoading: alertsLoading } = useQuery({
@@ -128,12 +143,23 @@ export default function Dashboard() {
   const mediumRiskCount = patients.filter((p) => p.riskLevel === "AMBER").length;
   const _lowRiskCount = patients.filter((p) => p.riskLevel === "GREEN").length;
 
-  const dueVisits = visits
-    .filter((v) => {
-      const today = new Date();
-      return new Date(v.visitDate) <= today;
-    })
-    .slice(0, 5);
+  // Count recorded visits per woman so the follow-up plan starts at her next
+  // ANC contact rather than repeating contacts already done.
+  const completedByPatient = new Map<string, number>();
+  for (const visit of visits) {
+    completedByPatient.set(visit.patientId, (completedByPatient.get(visit.patientId) ?? 0) + 1);
+  }
+
+  const allFollowUps = patients.flatMap((patient) =>
+    getFollowUpPlan(patient, completedByPatient.get(patient.id) ?? 0, 1).map((item) => ({
+      patient,
+      ...item,
+    }))
+  );
+  const followUpsDueCount = allFollowUps.filter((item) => item.status !== "UPCOMING").length;
+  const followUps = allFollowUps
+    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
+    .slice(0, 6);
 
   if (patientsLoading || visitsLoading || alertsLoading) {
     return (
@@ -169,6 +195,26 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <Link
+        to="/patients/new"
+        className="card flex items-center justify-between gap-4 p-6 bg-green-700 text-white transition hover:bg-green-800"
+      >
+        <div className="flex items-center gap-4">
+          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15">
+            <PlusIcon className="w-7 h-7" />
+          </span>
+          <div>
+            <p className="text-lg font-semibold">Add HRP Woman</p>
+            <p className="text-sm text-green-50">
+              Register a high-risk pregnancy in under a minute
+            </p>
+          </div>
+        </div>
+        <span aria-hidden="true" className="text-2xl">
+          →
+        </span>
+      </Link>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           label="Total Patients"
@@ -189,8 +235,8 @@ export default function Dashboard() {
           color="bg-amber-100"
         />
         <StatCard
-          label="Due Visits"
-          value={dueVisits.length}
+          label="Follow-ups Due"
+          value={followUpsDueCount}
           icon={<CalendarIcon className="w-8 h-8 text-green-600" />}
           color="bg-green-100"
         />
@@ -256,10 +302,10 @@ export default function Dashboard() {
 
         <div className="card">
           <div className="card-header flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Upcoming Visits Due</h2>
-            <a href="/patients" className="text-sm text-green-600 hover:text-green-700">
+            <h2 className="text-lg font-semibold text-gray-900">Follow-ups Due</h2>
+            <Link to="/patients" className="text-sm text-green-600 hover:text-green-700">
               View all
-            </a>
+            </Link>
           </div>
           <div className="card-body p-0">
             <div className="table-container">
@@ -267,29 +313,52 @@ export default function Dashboard() {
                 <thead>
                   <tr>
                     <th>Patient</th>
-                    <th>Visit #</th>
-                    <th>GA (wks)</th>
-                    <th>Due Date</th>
+                    <th>ANM</th>
+                    <th>Next Contact</th>
+                    <th>Tests</th>
                     <th className="text-center">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {dueVisits.length > 0 ? (
-                    dueVisits.map((v) => (
-                      <tr key={v.id}>
-                        <td className="font-medium">{v.patientId}</td>
-                        <td>Visit {v.visitNumber}</td>
-                        <td>{v.gestationalWeeks}</td>
-                        <td>{format(new Date(v.visitDate), "MMM d, yyyy")}</td>
+                  {followUps.length > 0 ? (
+                    followUps.map(({ patient, visitNumber, dueDate, status, tests }) => (
+                      <tr key={`${patient.id}-${visitNumber}`}>
+                        <td className="font-medium">
+                          <Link
+                            to={`/patients/${patient.id}`}
+                            className="text-green-700 hover:text-green-800"
+                          >
+                            {patient.name}
+                          </Link>
+                        </td>
+                        <td>{patient.anmName ?? "—"}</td>
+                        <td>
+                          Visit {visitNumber} · {format(dueDate, "MMM d")}
+                        </td>
+                        <td className="max-w-xs truncate">{tests.slice(0, 2).join(", ")}</td>
                         <td className="text-center">
-                          <span className="badge badge-amber">Due</span>
+                          <span
+                            className={`badge ${
+                              status === "OVERDUE"
+                                ? "badge-red"
+                                : status === "DUE"
+                                  ? "badge-amber"
+                                  : "badge-gray"
+                            }`}
+                          >
+                            {status === "OVERDUE"
+                              ? "Overdue"
+                              : status === "DUE"
+                                ? "Due"
+                                : "Upcoming"}
+                          </span>
                         </td>
                       </tr>
                     ))
                   ) : (
                     <tr>
                       <td colSpan={5} className="text-center py-8 text-gray-500">
-                        No visits due
+                        No follow-ups due
                       </td>
                     </tr>
                   )}

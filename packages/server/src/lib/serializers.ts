@@ -16,16 +16,21 @@ import type {
  * wire format stable regardless of how the tables are named.
  */
 
-export function serializePatient(row: PatientRow): Patient {
+export function serializePatient(row: PatientRow, anmName?: string | null): Patient {
   return {
     id: row.id,
     abhaId: row.abha_id,
     facilityId: row.facility_id,
     registeredBy: row.registered_by,
+    anmName: anmName ?? null,
     name: row.name,
     age: row.age,
     phone: row.phone,
     address: row.address,
+    hrpReason: (row.hrp_reason ?? null) as Patient["hrpReason"],
+    ashaName: row.asha_name,
+    ashaPhone: row.asha_phone,
+    referred: row.referred,
     lmp: row.lmp,
     edd: row.edd,
     gravida: row.gravida,

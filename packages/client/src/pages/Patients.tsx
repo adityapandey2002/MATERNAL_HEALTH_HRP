@@ -1,6 +1,5 @@
-import { Pagination, Patient, PatientFilter, type RiskLevel } from "@hrp/shared";
+import { Pagination, Patient, PatientFilter, type RiskLevel, getHrpReasonLabel } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { format } from "date-fns";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -20,16 +19,18 @@ export default function PatientsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskLevel | "">("");
+  const [anmFilter, setAnmFilter] = useState("");
   const limit = 20;
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["patients", "list", { page, search, riskFilter }],
+    queryKey: ["patients", "list", { page, search, riskFilter, anmFilter }],
     queryFn: () =>
       api.patients.list({
         page,
         limit,
         search: search || undefined,
         riskLevel: riskFilter || undefined,
+        anmName: anmFilter.trim() || undefined,
       }),
     placeholderData: (prev) => prev,
   });
@@ -51,13 +52,13 @@ export default function PatientsPage() {
           <p className="text-gray-500">Manage high-risk pregnancy registrations</p>
         </div>
         <Link to="/patients/new" className="btn btn-primary">
-          <PlusIcon className="w-5 h-5" /> Register Patient
+          <PlusIcon className="w-5 h-5" /> Add HRP Woman
         </Link>
       </div>
 
       <div className="card">
         <div className="card-body p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex flex-col lg:flex-row gap-4">
             <div className="flex-1 relative">
               <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
@@ -71,8 +72,20 @@ export default function PatientsPage() {
                 }}
               />
             </div>
+            <input
+              type="search"
+              placeholder="Filter by ANM name"
+              className="input lg:w-56"
+              aria-label="Filter by ANM name"
+              value={anmFilter}
+              onChange={(e) => {
+                setAnmFilter(e.target.value);
+                setPage(1);
+              }}
+            />
             <select
               className="input w-auto"
+              aria-label="Filter by risk level"
               value={riskFilter}
               onChange={(e) => {
                 setRiskFilter(e.target.value as RiskLevel);
@@ -106,9 +119,9 @@ export default function PatientsPage() {
                     <th>Age</th>
                     <th>Phone</th>
                     <th>GA (wks)</th>
+                    <th>Reason</th>
                     <th className="text-center">Risk</th>
-                    <th>Facility</th>
-                    <th>Last Visit</th>
+                    <th>ANM</th>
                     <th className="text-right">Actions</th>
                   </tr>
                 </thead>
@@ -130,11 +143,11 @@ export default function PatientsPage() {
                               )
                             : "—"}
                         </td>
+                        <td className="max-w-xs truncate">{getHrpReasonLabel(p.hrpReason)}</td>
                         <td className="text-center">
                           <RiskBadge level={p.riskLevel} />
                         </td>
-                        <td>{p.facilityId}</td>
-                        <td>{p.updatedAt ? format(new Date(p.updatedAt), "MMM d, yyyy") : "—"}</td>
+                        <td>{p.anmName ?? "—"}</td>
                         <td className="text-right">
                           <Link to={`/patients/${p.id}`} className="btn btn-outline btn-sm">
                             View
