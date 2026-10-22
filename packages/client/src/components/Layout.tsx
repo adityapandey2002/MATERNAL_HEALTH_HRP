@@ -54,7 +54,7 @@ export default function Layout() {
             <BrandMark size={32} variant="compact" title={null} />
             <div className="min-w-0">
               <p className="truncate text-base font-bold leading-tight text-gray-900">
-                HRP Tracker
+                High-Risk Pregnancy Tracking of Araria
               </p>
               <p className="truncate text-xs leading-tight text-gray-500">
                 Maternal Risk Monitoring

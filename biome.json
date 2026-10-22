@@ -14,7 +14,12 @@
     "enabled": true,
     "rules": {
       "recommended": true,
-      "complexity": { "noExcessiveCognitiveComplexity": { "level": "warn", "options": { "maxAllowedComplexity": 35 } } },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": { "maxAllowedComplexity": 35 }
+        }
+      },
       "correctness": { "noUnusedVariables": "error" },
       "style": { "noNonNullAssertion": "warn" },
       "suspicious": { "noExplicitAny": "warn" }
@@ -28,8 +33,3 @@
   },
   "javascript": { "formatter": { "semicolons": "always", "trailingCommas": "es5" } }
 }
-
-
-
-
-

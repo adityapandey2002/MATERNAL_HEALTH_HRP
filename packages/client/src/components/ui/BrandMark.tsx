@@ -13,7 +13,7 @@ interface BrandMarkProps {
 }
 
 /**
- * HRP Tracker brand mark.
+ * High-Risk Pregnancy Tracking of Araria brand mark.
  *
  * A heart outline carrying a monitoring pulse. The pulse is the dominant
  * stroke so the mark reads as "maternal vitals under watch" rather than as a
@@ -22,7 +22,7 @@ interface BrandMarkProps {
 export function BrandMark({
   size = 40,
   variant = "full",
-  title = "HRP Tracker",
+  title = "High-Risk Pregnancy Tracking of Araria",
   className,
 }: BrandMarkProps) {
   const gradientId = `brand-mark-gradient-${variant}`;
@@ -79,7 +79,9 @@ export function BrandLockup({ size = 40, variant = "full", className }: BrandLoc
     <div className={`flex items-center gap-2.5 ${className ?? ""}`}>
       <BrandMark size={size} variant={variant} title={null} />
       <div className="min-w-0">
-        <p className="truncate text-base font-bold leading-tight text-gray-900">HRP Tracker</p>
+        <p className="truncate text-base font-bold leading-tight text-gray-900">
+          High-Risk Pregnancy Tracking of Araria
+        </p>
         <p className="truncate text-xs leading-tight text-gray-500">Maternal Risk Monitoring</p>
       </div>
     </div>

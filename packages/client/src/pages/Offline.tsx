@@ -42,8 +42,8 @@ export default function OfflinePage() {
 
           <h1 className="text-2xl font-bold text-gray-900 mb-2">You're Offline</h1>
           <p className="text-gray-500 mb-6">
-            HRP Tracker works offline. Your data is saved locally and will sync automatically when
-            you're back online.
+            High-Risk Pregnancy Tracking of Araria works offline. Your data is saved locally and
+            will sync automatically when you're back online.
           </p>
 
           <div className="space-y-4 mb-6 p-4 rounded-lg bg-gray-50 text-left">

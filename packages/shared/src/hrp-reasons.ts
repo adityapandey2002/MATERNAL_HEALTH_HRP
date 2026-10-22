@@ -65,7 +65,9 @@ export const HRP_REASONS: HrpReasonOption[] = [
 
 const BY_VALUE = new Map(HRP_REASONS.map((reason) => [reason.value, reason]));
 
-export function getHrpReasonOption(value: HrpReason | null | undefined): HrpReasonOption | undefined {
+export function getHrpReasonOption(
+  value: HrpReason | null | undefined
+): HrpReasonOption | undefined {
   return value ? BY_VALUE.get(value) : undefined;
 }
 

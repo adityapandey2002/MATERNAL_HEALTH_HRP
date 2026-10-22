@@ -32,9 +32,11 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="flex flex-col items-center mb-8 text-center">
           <BrandMark size={64} variant="full" />
-          <h1 className="mt-4 text-2xl font-bold text-gray-900">HRP Tracker</h1>
+          <h1 className="mt-4 text-2xl font-bold text-gray-900">
+            High-Risk Pregnancy Tracking of Araria
+          </h1>
           <p className="mt-1 text-sm text-gray-500">
-            High-Risk Pregnancy Tracking for ANMs and CHOs
+            High-Risk Pregnancy Tracking of Araria for ANMs and CHOs
           </p>
         </div>
 

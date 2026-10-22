@@ -13,9 +13,9 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: {
-        name: "HRP Tracker",
+        name: "High-Risk Pregnancy Tracking of Araria",
         short_name: "HRP",
-        description: "High-Risk Pregnancy Tracking for ANMs",
+        description: "High-Risk Pregnancy Tracking of Araria for ANMs",
         theme_color: "#16a34a",
         background_color: "#ffffff",
         display: "standalone",

@@ -182,7 +182,9 @@ export default function SettingsPage() {
                   />
                 </svg>
                 <div>
-                  <h3 className="font-semibold text-gray-900">HRP Tracker</h3>
+                  <h3 className="font-semibold text-gray-900">
+                    High-Risk Pregnancy Tracking of Araria
+                  </h3>
                   <p className="text-sm text-gray-500">Version 0.1.0 (MVP)</p>
                 </div>
               </div>
@@ -206,7 +208,7 @@ export default function SettingsPage() {
               </div>
               <div className="pt-4 border-t border-gray-200">
                 <p className="text-sm text-gray-500">
-                  Built for India's National Health Mission · High-Risk Pregnancy Tracking
+                  Built for India's National Health Mission · High-Risk Pregnancy Tracking of Araria
                 </p>
               </div>
             </div>
