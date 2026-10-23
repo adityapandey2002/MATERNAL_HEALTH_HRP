@@ -111,11 +111,30 @@ export const ReferralFilterSchema = z.object({
   toFacilityId: z.string().uuid().optional(),
 });
 
+export const SyncPatientSchema = CreatePatientSchema.extend({
+  id: z.string().uuid().optional(),
+  updatedAt: DateInput.optional(),
+});
+
+export const SyncVisitSchema = CreateVisitSchema.extend({
+  id: z.string().uuid().optional(),
+  updatedAt: DateInput.optional(),
+});
+
+export const SyncReferralSchema = CreateReferralSchema.extend({
+  id: z.string().uuid().optional(),
+  updatedAt: DateInput.optional(),
+});
+
 export const SyncPayloadSchema = z.object({
-  patients: z.array(CreatePatientSchema).optional(),
-  visits: z.array(CreateVisitSchema).optional(),
-  referrals: z.array(CreateReferralSchema).optional(),
+  patients: z.array(SyncPatientSchema).max(100).optional(),
+  visits: z.array(SyncVisitSchema).max(100).optional(),
+  referrals: z.array(SyncReferralSchema).max(100).optional(),
   lastSyncTimestamp: DateInput.optional(),
+});
+
+export const SyncPullQuerySchema = z.object({
+  since: DateInput.optional(),
 });
 
 export const SyncResponseSchema = z.object({
@@ -147,8 +166,12 @@ export type PatientFilter = z.infer<typeof PatientFilterSchema>;
 export type VisitFilter = z.infer<typeof VisitFilterSchema>;
 export type SupervisionFilter = z.infer<typeof SupervisionFilterSchema>;
 export type ReferralFilter = z.infer<typeof ReferralFilterSchema>;
+export type SyncPatient = z.infer<typeof SyncPatientSchema>;
+export type SyncVisit = z.infer<typeof SyncVisitSchema>;
+export type SyncReferral = z.infer<typeof SyncReferralSchema>;
 export type SyncPayload = z.infer<typeof SyncPayloadSchema>;
 export type SyncResponse = z.infer<typeof SyncResponseSchema>;
+export type SyncPullQuery = z.infer<typeof SyncPullQuerySchema>;
 
 export const apiSchemas = {
   patient: {
@@ -161,5 +184,5 @@ export const apiSchemas = {
   auth: { login: LoginSchema, refresh: RefreshTokenSchema },
   pagination: PaginationSchema,
   supervision: { filter: SupervisionFilterSchema },
-  sync: { payload: SyncPayloadSchema, response: SyncResponseSchema },
+  sync: { payload: SyncPayloadSchema, response: SyncResponseSchema, pull: SyncPullQuerySchema },
 } as const;

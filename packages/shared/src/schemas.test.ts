@@ -8,7 +8,11 @@ import {
   PatientFilterSchema,
   ReferralFilterSchema,
   SupervisionFilterSchema,
+  SyncPatientSchema,
   SyncPayloadSchema,
+  SyncPullQuerySchema,
+  SyncReferralSchema,
+  SyncVisitSchema,
   UpdatePatientSchema,
   UpdateVisitSchema,
   VisitFilterSchema,
@@ -245,6 +249,71 @@ describe("SyncPayloadSchema", () => {
     expect(SyncPayloadSchema.safeParse({ patients: [{ ...patient, age: 10 }] }).success).toBe(
       false
     );
+  });
+
+  it("caps each entity batch at 100", () => {
+    const patients = Array.from({ length: 101 }, (_, index) => ({
+      ...patient,
+      name: `Patient ${index}`,
+    }));
+
+    expect(SyncPayloadSchema.safeParse({ patients }).success).toBe(false);
+    expect(SyncPayloadSchema.safeParse({ patients: patients.slice(0, 100) }).success).toBe(true);
+  });
+});
+
+describe("sync entity schemas", () => {
+  it("accepts client ids and server versions while stripping server-owned fields", () => {
+    const patientId = "11111111-1111-4111-8111-111111111111";
+    const updatedAt = "2026-02-01T00:00:00.000Z";
+
+    const parsedPatient = SyncPatientSchema.parse({
+      ...patient,
+      id: patientId,
+      updatedAt,
+      facilityId: "22222222-2222-4222-8222-222222222222",
+      registeredBy: "33333333-3333-4333-8333-333333333333",
+    });
+    expect(parsedPatient.id).toBe(patientId);
+    expect(parsedPatient.updatedAt).toBeInstanceOf(Date);
+    expect(parsedPatient).not.toHaveProperty("facilityId");
+    expect(parsedPatient).not.toHaveProperty("registeredBy");
+
+    const parsedVisit = SyncVisitSchema.parse({
+      ...visit,
+      id: patientId,
+      updatedAt,
+      facilityId: "22222222-2222-4222-8222-222222222222",
+      conductedBy: "33333333-3333-4333-8333-333333333333",
+    });
+    expect(parsedVisit.id).toBe(patientId);
+    expect(parsedVisit).not.toHaveProperty("facilityId");
+    expect(parsedVisit).not.toHaveProperty("conductedBy");
+
+    const parsedReferral = SyncReferralSchema.parse({
+      ...referral,
+      id: patientId,
+      updatedAt,
+      fromFacilityId: "22222222-2222-4222-8222-222222222222",
+      referredBy: "33333333-3333-4333-8333-333333333333",
+      status: "COMPLETED",
+    });
+    expect(parsedReferral.id).toBe(patientId);
+    expect(parsedReferral).not.toHaveProperty("fromFacilityId");
+    expect(parsedReferral).not.toHaveProperty("referredBy");
+    expect(parsedReferral).not.toHaveProperty("status");
+  });
+});
+
+describe("SyncPullQuerySchema", () => {
+  it("parses a since cursor", () => {
+    const parsed = SyncPullQuerySchema.parse({ since: "2026-02-01T00:00:00.000Z" });
+    expect(parsed.since).toBeInstanceOf(Date);
+  });
+
+  it("rejects invalid or empty cursors", () => {
+    expect(SyncPullQuerySchema.safeParse({ since: "not-a-date" }).success).toBe(false);
+    expect(SyncPullQuerySchema.safeParse({ since: "" }).success).toBe(false);
   });
 });
 
