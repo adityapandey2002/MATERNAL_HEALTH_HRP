@@ -2,7 +2,8 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import fastify, { type FastifyReply, type FastifyRequest } from "fastify";
-import { db } from "./db/client.js";
+import { config } from "./config.js";
+import { closeDb, db } from "./db/client.js";
 import { authRoutes } from "./routes/auth.js";
 import { facilityRoutes } from "./routes/facilities.js";
 import { patientRoutes } from "./routes/patients.js";
@@ -12,10 +13,13 @@ import { supervisionRoutes } from "./routes/supervision.js";
 import { syncRoutes } from "./routes/sync.js";
 import { visitRoutes } from "./routes/visits.js";
 
-const app = fastify({ logger: true });
+const app = fastify({
+  logger: { level: config.logLevel },
+  trustProxy: config.trustProxy,
+});
 
 app.register(cors, {
-  origin: true,
+  origin: config.corsOrigins.length > 0 ? config.corsOrigins : config.nodeEnv !== "production",
   credentials: true,
 });
 
@@ -38,16 +42,16 @@ app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, b
 });
 
 app.register(jwt, {
-  secret: process.env.JWT_SECRET ?? "dev-secret-change-in-production",
+  secret: config.jwtSecret,
   cookie: { cookieName: "refreshToken", signed: false },
-  sign: { expiresIn: "15m" },
+  sign: { expiresIn: config.jwtAccessTtl },
 });
 
 app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply) => {
   try {
     await request.jwtVerify();
-  } catch (err) {
-    reply.send(err);
+  } catch {
+    return reply.code(401).send({ message: "Unauthorized" });
   }
 });
 
@@ -64,15 +68,22 @@ app.register(queueRoutes, { prefix: "/api/queue" });
 
 const start = async () => {
   try {
-    await app.listen({
-      port: Number(process.env.PORT) || 3000,
-      host: process.env.HOST ?? "0.0.0.0",
-    });
-    console.log(`Server running on port ${process.env.PORT || 3000}`);
+    await app.listen({ port: config.port, host: config.host });
+    app.log.info({ port: config.port, env: config.nodeEnv }, "Server running");
   } catch (err) {
     app.log.error(err);
     process.exit(1);
   }
 };
+
+const shutdown = async (signal: string) => {
+  app.log.info({ signal }, "Shutting down");
+  await app.close();
+  await closeDb();
+  process.exit(0);
+};
+
+process.on("SIGTERM", () => void shutdown("SIGTERM"));
+process.on("SIGINT", () => void shutdown("SIGINT"));
 
 start();

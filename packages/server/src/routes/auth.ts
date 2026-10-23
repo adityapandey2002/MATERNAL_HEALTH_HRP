@@ -1,6 +1,7 @@
 import { LoginSchema } from "@hrp/shared/schemas";
 import bcrypt from "bcryptjs";
 import type { FastifyPluginAsync } from "fastify";
+import { config } from "../config.js";
 import { db } from "../db/client.js";
 import { serializeUser } from "../lib/serializers.js";
 import { validateBody } from "../lib/validate.js";
@@ -30,11 +31,14 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       role: user.role,
       facilityId: user.facility_id,
     });
-    const refreshToken = app.jwt.sign({ sub: user.id, type: "refresh" }, { expiresIn: "7d" });
+    const refreshToken = app.jwt.sign(
+      { sub: user.id, type: "refresh" },
+      { expiresIn: config.jwtRefreshTtl, key: config.jwtRefreshSecret }
+    );
 
     reply.setCookie(REFRESH_COOKIE, refreshToken, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
+      secure: config.cookieSecure,
       sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60,
       path: "/",
@@ -44,18 +48,16 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post("/refresh", async (request, reply) => {
-    // The refresh token is delivered as an httpOnly cookie, which is not
-    // readable from JavaScript. The body field stays as a fallback for
-    // clients that cannot rely on cookies.
-    const body = request.body as { refreshToken?: string } | undefined;
-    const refreshToken = request.cookies[REFRESH_COOKIE] ?? body?.refreshToken;
+    const refreshToken = request.cookies[REFRESH_COOKIE];
 
     if (!refreshToken) {
       return reply.code(401).send({ message: "No refresh token provided" });
     }
 
     try {
-      const decoded = app.jwt.verify<{ sub: string; type: string }>(refreshToken);
+      const decoded = app.jwt.verify<{ sub: string; type: string }>(refreshToken, {
+        key: config.jwtRefreshSecret,
+      });
       if (decoded.type !== "refresh") throw new Error("Invalid token type");
 
       const user = await db
@@ -72,11 +74,14 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
         role: user.role,
         facilityId: user.facility_id,
       });
-      const newRefreshToken = app.jwt.sign({ sub: user.id, type: "refresh" }, { expiresIn: "7d" });
+      const newRefreshToken = app.jwt.sign(
+        { sub: user.id, type: "refresh" },
+        { expiresIn: config.jwtRefreshTtl, key: config.jwtRefreshSecret }
+      );
 
       reply.setCookie(REFRESH_COOKIE, newRefreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: config.cookieSecure,
         sameSite: "lax",
         maxAge: 7 * 24 * 60 * 60,
         path: "/",
