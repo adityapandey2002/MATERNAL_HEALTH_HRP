@@ -14,7 +14,7 @@ import { assertSeedAllowed } from "./seed-guard.js";
 interface FacilitySeed {
   code: string;
   name: string;
-  level: "VILLAGE" | "HWC" | "PHC" | "CHC" | "DISTRICT" | "STATE";
+  level: "VILLAGE" | "HSC" | "HWC" | "PHC" | "CHC" | "BLOCK" | "DISTRICT" | "STATE";
   parentCode: string | null;
   path: string;
   state: string;
@@ -102,6 +102,7 @@ export async function seed() {
   assertSeedAllowed(process.env);
   console.log("Seeding database...");
 
+  await db.deleteFrom("responsibilities").execute();
   await db.deleteFrom("supervision_alerts").execute();
   await db.deleteFrom("referrals").execute();
   await db.deleteFrom("visits").execute();
@@ -175,7 +176,7 @@ export async function seed() {
         name: "Dr. Rajesh Kumar",
         phone: "9876543212",
         password_hash: passwordHash,
-        role: "MO",
+        role: "BHM",
         facility_id: chcId,
         language: "hi",
       },
@@ -184,7 +185,7 @@ export async function seed() {
         name: "District Admin",
         phone: "9876543213",
         password_hash: passwordHash,
-        role: "DISTRICT_ADMIN",
+        role: "DHS",
         facility_id: districtId,
         language: "hi",
       },
@@ -387,8 +388,8 @@ export async function seed() {
   console.log("Test users:");
   console.log("  ANM: ANM001 / password123");
   console.log("  CHO: CHO001 / password123");
-  console.log("  MO: MO001 / password123");
-  console.log("  Admin: ADM001 / password123");
+  console.log("  BHM: MO001 / password123");
+  console.log("  DHS: ADM001 / password123");
 }
 
 await seed();

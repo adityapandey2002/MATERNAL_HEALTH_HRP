@@ -70,11 +70,22 @@ describe("BooleanInput", () => {
 describe("enums", () => {
   it("accepts known facility levels and rejects others", () => {
     expect(FacilityLevel.parse("PHC")).toBe("PHC");
+    expect(FacilityLevel.parse("HSC")).toBe("HSC");
+    expect(FacilityLevel.parse("BLOCK")).toBe("BLOCK");
     expect(FacilityLevel.safeParse("CLINIC").success).toBe(false);
   });
 
-  it("accepts known user roles and risk levels", () => {
-    expect(UserRole.parse("ANM")).toBe("ANM");
+  it("accepts the four login roles and rejects retired roles", () => {
+    for (const role of ["ANM", "CHO", "BHM", "DHS"]) {
+      expect(UserRole.parse(role)).toBe(role);
+    }
+
+    for (const retired of ["ASHA", "MO", "DISTRICT_ADMIN", "STATE_ADMIN"]) {
+      expect(UserRole.safeParse(retired).success).toBe(false);
+    }
+  });
+
+  it("accepts risk levels and rejects others", () => {
     expect(RiskLevel.parse("RED")).toBe("RED");
     expect(RiskLevel.safeParse("BLUE").success).toBe(false);
   });

@@ -13,7 +13,7 @@ export interface Facility {
   id: Generated<string>;
   code: string;
   name: string;
-  level: "VILLAGE" | "HWC" | "PHC" | "CHC" | "BLOCK" | "DISTRICT" | "STATE";
+  level: "VILLAGE" | "HSC" | "HWC" | "PHC" | "CHC" | "BLOCK" | "DISTRICT" | "STATE";
   parent_id: string | null;
   path: string;
   state: string;
@@ -29,7 +29,7 @@ export interface User {
   name: string;
   phone: string;
   password_hash: string;
-  role: "ANM" | "ASHA" | "CHO" | "MO" | "DISTRICT_ADMIN" | "STATE_ADMIN";
+  role: "ANM" | "CHO" | "BHM" | "DHS";
   facility_id: string;
   language: Generated<string>;
   is_active: Generated<boolean>;
@@ -118,6 +118,15 @@ export interface SyncQueue {
   updated_at: Generated<Date>;
 }
 
+export interface Responsibility {
+  id: Generated<string>;
+  user_id: string;
+  responsibility: "REFERRAL_NODAL";
+  scope_facility_id: string;
+  granted_by: string;
+  granted_at: Generated<Date>;
+}
+
 export interface SupervisionAlert {
   id: Generated<string>;
   facility_id: string;
@@ -145,6 +154,7 @@ export interface DB {
   referrals: Referral;
   sync_queue: SyncQueue;
   supervision_alerts: SupervisionAlert;
+  responsibilities: Responsibility;
   schema_migrations: SchemaMigration;
 }
 
@@ -156,3 +166,4 @@ export type VisitRow = Selectable<DB["visits"]>;
 export type ReferralRow = Selectable<DB["referrals"]>;
 export type SyncQueueRow = Selectable<DB["sync_queue"]>;
 export type SupervisionAlertRow = Selectable<DB["supervision_alerts"]>;
+export type ResponsibilityRow = Selectable<DB["responsibilities"]>;

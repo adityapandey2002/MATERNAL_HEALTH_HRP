@@ -75,12 +75,13 @@ describe("migration plan", () => {
     expect(pending.map((migration) => migration.id)).toEqual(["002_second"]);
   });
 
-  it("ships the baseline and scope-index migrations", async () => {
+  it("ships the baseline, scope-index and authorization migrations", async () => {
     const migrations = await loadMigrations();
 
     expect(migrations.map((migration) => migration.id)).toEqual([
       "001_baseline",
       "002_scope_indexes",
+      "003_authz_foundation",
     ]);
   });
 });
