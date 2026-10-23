@@ -12,8 +12,8 @@
  * No connection strings or row-level data are printed.
  */
 
-import { existsSync, statSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { existsSync, statSync } from "node:fs";
 
 const MIN_BYTES = 1024;
 const MIN_TABLES = 8;
