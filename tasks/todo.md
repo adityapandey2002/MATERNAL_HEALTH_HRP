@@ -1,198 +1,130 @@
-# Frontend UI Engineering Quality Improvements - Task List
+# Task List: HRP Araria Production Launch
 
-## Phase 1: Foundation & Component Extraction
+Status key: [ ] pending, [x] complete, [~] in progress
 
-- [ ] **Task 1.1**: Create reusable Icon components library
-  - Extract all inline SVG icons into \src/components/icons/\
-  - Create index barrel export
-  - Update all pages to use shared icons
-  - **Files**: \src/components/icons/*.tsx\, update all page files
-  - **Scope**: Medium
-  - **Dependencies**: None
+## Wave 0 - Safe foundation
 
-- [ ] **Task 1.2**: Create reusable RiskBadge component
-  - Extract RiskBadge from Dashboard, Patients, PatientDetail, Referrals, Supervision
-  - Add variants for different contexts (compact, detailed, with icon)
-  - Add proper TypeScript types and accessibility attributes
-  - **Files**: \src/components/RiskBadge/\, update all page files
-  - **Scope**: Small
-  - **Dependencies**: None
+- [ ] Task: Create typed server config module
+  - Acceptance: production rejects weak/default secrets; errors list variable names only
+  - Verify: unit tests + boot failure test; `npm run check:task`
+  - Files: `packages/server/src/config.ts`, `config.test.ts`, `index.ts`, `routes/auth.ts`, `db/client.ts`, `.env.example`
 
-- [ ] **Task 1.3**: Create reusable FormField components
-  - Create Input, Select, Textarea, Checkbox, Radio components with consistent styling
-  - Add label association, error state, helper text support
-  - **Files**: \src/components/FormField/\, update form-heavy pages
-  - **Scope**: Medium
-  - **Dependencies**: None
+- [ ] Task: Add migration ledger and ordered migrations
+  - Acceptance: re-run is a no-op; checksum drift fails; seed guard blocks production
+  - Verify: migration integration test; `npm run check:task`
+  - Files: `packages/server/src/db/migrate.ts`, `migrations/`, `db/seed.ts`, `package.json`
 
-- [ ] **Task 1.4**: Create reusable Table components
-  - Extract table structure into composable Table, TableHeader, TableRow, TableCell
-  - Add sorting, pagination, empty state, loading skeleton support
-  - **Files**: \src/components/Table/\, update Dashboard, Patients, Referrals, Supervision
-  - **Scope**: Medium
-  - **Dependencies**: Task 1.1 (icons for sort indicators)
+- [ ] Task: Add scope indexes and sync queue facility
+  - Acceptance: `sync_queue.facility_id` exists; path and updated-at indexes exist
+  - Verify: migration test; query plan check
+  - Files: migrations, `db/types.ts`
 
-### Checkpoint 1: After Phase 1
-- [ ] All shared components extracted and exported
-- [ ] All pages updated to use shared components
-- [ ] \
-pm run check:fast\ passes
-- [ ] Visual regression: no breaking changes
+- [ ] Task: Fix production containers
+  - Acceptance: root-context images build; non-root; health/readiness; graceful shutdown
+  - Verify: clean-clone `docker build`; compose smoke
+  - Files: `Dockerfile.server`, `Dockerfile.client`, `packages/*/Dockerfile`, `docker-compose*.yml`, `nginx*.conf`, `src/index.ts`
 
-## Phase 2: Accessibility Improvements
+## Wave 1 - PHI protection
 
-- [ ] **Task 2.1**: Fix heading hierarchy across all pages
-  - Ensure single h1 per page, proper h2/h3 nesting
-  - Add landmark regions (main, nav, aside)
-  - **Files**: All page files, Layout.tsx
-  - **Scope**: Small
-  - **Dependencies**: Phase 1
+- [ ] Task: Implement authz policy and scope resolver
+  - Acceptance: ANM/CHO/BHM/DHS matrix; path subtree; no client widening
+  - Verify: unit tests; `npm run check:task`
+  - Files: `packages/server/src/authz/*`, tests
 
-- [ ] **Task 2.2**: Improve keyboard navigation and focus management
-  - Ensure all interactive elements are keyboard accessible
-  - Add visible focus styles (already in CSS but verify)
-  - Implement focus trapping in modals/dialogs
-  - **Files**: Layout.tsx, PatientDetail.tsx, NewVisit.tsx, Settings.tsx
-  - **Scope**: Small
-  - **Dependencies**: Phase 1
+- [ ] Task: Enforce scope on patient and visit routes
+  - Acceptance: IDOR denied; list scope before pagination; audit reads
+  - Verify: integration tests
+  - Files: `routes/patients.ts`, `routes/visits.ts`
 
-- [ ] **Task 2.3**: Add ARIA labels and semantic HTML improvements
-  - Add aria-label to icon-only buttons
-  - Ensure form inputs have associated labels
-  - Add role=\lert\ for error messages
-  - Add aria-live for dynamic content updates
-  - **Files**: All interactive components
-  - **Scope**: Medium
-  - **Dependencies**: Phase 1
+- [ ] Task: Enforce scope on referral, supervision, queue, sync, facilities
+  - Acceptance: no global queue; sync rejects out-of-scope pushes
+  - Verify: integration tests
+  - Files: related routes, `db/types.ts`
 
-- [ ] **Task 2.4**: Improve screen reader experience
-  - Add proper table headers with scope attributes
-  - Ensure status updates are announced
-  - Add descriptive link text (avoid \View all\ without context)
-  - **Files**: Table components, Dashboard, Patients, Referrals
-  - **Scope**: Small
-  - **Dependencies**: Phase 1, Task 1.4
+- [ ] Task: Add audit schema and writer
+  - Acceptance: append-only; hash chain; no PHI metadata
+  - Verify: audit tests; tamper test
+  - Files: migrations, `src/audit/*`, `db/types.ts`
 
-### Checkpoint 2: After Phase 2
-- [ ] axe-core scan passes with zero critical/serious violations
-- [ ] Keyboard navigation works for all flows
-- [ ] Screen reader announces content correctly
-- [ ] \
-pm run check:fast\ passes
+- [ ] Task: Emit audit events across routes
+  - Acceptance: every sensitive success/denial emits exactly one event
+  - Verify: route audit matrix test
+  - Files: routes, audit helpers
 
-## Phase 3: Responsive Design & Polish
+## Wave 2 - Web and PWA hardening
 
-- [ ] **Task 3.1**: Audit and fix responsive breakpoints
-  - Test at 320px, 768px, 1024px, 1440px
-  - Fix any horizontal overflow issues
-  - Ensure touch targets meet 44x44px minimum
-  - **Files**: All page files, CSS
-  - **Scope**: Medium
-  - **Dependencies**: Phase 1
+- [ ] Task: Lock down CORS, headers, rate limits, lockout
+  - Acceptance: allowlist; 100/min auth; 500/min API; 60/min sync; headers present
+  - Verify: security integration tests
+  - Files: `src/index.ts`, `package.json`, config
 
-- [ ] **Task 3.2**: Improve loading, empty, and error states
-  - Replace spinners with skeleton loaders for content
-  - Add meaningful empty states with action buttons
-  - Improve error messages with retry actions
-  - **Files**: All pages with data fetching
-  - **Scope**: Small
-  - **Dependencies**: Phase 1
+- [ ] Task: Add refresh rotation and revocation
+  - Acceptance: replay fails; logout/password/role/facility change revoke
+  - Verify: auth integration tests
+  - Files: `routes/auth.ts`, migrations, session store
 
-- [ ] **Task 3.3**: Design system consistency audit
-  - Replace any hardcoded values with CSS variables
-  - Ensure consistent spacing scale (0.25rem increments)
-  - Verify color contrast ratios meet 4.5:1
-  - **Files**: index.css, all component files
-  - **Scope**: Small
-  - **Dependencies**: Phase 1
+- [ ] Task: Remove API caching and wipe local data
+  - Acceptance: no PHI in Cache Storage; logout wipes IndexedDB/localStorage/cache
+  - Verify: Playwright inspection test
+  - Files: `vite.config.ts`, `src/utils/sw.ts`, auth provider
 
-### Checkpoint 3: After Phase 3
-- [ ] Responsive at all breakpoints
-- [ ] Loading/empty/error states improved
-- [ ] Design system consistent
-- [ ] \
-pm run check:fast\ passes
+## Wave 3 - District operations
 
-## Phase 4: Component Decomposition
+- [ ] Task: Add BLOCK level and onboarding import
+  - Acceptance: Araria fixture imports; cycles/duplicates rejected; idempotent
+  - Verify: import tests; dry-run
+  - Files: migrations, `scripts/onboard.mjs`, shared types
 
-- [ ] **Task 4.1**: Decompose PatientDetail page (>300 lines)
-  - Split into: PatientHeader, RiskAssessmentPanel, PatientDetailsGrid, VisitHistoryTable, PatientForm
-  - Create container/presentation separation
-  - **Files**: \src/components/patient/\, \src/pages/PatientDetail.tsx\
-  - **Scope**: Large
-  - **Dependencies**: Phase 1
+- [ ] Task: Build DHS admin API and UI
+  - Acceptance: user/facility/responsibility management; last-DHS guard; audit
+  - Verify: integration + component tests
+  - Files: `routes/admin.ts`, `pages/Admin*.tsx`, tests
 
-- [ ] **Task 4.2**: Decompose NewVisit page (>280 lines)
-  - Split into: VisitDetailsForm, VitalsGrid, DangerSignsSelector, SupplementsSelector, ReferralSection, NotesSection
-  - **Files**: \src/components/visit/\, \src/pages/NewVisit.tsx\
-  - **Scope**: Large
-  - **Dependencies**: Phase 1
+- [ ] Task: Implement referral state machine and nodal visibility
+  - Acceptance: destination acknowledgement; block/district nodal; audited transitions
+  - Verify: state-machine + visibility tests
+  - Files: `routes/referrals.ts`, shared schemas, `pages/Referrals.tsx`
 
-- [ ] **Task 4.3**: Decompose Dashboard page (>250 lines)
-  - Split into: StatCardsGrid, HighRiskPatientsTable, UpcomingVisitsTable, SupervisionAlertsTable
-  - **Files**: \src/components/dashboard/\, \src/pages/Dashboard.tsx\
-  - **Scope**: Medium
-  - **Dependencies**: Phase 1, Task 1.4
+- [ ] Task: Implement scoped dashboards with drill-down
+  - Acceptance: aggregate + patient drill-down within scope; audit patient views
+  - Verify: scope + aggregate tests; axe
+  - Files: `routes/dashboard.ts`, `pages/Dashboard.tsx`, shared types
 
-### Checkpoint 4: After Phase 4
-- [ ] All large components decomposed (<200 lines each)
-- [ ] Container/presentation pattern applied
-- [ ] \
-pm run check:fast\ passes
-- [ ] No functionality regression
+- [ ] Task: Add readiness, metrics, alerts, redacted logs
+  - Acceptance: `/ready` checks DB + migration; no PHI in logs; alerts defined
+  - Verify: readiness test; redaction test
+  - Files: `src/index.ts`, `src/observability/*`, docs
 
-## Phase 5: Testing
+## Wave 4 - Compliance and usability
 
-- [ ] **Task 5.1**: Add unit tests for extracted components
-  - Test RiskBadge variants, FormField components, Table components
-  - Test icon components render correctly
-  - **Files**: \src/components/**/*.test.tsx\
-  - **Scope**: Medium
-  - **Dependencies**: Phases 1-4
+- [ ] Task: Add consent capture and retention jobs
+  - Acceptance: consent version/language stored; purge audited; withdrawal supported
+  - Verify: integration tests
+  - Files: migrations, `routes/patients.ts`, `src/retention/*`, UI
 
-- [ ] **Task 5.2**: Add integration tests for pages
-  - Test Patients page: search, filter, pagination
-  - Test PatientDetail: view/edit modes, form validation
-  - Test NewVisit: form submission, validation
-  - **Files**: \src/pages/*.test.tsx\
-  - **Scope**: Medium
-  - **Dependencies**: Phases 1-4
+- [ ] Task: Add Hindi/English catalogs and accessibility fixes
+  - Acceptance: pilot strings externalized; Hindi sign-off; axe zero critical
+  - Verify: i18n tests; axe; keyboard script
+  - Files: `src/i18n/*`, pages, tests
 
-- [ ] **Task 5.3**: Add E2E tests for critical user flows
-  - Login > Dashboard > Patient list > Patient detail > New visit
-  - Offline mode handling
-  - Sync flow
-  - **Files**: \	ests/e2e/*.spec.ts\
-  - **Scope**: Large
-  - **Dependencies**: Phases 1-4
+- [ ] Task: Add E2E and load tests
+  - Acceptance: offline sync, referral, dashboard, denial; k6 p95 <= 300 ms
+  - Verify: Playwright + k6 reports
+  - Files: `packages/client/src/test/e2e/*`, `load/*`, CI
 
-### Checkpoint 5: After Phase 5
-- [ ] Unit test coverage >= 80% on changed lines
-- [ ] Integration tests cover key user flows
-- [ ] E2E tests pass for critical paths
-- [ ] \
-pm run check:task\ passes
+## Wave 5 - Release
 
-## Phase 6: Performance & Bundle Optimization
+- [ ] Task: Add staging/production deploy and rollback workflows
+  - Acceptance: build once, migrate, smoke, approval, rollback
+  - Verify: staging deploy; rollback rehearsal
+  - Files: `.github/workflows/*`, docs/runbooks
 
-- [ ] **Task 6.1**: Code splitting and lazy loading
-  - Lazy load page components
-  - Split vendor chunks appropriately
-  - **Files**: App.tsx, vite.config.ts
-  - **Scope**: Small
-  - **Dependencies**: Phase 1
+- [ ] Task: Complete compliance and launch docs
+  - Acceptance: DPIA, ROPA, notices, breach plan, checklist signed
+  - Verify: review checklist
+  - Files: `docs/compliance/*`, `docs/launch/*`, `docs/runbooks/*`
 
-- [ ] **Task 6.2**: Bundle size audit
-  - Run size-limit check
-  - Identify and remove unused dependencies
-  - Optimize imports
-  - **Files**: package.json, vite.config.ts
-  - **Scope**: Small
-  - **Dependencies**: Phase 1
-
-### Checkpoint 6: After Phase 6
-- [ ] Bundle size <= 170 kB gzipped
-- [ ] LCP <= 2500ms, CLS <= 0.1
-- [ ] \
-pm run check:perf && npm run check:bundle\ passes
-
+- [ ] Task: Reconcile final docs and README
+  - Acceptance: no false deployment claims; env matrix; links valid
+  - Verify: docs review
+  - Files: `README.md`, `docs/STARTUP.md`, `AGENTS.md`, `CONSTRAINTS.md`

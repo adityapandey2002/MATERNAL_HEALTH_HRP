@@ -1,190 +1,107 @@
-# Implementation Plan: Frontend UI Engineering Quality Improvements
+# Implementation Plan: HRP Araria Production Launch
 
-## Overview
-This plan addresses the frontend UI engineering quality issues identified in the HRP Tracking Platform. The current codebase has functional UI but lacks production-quality accessibility, component architecture, design system consistency, and testing coverage. We'll systematically improve these areas while maintaining all existing functionality.
+Status: Approved
+Last updated: 2026-10-23
 
-## Architecture Decisions
-- **Component Extraction**: Extract reusable components (RiskBadge, icons, form fields) into dedicated files under \src/components/\
-- **Design System**: Continue using CSS variables but formalize token usage and create component variants
-- **Accessibility**: WCAG 2.1 AA compliance as baseline
-- **Testing**: Add unit tests for components, integration tests for pages, E2E tests for critical flows
-- **State Management**: Keep React Query for server state, useState for local UI state, introduce context only where needed
+## Scope
 
-## Task List
+Implement all 17 launch-readiness modules in dependency order. Real patient data stays blocked until the security, audit, PWA, and backup gates pass.
 
-### Phase 1: Foundation & Component Extraction
-- [ ] **Task 1.1**: Create reusable Icon components library
-  - Extract all inline SVG icons into \src/components/icons/\
-  - Create index barrel export
-  - Update all pages to use shared icons
-  - **Files**: \src/components/icons/*.tsx\, update all page files
+## Vertical slices
 
-- [ ] **Task 1.2**: Create reusable RiskBadge component
-  - Extract RiskBadge from Dashboard, Patients, PatientDetail, Referrals, Supervision
-  - Add variants for different contexts (compact, detailed, with icon)
-  - Add proper TypeScript types and accessibility attributes
-  - **Files**: \src/components/RiskBadge/\, update all page files
+### Wave 0 - Safe foundation (week 1)
 
-- [ ] **Task 1.3**: Create reusable FormField components
-  - Create Input, Select, Textarea, Checkbox, Radio components with consistent styling
-  - Add label association, error state, helper text support
-  - **Files**: \src/components/FormField/\, update form-heavy pages
+1. `secrets-config`
+   - Config module, `.env.example`, remove fallbacks, tests.
+2. `database-lifecycle`
+   - Migration ledger, ordered migrations, seed guard, scope indexes.
+3. `production-packaging`
+   - Root Dockerfiles, health/readiness, graceful shutdown, preview compose.
 
-- [ ] **Task 1.4**: Create reusable Table components
-  - Extract table structure into composable Table, TableHeader, TableRow, TableCell
-  - Add sorting, pagination, empty state, loading skeleton support
-  - **Files**: \src/components/Table/\, update Dashboard, Patients, Referrals, Supervision
+Gate: clean-clone build, invalid-config boot failure, migration idempotency, `npm run check:full`.
 
-### Phase 2: Accessibility Improvements
-- [ ] **Task 2.1**: Fix heading hierarchy across all pages
-  - Ensure single h1 per page, proper h2/h3 nesting
-  - Add landmark regions (main, nav, aside)
-  - **Files**: All page files, Layout.tsx
+### Wave 1 - PHI protection (weeks 2-3)
 
-- [ ] **Task 2.2**: Improve keyboard navigation and focus management
-  - Ensure all interactive elements are keyboard accessible
-  - Add visible focus styles (already in CSS but verify)
-  - Implement focus trapping in modals/dialogs
-  - **Files**: Layout.tsx, PatientDetail.tsx, NewVisit.tsx, Settings.tsx
+4. `authz-facility-scope`
+   - Policy, scope resolver, route enforcement, IDOR tests.
+5. `phi-audit`
+   - Audit schema, writer, route coverage, DHS reader, hash chain.
 
-- [ ] **Task 2.3**: Add ARIA labels and semantic HTML improvements
-  - Add aria-label to icon-only buttons
-  - Ensure form inputs have associated labels
-  - Add role=\lert\ for error messages
-  - Add aria-live for dynamic content updates
-  - **Files**: All interactive components
+Gate: role/responsibility matrix, IDOR suite, audit completeness, changed-line coverage >= 80%.
 
-- [ ] **Task 2.4**: Improve screen reader experience
-  - Add proper table headers with scope attributes
-  - Ensure status updates are announced
-  - Add descriptive link text (avoid \View all\ without context)
-  - **Files**: Table components, Dashboard, Patients, Referrals
+### Wave 2 - Browser and API hardening (weeks 3-4)
 
-### Phase 3: Responsive Design & Polish
-- [ ] **Task 3.1**: Audit and fix responsive breakpoints
-  - Test at 320px, 768px, 1024px, 1440px
-  - Fix any horizontal overflow issues
-  - Ensure touch targets meet 44x44px minimum
-  - **Files**: All page files, CSS
+6. `web-security`
+   - CORS, CSRF, rate limits, lockout, headers, refresh rotation.
+7. `pwa-privacy`
+   - Remove API caching, logout wipe, private source maps, manifest config.
 
-- [ ] **Task 3.2**: Improve loading, empty, and error states
-  - Replace spinners with skeleton loaders for content
-  - Add meaningful empty states with action buttons
-  - Improve error messages with retry actions
-  - **Files**: All pages with data fetching
+Gate: CORS/rate-limit/revocation tests, no PHI in Cache Storage, ZAP baseline.
 
-- [ ] **Task 3.3**: Design system consistency audit
-  - Replace any hardcoded values with CSS variables
-  - Ensure consistent spacing scale (0.25rem increments)
-  - Verify color contrast ratios meet 4.5:1
-  - **Files**: index.css, all component files
+### Wave 3 - District operations (weeks 4-6)
 
-### Phase 4: Component Decomposition
-- [ ] **Task 4.1**: Decompose PatientDetail page (>300 lines)
-  - Split into: PatientHeader, RiskAssessmentPanel, PatientDetailsGrid, VisitHistoryTable, PatientForm
-  - Create container/presentation separation
-  - **Files**: \src/components/patient/\, \src/pages/PatientDetail.tsx\
+8. `observability`
+   - Redacted logs, metrics, `/ready`, alerts, SLOs.
+9. `district-onboarding`
+   - Araria facility/user/import scripts, BLOCK level, dry-run.
+10. `district-administration`
+    - DHS admin UI/API, user/facility/responsibility management, audit viewer.
+11. `referral-workflow`
+    - Clinical routing, destination acknowledgement, nodal visibility, states.
+12. `district-dashboards`
+    - Scoped aggregate and patient drill-down.
 
-- [ ] **Task 4.2**: Decompose NewVisit page (>280 lines)
-  - Split into: VisitDetailsForm, VitalsGrid, DangerSignsSelector, SupplementsSelector, ReferralSection, NotesSection
-  - **Files**: \src/components/visit/\, \src/pages/NewVisit.tsx\
+Gate: staging deploy, Araria dry-run/rollback, admin audit, referral state machine, dashboard authz.
 
-- [ ] **Task 4.3**: Decompose Dashboard page (>250 lines)
-  - Split into: StatCardsGrid, HighRiskPatientsTable, UpcomingVisitsTable, SupervisionAlertsTable
-  - **Files**: \src/components/dashboard/\, \src/pages/Dashboard.tsx\
+### Wave 4 - Compliance and usability (weeks 6-8)
 
-### Phase 5: Testing
-- [ ] **Task 5.1**: Add unit tests for extracted components
-  - Test RiskBadge variants, FormField components, Table components
-  - Test icon components render correctly
-  - **Files**: \src/components/**/*.test.tsx\
+13. `consent-retention`
+    - Consent capture, retention/erasure jobs, DSAR runbook.
+14. `i18n-a11y`
+    - Hindi/English catalogs, clinical glossary, WCAG AA.
+15. `observability` finalization
+    - Alerts, dashboards, on-call.
 
-- [ ] **Task 5.2**: Add integration tests for pages
-  - Test Patients page: search, filter, pagination
-  - Test PatientDetail: view/edit modes, form validation
-  - Test NewVisit: form submission, validation
-  - **Files**: \src/pages/*.test.tsx\
+Gate: consent capture, axe zero critical, readiness/alerts live.
 
-- [ ] **Task 5.3**: Add E2E tests for critical user flows
-  - Login > Dashboard > Patient list > Patient detail > New visit
-  - Offline mode handling
-  - Sync flow
-  - **Files**: \	ests/e2e/*.spec.ts\
+### Wave 5 - Release evidence (weeks 8-10)
 
-### Phase 6: Performance & Bundle Optimization
-- [ ] **Task 6.1**: Code splitting and lazy loading
-  - Lazy load page components
-  - Split vendor chunks appropriately
-  - **Files**: App.tsx, vite.config.ts
+16. `e2e-load`
+    - Offline/sync/referral/dashboard E2E, k6.
+17. `cicd-release`
+    - Build once, migration job, staging/prod deploy, rollback.
+18. `compliance-docs`
+    - DPIA, ROPA, notices, runbooks, launch checklist.
 
-- [ ] **Task 6.2**: Bundle size audit
-  - Run size-limit check
-  - Identify and remove unused dependencies
-  - Optimize imports
-  - **Files**: package.json, vite.config.ts
+Gate: E2E and load evidence, rollback and restore drills, security review, signed release.
 
-## Checkpoints
+### Pilot (weeks 10-12)
 
-### Checkpoint 1: After Phase 1 (Component Extraction)
-- [ ] All shared components extracted and exported
-- [ ] All pages updated to use shared components
-- [ ] \
-pm run check:fast\ passes
-- [ ] Visual regression: no breaking changes
+- UAT with 10-20 ANMs, 3-5 CHOs, BHM, DHS.
+- Training, paper fallback, hypercare.
+- Weekly KPI review and go/no-go for expansion.
 
-### Checkpoint 2: After Phase 2 (Accessibility)
-- [ ] axe-core scan passes with zero critical/serious violations
-- [ ] Keyboard navigation works for all flows
-- [ ] Screen reader announces content correctly
-- [ ] \
-pm run check:fast\ passes
+## Parallel work
 
-### Checkpoint 3: After Phase 3 (Responsive & Polish)
-- [ ] Responsive at all breakpoints
-- [ ] Loading/empty/error states improved
-- [ ] Design system consistent
-- [ ] \
-pm run check:fast\ passes
+- Documentation and approvals start in week 1.
+- Frontend i18n can begin after PWA privacy.
+- Admin UI and referral UI can proceed in parallel once authz API contracts are stable.
+- Compliance docs run alongside Waves 2-5.
 
-### Checkpoint 4: After Phase 4 (Decomposition)
-- [ ] All large components decomposed (<200 lines each)
-- [ ] Container/presentation pattern applied
-- [ ] \
-pm run check:fast\ passes
-- [ ] No functionality regression
+## Risks
 
-### Checkpoint 5: After Phase 5 (Testing)
-- [ ] Unit test coverage >= 80% on changed lines
-- [ ] Integration tests cover key user flows
-- [ ] E2E tests pass for critical paths
-- [ ] \
-pm run check:task\ passes
+| Risk | Mitigation |
+|---|---|
+| IDOR/PHI exposure | Wave 1 deny-by-default and IDOR suite before any pilot data |
+| Workspace packaging broken | Root-context images and clean-clone build in Wave 0 |
+| Sync corruption | Server-assigned versions, tombstones, batched transactional push |
+| PHI in caches/logs | PWA cache exclusion, log redaction, private source maps |
+| Approval/hosting delay | Start managed-cloud staging with synthetic data; run NIC/BSDC approval in parallel |
 
-### Checkpoint 6: After Phase 6 (Performance)
-- [ ] Bundle size <= 170 kB gzipped
-- [ ] LCP <= 2500ms, CLS <= 0.1
-- [ ] \
-pm run check:perf && npm run check:bundle\ passes
+## Verification checkpoints
 
-## Risks and Mitigations
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Breaking existing functionality during refactoring | High | Incremental changes, verify after each task, comprehensive testing |
-| Accessibility regressions | High | Run axe-core after each phase, manual keyboard testing |
-| Bundle size increase from new components | Medium | Tree-shaking, lazy loading, monitor with size-limit |
-| Design inconsistency during transition | Medium | Design token audit, systematic replacement |
-| Test maintenance overhead | Low | Focus on behavior testing, not implementation details |
-
-## Open Questions
-- Should we adopt a component library (Radix UI, Headless UI) or keep custom components?
-- Do we need Storybook for component documentation?
-- What's the target browser support matrix?
-
-## Dependencies
-Phase 1 must complete before Phase 2-4 (components needed for accessibility fixes).
-Phase 2 can parallelize with Phase 3.
-Phase 4 depends on Phase 1.
-Phase 5 depends on Phases 1-4.
-Phase 6 can start after Phase 1.
-
+- After each task: `npm run check:fast`.
+- After each module: `npm run check:task`.
+- Before merge: `npm run check:full`.
+- Before staging: E2E smoke and migration dry-run.
+- Before pilot: backup restore, rollback rehearsal, security review, UAT sign-off.
