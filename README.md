@@ -71,8 +71,8 @@ npm run test:smoke:proxy    # same, through the Vite proxy
 |------|-------------|----------|
 | ANM | ANM001 | password123 |
 | CHO | CHO001 | password123 |
-| MO | MO001 | password123 |
-| Admin | ADM001 | password123 |
+| BHM | MO001 | password123 |
+| DHS | ADM001 | password123 |
 
 ## Quality Gates
 
@@ -140,7 +140,7 @@ hrp/
 - [x] ANC visit logging with vitals
 - [x] Auto HRP risk scoring (configurable rules)
 - [x] CHO dashboard with triage line list
-- [x] Referral workflow (ANM → CHO → MO)
+- [x] Referral workflow (ANM → CHO → BHM → DHS)
 - [x] Offline sync with conflict handling
 - [x] Supervision alerts (ANM offline, overdue visits)
 - [x] JWT auth with refresh tokens

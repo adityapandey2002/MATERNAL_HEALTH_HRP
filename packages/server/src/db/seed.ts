@@ -103,6 +103,7 @@ export async function seed() {
   console.log("Seeding database...");
 
   await db.deleteFrom("responsibilities").execute();
+  await db.deleteFrom("sync_queue").execute();
   await db.deleteFrom("supervision_alerts").execute();
   await db.deleteFrom("referrals").execute();
   await db.deleteFrom("visits").execute();

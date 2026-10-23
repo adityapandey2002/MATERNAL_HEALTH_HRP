@@ -1,51 +1,87 @@
-import type { UserRole } from "@hrp/shared";
+import type { FacilityLevel, UserRole } from "@hrp/shared";
 import { AuthzError } from "./scope.js";
 import type { ActorScope } from "./scope.js";
 import { REFERRAL_NODAL, isPathInSubtree } from "./scope.js";
 
-export type Action =
-  | "patient:read"
-  | "patient:write"
-  | "visit:read"
-  | "visit:write"
-  | "referral:read"
-  | "referral:create"
-  | "referral:respond"
-  | "alert:read"
-  | "alert:acknowledge"
-  | "queue:read"
-  | "sync:read"
-  | "sync:push"
-  | "facility:read"
-  | "dashboard:read"
-  | "audit:read"
-  | "admin:manage";
+export const ACTIONS = [
+  "patient:read",
+  "patient:write",
+  "patient:delete",
+  "patient:archive",
+  "visit:read",
+  "visit:write",
+  "visit:delete",
+  "referral:read",
+  "referral:create",
+  "referral:respond",
+  "alert:read",
+  "alert:acknowledge",
+  "queue:read",
+  "queue:retry",
+  "sync:read",
+  "sync:push",
+  "facility:read",
+  "dashboard:read",
+  "audit:read",
+  "admin:manage",
+] as const;
 
-export interface ResourceTarget {
-  facilityPath?: string | null;
-  fromFacilityPath?: string | null;
-  toFacilityPath?: string | null;
+export type Action = (typeof ACTIONS)[number];
+
+export interface FacilityTarget {
+  type: "facility";
+  facilityPath: string | null;
 }
+
+export interface ReferralTarget {
+  type: "referral";
+  fromFacilityPath: string | null;
+  toFacilityPath: string | null;
+  toFacilityLevel?: FacilityLevel | null;
+}
+
+export type ResourceTarget = FacilityTarget | ReferralTarget;
 
 export type DenyReason =
   | "ROLE_NOT_PERMITTED"
   | "OUT_OF_SCOPE"
   | "MISSING_TARGET_SCOPE"
   | "REFERRAL_NOT_VISIBLE"
+  | "TARGET_TYPE_MISMATCH"
   | "UNKNOWN_ACTION";
 
 export type Decision =
   | { allowed: true; reason: "ALLOWED" }
-  | { allowed: false; reason: DenyReason };
+  | { allowed: false; reason: DenyReason; httpStatus: 403 | 404 };
+
+type PolicyResult = { allowed: true; reason: "ALLOWED" } | { allowed: false; reason: DenyReason };
+
+const READ_ACTIONS: ReadonlySet<Action> = new Set<Action>([
+  "patient:read",
+  "visit:read",
+  "referral:read",
+  "alert:read",
+  "queue:read",
+  "sync:read",
+  "facility:read",
+  "dashboard:read",
+  "audit:read",
+]);
 
 const CLINICAL_WRITE_ROLES: readonly UserRole[] = ["ANM", "CHO"];
-const REFERRAL_RESPOND_ROLES: readonly UserRole[] = ["CHO", "BHM", "DHS"];
+const SUPERVISION_ROLES: readonly UserRole[] = ["CHO", "BHM", "DHS"];
 
-function allow(): Decision {
+const REFERRAL_DESTINATION_LEVELS: Partial<Record<UserRole, readonly FacilityLevel[]>> = {
+  CHO: ["HWC"],
+  BHM: ["BLOCK", "CHC"],
+  DHS: ["DISTRICT"],
+};
+
+function allow(): PolicyResult {
   return { allowed: true, reason: "ALLOWED" };
 }
 
-function deny(reason: DenyReason): Decision {
+function deny(reason: DenyReason): PolicyResult {
   return { allowed: false, reason };
 }
 
@@ -53,8 +89,8 @@ function isFacilityInScope(actor: ActorScope, facilityPath: string | null | unde
   return typeof facilityPath === "string" && isPathInSubtree(actor.facilityPath, facilityPath);
 }
 
-function hasNodalGrant(actor: ActorScope, facilityPath: string | null): boolean {
-  if (facilityPath === null) return false;
+function hasNodalGrant(actor: ActorScope, facilityPath: string | null | undefined): boolean {
+  if (typeof facilityPath !== "string" || facilityPath.length === 0) return false;
 
   return actor.responsibilities.some(
     (grant) =>
@@ -62,7 +98,11 @@ function hasNodalGrant(actor: ActorScope, facilityPath: string | null): boolean 
   );
 }
 
-function canReadFacilityScoped(actor: ActorScope, target: ResourceTarget): Decision {
+function canReadFacilityScoped(actor: ActorScope, target: ResourceTarget): PolicyResult {
+  if (target.type !== "facility") {
+    return deny("TARGET_TYPE_MISMATCH");
+  }
+
   const facilityPath = target.facilityPath;
   if (typeof facilityPath !== "string" || facilityPath.length === 0) {
     return deny("MISSING_TARGET_SCOPE");
@@ -71,9 +111,13 @@ function canReadFacilityScoped(actor: ActorScope, target: ResourceTarget): Decis
   return isPathInSubtree(actor.facilityPath, facilityPath) ? allow() : deny("OUT_OF_SCOPE");
 }
 
-function canWriteClinical(actor: ActorScope, target: ResourceTarget): Decision {
+function canWriteClinical(actor: ActorScope, target: ResourceTarget): PolicyResult {
   if (!CLINICAL_WRITE_ROLES.includes(actor.role)) {
     return deny("ROLE_NOT_PERMITTED");
+  }
+
+  if (target.type !== "facility") {
+    return deny("TARGET_TYPE_MISMATCH");
   }
 
   const facilityPath = target.facilityPath;
@@ -82,13 +126,17 @@ function canWriteClinical(actor: ActorScope, target: ResourceTarget): Decision {
   }
 
   if (actor.role === "ANM") {
-    return facilityPath === actor.facilityPath ? allow() : deny("OUT_OF_SCOPE");
+    return facilityPath === actor.homeFacilityPath ? allow() : deny("OUT_OF_SCOPE");
   }
 
   return isPathInSubtree(actor.facilityPath, facilityPath) ? allow() : deny("OUT_OF_SCOPE");
 }
 
-function canReadReferral(actor: ActorScope, target: ResourceTarget): Decision {
+function canReadReferral(actor: ActorScope, target: ResourceTarget): PolicyResult {
+  if (target.type !== "referral") {
+    return deny("TARGET_TYPE_MISMATCH");
+  }
+
   const fromFacilityPath = target.fromFacilityPath ?? null;
   const toFacilityPath = target.toFacilityPath ?? null;
 
@@ -96,20 +144,24 @@ function canReadReferral(actor: ActorScope, target: ResourceTarget): Decision {
     return deny("MISSING_TARGET_SCOPE");
   }
 
-  if (isFacilityInScope(actor, fromFacilityPath) || isFacilityInScope(actor, toFacilityPath)) {
+  if (hasNodalGrant(actor, fromFacilityPath) || hasNodalGrant(actor, toFacilityPath)) {
     return allow();
   }
 
-  if (hasNodalGrant(actor, fromFacilityPath) || hasNodalGrant(actor, toFacilityPath)) {
+  if (actor.role === "ANM") {
+    return fromFacilityPath === actor.facilityPath ? allow() : deny("REFERRAL_NOT_VISIBLE");
+  }
+
+  if (isFacilityInScope(actor, fromFacilityPath) || isFacilityInScope(actor, toFacilityPath)) {
     return allow();
   }
 
   return deny("REFERRAL_NOT_VISIBLE");
 }
 
-function canRespondToReferral(actor: ActorScope, target: ResourceTarget): Decision {
-  if (!REFERRAL_RESPOND_ROLES.includes(actor.role)) {
-    return deny("ROLE_NOT_PERMITTED");
+function canRespondToReferral(actor: ActorScope, target: ResourceTarget): PolicyResult {
+  if (target.type !== "referral") {
+    return deny("TARGET_TYPE_MISMATCH");
   }
 
   const destination = target.toFacilityPath;
@@ -117,23 +169,52 @@ function canRespondToReferral(actor: ActorScope, target: ResourceTarget): Decisi
     return deny("MISSING_TARGET_SCOPE");
   }
 
-  return isPathInSubtree(actor.facilityPath, destination) ? allow() : deny("OUT_OF_SCOPE");
+  const destinationLevel = target.toFacilityLevel;
+  if (!destinationLevel) {
+    return deny("MISSING_TARGET_SCOPE");
+  }
+
+  if (hasNodalGrant(actor, destination)) {
+    return allow();
+  }
+
+  const allowedLevels = REFERRAL_DESTINATION_LEVELS[actor.role];
+  if (!allowedLevels) {
+    return deny("ROLE_NOT_PERMITTED");
+  }
+
+  if (!isFacilityInScope(actor, destination)) {
+    return deny("OUT_OF_SCOPE");
+  }
+
+  return allowedLevels.includes(destinationLevel) ? allow() : deny("ROLE_NOT_PERMITTED");
 }
 
-function canAdminister(actor: ActorScope, target: ResourceTarget): Decision {
+function canAcknowledgeAlert(actor: ActorScope, target: ResourceTarget): PolicyResult {
+  if (!SUPERVISION_ROLES.includes(actor.role)) {
+    return deny("ROLE_NOT_PERMITTED");
+  }
+
+  return canReadFacilityScoped(actor, target);
+}
+
+function canRetryQueue(actor: ActorScope, target: ResourceTarget): PolicyResult {
+  if (!SUPERVISION_ROLES.includes(actor.role)) {
+    return deny("ROLE_NOT_PERMITTED");
+  }
+
+  return canReadFacilityScoped(actor, target);
+}
+
+function canAdminister(actor: ActorScope, target: ResourceTarget): PolicyResult {
   if (actor.role !== "DHS") {
     return deny("ROLE_NOT_PERMITTED");
   }
 
-  const facilityPath = target.facilityPath;
-  if (typeof facilityPath !== "string" || facilityPath.length === 0) {
-    return deny("MISSING_TARGET_SCOPE");
-  }
-
-  return isPathInSubtree(actor.facilityPath, facilityPath) ? allow() : deny("OUT_OF_SCOPE");
+  return canReadFacilityScoped(actor, target);
 }
 
-export function can(actor: ActorScope, action: Action, target: ResourceTarget): Decision {
+function evaluate(actor: ActorScope, action: Action, target: ResourceTarget): PolicyResult {
   switch (action) {
     case "patient:read":
     case "visit:read":
@@ -142,7 +223,6 @@ export function can(actor: ActorScope, action: Action, target: ResourceTarget): 
     case "sync:read":
     case "facility:read":
     case "dashboard:read":
-    case "alert:acknowledge":
       return canReadFacilityScoped(actor, target);
 
     case "patient:write":
@@ -151,28 +231,62 @@ export function can(actor: ActorScope, action: Action, target: ResourceTarget): 
     case "sync:push":
       return canWriteClinical(actor, target);
 
+    case "patient:archive":
+    case "audit:read":
+    case "admin:manage":
+      return canAdminister(actor, target);
+
+    case "patient:delete":
+    case "visit:delete":
+      return deny("ROLE_NOT_PERMITTED");
+
     case "referral:read":
       return canReadReferral(actor, target);
 
     case "referral:respond":
       return canRespondToReferral(actor, target);
 
-    case "audit:read":
-    case "admin:manage":
-      return canAdminister(actor, target);
+    case "alert:acknowledge":
+      return canAcknowledgeAlert(actor, target);
+
+    case "queue:retry":
+      return canRetryQueue(actor, target);
 
     default:
       return deny("UNKNOWN_ACTION");
   }
 }
 
+export function can(actor: ActorScope, action: Action, target: ResourceTarget): Decision {
+  const result = evaluate(actor, action, target);
+
+  if (result.allowed) {
+    return result;
+  }
+
+  const outOfScopeRead =
+    (result.reason === "OUT_OF_SCOPE" || result.reason === "REFERRAL_NOT_VISIBLE") &&
+    READ_ACTIONS.has(action);
+
+  return {
+    allowed: false,
+    reason: result.reason,
+    httpStatus: outOfScopeRead ? 404 : 403,
+  };
+}
+
 export function assertCan(actor: ActorScope, action: Action, target: ResourceTarget): void {
   const decision = can(actor, action, target);
 
   if (!decision.allowed) {
-    throw new AuthzError("FORBIDDEN", "Action is not permitted", {
-      action,
-      reason: decision.reason,
-    });
+    throw new AuthzError(
+      "FORBIDDEN",
+      "Action is not permitted",
+      {
+        action,
+        reason: decision.reason,
+      },
+      decision.httpStatus
+    );
   }
 }

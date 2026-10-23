@@ -18,6 +18,9 @@ export interface ActorScope {
   facilityId: string;
   facilityPath: string;
   facilityLevel: FacilityLevel;
+  readonly homeFacilityId: string;
+  readonly homeFacilityPath: string;
+  readonly homeFacilityLevel: FacilityLevel;
   responsibilities: readonly ResponsibilityGrant[];
 }
 
@@ -51,18 +54,26 @@ export type AuthzErrorCode =
   | "INACTIVE_USER"
   | "UNKNOWN_ROLE"
   | "UNKNOWN_FACILITY"
+  | "USER_FACILITY_MISMATCH"
   | "ROLE_FACILITY_MISMATCH"
   | "SCOPE_WIDENING"
   | "FORBIDDEN";
 
 export class AuthzError extends Error {
   readonly code: AuthzErrorCode;
+  readonly httpStatus: number;
   readonly details: Record<string, unknown> | undefined;
 
-  constructor(code: AuthzErrorCode, message: string, details?: Record<string, unknown>) {
+  constructor(
+    code: AuthzErrorCode,
+    message: string,
+    details?: Record<string, unknown>,
+    httpStatus = 403
+  ) {
     super(message);
     this.name = "AuthzError";
     this.code = code;
+    this.httpStatus = httpStatus;
     this.details = details;
   }
 }
@@ -119,6 +130,14 @@ export function buildActorScope(
     throw new AuthzError("INACTIVE_USER", "User is inactive", { userId: user.id });
   }
 
+  if (user.facilityId !== facility.id) {
+    throw new AuthzError("USER_FACILITY_MISMATCH", "User and facility do not match", {
+      userId: user.id,
+      userFacilityId: user.facilityId,
+      facilityId: facility.id,
+    });
+  }
+
   const role = UserRole.safeParse(user.role);
   if (!role.success) {
     throw new AuthzError("UNKNOWN_ROLE", "User role is not supported", {
@@ -155,6 +174,9 @@ export function buildActorScope(
     facilityId: facility.id,
     facilityPath: facility.path,
     facilityLevel: level.data,
+    homeFacilityId: facility.id,
+    homeFacilityPath: facility.path,
+    homeFacilityLevel: level.data,
     responsibilities: buildResponsibilities(responsibilities),
   };
 }
@@ -169,7 +191,11 @@ export async function resolveActor(userId: string, lookup: ActorLookup): Promise
     throw new AuthzError("INACTIVE_USER", "User is inactive", { userId });
   }
 
-  const facility = await lookup.findFacility(user.facilityId);
+  const [facility, responsibilities] = await Promise.all([
+    lookup.findFacility(user.facilityId),
+    lookup.findResponsibilities(userId),
+  ]);
+
   if (!facility) {
     throw new AuthzError("UNKNOWN_FACILITY", "Actor facility was not found", {
       userId,
@@ -177,7 +203,6 @@ export async function resolveActor(userId: string, lookup: ActorLookup): Promise
     });
   }
 
-  const responsibilities = await lookup.findResponsibilities(userId);
   return buildActorScope(user, facility, responsibilities);
 }
 
@@ -217,6 +242,9 @@ export async function assertRequestedScope(
     facilityId: facility.id,
     facilityPath: facility.path,
     facilityLevel: level.data,
+    responsibilities: actor.responsibilities.filter((grant) =>
+      isPathInSubtree(facility.path, grant.scopePath)
+    ),
   };
 }
 

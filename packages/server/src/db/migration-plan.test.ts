@@ -82,6 +82,7 @@ describe("migration plan", () => {
       "001_baseline",
       "002_scope_indexes",
       "003_authz_foundation",
+      "004_authz_hardening",
     ]);
   });
 });

@@ -1,3 +1,4 @@
+import { UserRole } from "@hrp/shared";
 import type { Facility, Patient, Referral, SupervisionAlert, User, Visit } from "@hrp/shared";
 import type {
   FacilityRow,
@@ -112,7 +113,7 @@ export function serializeUser(row: UserRow): User {
     employeeId: row.employee_id,
     name: row.name,
     phone: row.phone,
-    role: row.role,
+    role: UserRole.parse(row.role),
     facilityId: row.facility_id,
     language: row.language,
     isActive: row.is_active,

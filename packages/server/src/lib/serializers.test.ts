@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { PatientRow } from "../db/types.js";
-import { serializePatient } from "./serializers.js";
+import type { PatientRow, UserRow } from "../db/types.js";
+import { serializePatient, serializeUser } from "./serializers.js";
 
 const row: PatientRow = {
   id: "11111111-1111-4111-8111-111111111111",
@@ -55,5 +55,36 @@ describe("serializePatient", () => {
     const patient = serializePatient({ ...row, risk_factors: null as unknown as string[] });
 
     expect(patient.riskFactors).toEqual([]);
+  });
+});
+
+const userRow: UserRow = {
+  id: "44444444-4444-4444-8444-444444444444",
+  employee_id: "ANM001",
+  name: "Asha Ben",
+  phone: "9876543210",
+  password_hash: "hash",
+  role: "ANM",
+  facility_id: "22222222-2222-4222-8222-222222222222",
+  language: "hi",
+  is_active: true,
+  created_at: new Date("2026-01-01T00:00:00.000Z"),
+  updated_at: new Date("2026-01-01T00:00:00.000Z"),
+};
+
+describe("serializeUser", () => {
+  it("maps an active login role", () => {
+    expect(serializeUser(userRow)).toMatchObject({
+      id: userRow.id,
+      employeeId: "ANM001",
+      role: "ANM",
+      facilityId: userRow.facility_id,
+      isActive: true,
+    });
+  });
+
+  it("rejects inactive legacy roles from the database union", () => {
+    expect(() => serializeUser({ ...userRow, role: "ASHA" })).toThrow();
+    expect(() => serializeUser({ ...userRow, role: "STATE_ADMIN" })).toThrow();
   });
 });

@@ -110,6 +110,9 @@ describe("buildActorScope", () => {
       facilityId: "fac-village",
       facilityPath: VILLAGE_PATH,
       facilityLevel: "VILLAGE",
+      homeFacilityId: "fac-village",
+      homeFacilityPath: VILLAGE_PATH,
+      homeFacilityLevel: "VILLAGE",
       responsibilities: [
         {
           responsibility: "REFERRAL_NODAL",
@@ -158,6 +161,15 @@ describe("buildActorScope", () => {
       throw new Error("Expected an AuthzError");
     } catch (error) {
       expectAuthzError(error, "ROLE_FACILITY_MISMATCH");
+    }
+  });
+
+  it("rejects a user whose record points at a different facility", () => {
+    try {
+      buildActorScope({ ...activeUser, facilityId: "fac-other" }, villageFacility);
+      throw new Error("Expected an AuthzError");
+    } catch (error) {
+      expectAuthzError(error, "USER_FACILITY_MISMATCH");
     }
   });
 
@@ -283,12 +295,50 @@ describe("assertRequestedScope", () => {
     expect(await assertRequestedScope(actor, "fac-hwc", lookup)).toBe(actor);
   });
 
-  it("narrows to a descendant facility", async () => {
+  it("narrows to a descendant facility without losing the home scope", async () => {
     const narrowed = await assertRequestedScope(actor, "fac-village", lookup);
 
     expect(narrowed.facilityId).toBe("fac-village");
     expect(narrowed.facilityPath).toBe(VILLAGE_PATH);
+    expect(narrowed.facilityLevel).toBe("VILLAGE");
     expect(narrowed.role).toBe("CHO");
+    expect(narrowed.homeFacilityId).toBe("fac-hwc");
+    expect(narrowed.homeFacilityPath).toBe(HWC_PATH);
+    expect(narrowed.homeFacilityLevel).toBe("HWC");
+  });
+
+  it("keeps only responsibility grants inside the requested subtree", async () => {
+    const actorWithGrants = buildActorScope(
+      { ...activeUser, role: "CHO", facilityId: "fac-hwc" },
+      { id: "fac-hwc", path: HWC_PATH, level: "HWC" },
+      [
+        {
+          responsibility: "REFERRAL_NODAL",
+          scopeFacilityId: "fac-village",
+          scopePath: VILLAGE_PATH,
+        },
+        {
+          responsibility: "REFERRAL_NODAL",
+          scopeFacilityId: "fac-block",
+          scopePath: BLOCK_PATH,
+        },
+        {
+          responsibility: "REFERRAL_NODAL",
+          scopeFacilityId: "fac-sibling",
+          scopePath: SIBLING_PATH,
+        },
+      ]
+    );
+
+    const narrowed = await assertRequestedScope(actorWithGrants, "fac-village", lookup);
+
+    expect(narrowed.responsibilities).toEqual([
+      {
+        responsibility: "REFERRAL_NODAL",
+        scopeFacilityId: "fac-village",
+        scopePath: VILLAGE_PATH,
+      },
+    ]);
   });
 
   it("rejects widening to an ancestor or sibling", async () => {

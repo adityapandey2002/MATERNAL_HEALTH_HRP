@@ -1,3 +1,4 @@
+import type { UserRole } from "@hrp/shared";
 import type { ColumnType, Generated, Selectable } from "kysely";
 
 /**
@@ -8,6 +9,8 @@ import type { ColumnType, Generated, Selectable } from "kysely";
  * declared as `ColumnType<T, string, string>` because the driver sends them
  * as JSON text and parses them back into objects on read.
  */
+
+export type DbUserRole = UserRole | "ASHA" | "STATE_ADMIN";
 
 export interface Facility {
   id: Generated<string>;
@@ -29,7 +32,7 @@ export interface User {
   name: string;
   phone: string;
   password_hash: string;
-  role: "ANM" | "CHO" | "BHM" | "DHS";
+  role: DbUserRole;
   facility_id: string;
   language: Generated<string>;
   is_active: Generated<boolean>;
@@ -106,7 +109,7 @@ export interface Referral {
 
 export interface SyncQueue {
   id: Generated<string>;
-  facility_id: string | null;
+  facility_id: string;
   entity_type: "PATIENT" | "VISIT" | "REFERRAL";
   entity_id: string;
   operation: "CREATE" | "UPDATE" | "DELETE";

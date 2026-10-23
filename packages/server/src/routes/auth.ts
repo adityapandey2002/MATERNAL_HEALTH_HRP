@@ -1,3 +1,4 @@
+import { UserRole } from "@hrp/shared";
 import { LoginSchema } from "@hrp/shared/schemas";
 import bcrypt from "bcryptjs";
 import type { FastifyPluginAsync } from "fastify";
@@ -26,9 +27,10 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       return reply.code(401).send({ message: "Invalid credentials" });
     }
 
+    const serializedUser = serializeUser(user);
     const accessToken = app.jwt.sign({
       sub: user.id,
-      role: user.role,
+      role: serializedUser.role,
       facilityId: user.facility_id,
     });
     const refreshToken = app.jwt.sign(
@@ -44,7 +46,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       path: "/",
     });
 
-    return { accessToken, user: serializeUser(user) };
+    return { accessToken, user: serializedUser };
   });
 
   app.post("/refresh", async (request, reply) => {
@@ -71,7 +73,7 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
 
       const newAccessToken = app.jwt.sign({
         sub: user.id,
-        role: user.role,
+        role: UserRole.parse(user.role),
         facilityId: user.facility_id,
       });
       const newRefreshToken = app.jwt.sign(
