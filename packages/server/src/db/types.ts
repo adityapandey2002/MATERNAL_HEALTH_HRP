@@ -13,7 +13,7 @@ export interface Facility {
   id: Generated<string>;
   code: string;
   name: string;
-  level: "VILLAGE" | "HWC" | "PHC" | "CHC" | "DISTRICT" | "STATE";
+  level: "VILLAGE" | "HWC" | "PHC" | "CHC" | "BLOCK" | "DISTRICT" | "STATE";
   parent_id: string | null;
   path: string;
   state: string;
@@ -106,6 +106,7 @@ export interface Referral {
 
 export interface SyncQueue {
   id: Generated<string>;
+  facility_id: string | null;
   entity_type: "PATIENT" | "VISIT" | "REFERRAL";
   entity_id: string;
   operation: "CREATE" | "UPDATE" | "DELETE";
@@ -130,6 +131,12 @@ export interface SupervisionAlert {
   created_at: Generated<Date>;
 }
 
+export interface SchemaMigration {
+  id: string;
+  checksum: string;
+  applied_at: Generated<Date>;
+}
+
 export interface DB {
   facilities: Facility;
   users: User;
@@ -138,6 +145,7 @@ export interface DB {
   referrals: Referral;
   sync_queue: SyncQueue;
   supervision_alerts: SupervisionAlert;
+  schema_migrations: SchemaMigration;
 }
 
 /** Row shape as returned by a SELECT (defaults resolved, jsonb parsed). */

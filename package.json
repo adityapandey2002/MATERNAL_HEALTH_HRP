@@ -30,7 +30,8 @@
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down",
     "db:migrate": "npm run db:migrate --workspace=packages/server",
-    "db:seed": "npm run db:seed --workspace=packages/server"
+    "db:seed": "npm run db:seed --workspace=packages/server",
+    "backup:verify": "node scripts/verify-backup.mjs"
   },
   "devDependencies": {
     "@axe-core/cli": "^4.9.1",

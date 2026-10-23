@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db } from "./client.js";
+import { assertSeedAllowed } from "./seed-guard.js";
 
 /**
  * Seeds a realistic facility hierarchy, test users, patients, visits, a
@@ -98,6 +99,7 @@ const FACILITIES: FacilitySeed[] = [
 const date = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 
 export async function seed() {
+  assertSeedAllowed(process.env);
   console.log("Seeding database...");
 
   await db.deleteFrom("supervision_alerts").execute();

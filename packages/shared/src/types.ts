@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { HrpReason } from "./hrp-reasons.js";
 
-export const FacilityLevel = z.enum(["VILLAGE", "HWC", "PHC", "CHC", "DISTRICT", "STATE"]);
+export const FacilityLevel = z.enum(["VILLAGE", "HWC", "PHC", "CHC", "BLOCK", "DISTRICT", "STATE"]);
 export const UserRole = z.enum(["ANM", "ASHA", "CHO", "MO", "DISTRICT_ADMIN", "STATE_ADMIN"]);
 
 export const RiskLevel = z.enum(["GREEN", "AMBER", "RED"]);

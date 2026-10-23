@@ -26,7 +26,8 @@ services:
     working_dir: /app/packages/server
     environment:
       DATABASE_URL: postgresql://hrp:hrp_dev@db:5432/hrp
-      JWT_SECRET: dev-secret-change-in-production
+      JWT_SECRET: dev-secret-change-in-production-32chars
+      JWT_REFRESH_SECRET: dev-refresh-secret-change-in-production-32chars
       NODE_ENV: development
       PORT: "3000"
     ports:
