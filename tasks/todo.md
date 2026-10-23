@@ -2,27 +2,29 @@
 
 Status key: [ ] pending, [x] complete, [~] in progress
 
+Completed modules: `secrets-config`, `database-lifecycle`, `production-packaging`.
+
 ## Wave 0 - Safe foundation
 
-- [ ] Task: Create typed server config module
+- [x] Task: Create typed server config module (`secrets-config`)
   - Acceptance: production rejects weak/default secrets; errors list variable names only
   - Verify: unit tests + boot failure test; `npm run check:task`
   - Files: `packages/server/src/config.ts`, `config.test.ts`, `index.ts`, `routes/auth.ts`, `db/client.ts`, `.env.example`
 
-- [ ] Task: Add migration ledger and ordered migrations
+- [x] Task: Add migration ledger and ordered migrations (`database-lifecycle`)
   - Acceptance: re-run is a no-op; checksum drift fails; seed guard blocks production
   - Verify: migration integration test; `npm run check:task`
   - Files: `packages/server/src/db/migrate.ts`, `migrations/`, `db/seed.ts`, `package.json`
 
-- [ ] Task: Add scope indexes and sync queue facility
+- [x] Task: Add scope indexes and sync queue facility (`database-lifecycle`)
   - Acceptance: `sync_queue.facility_id` exists; path and updated-at indexes exist
   - Verify: migration test; query plan check
   - Files: migrations, `db/types.ts`
 
-- [ ] Task: Fix production containers
+- [x] Task: Fix production containers (`production-packaging`)
   - Acceptance: root-context images build; non-root; health/readiness; graceful shutdown
   - Verify: clean-clone `docker build`; compose smoke
-  - Files: `Dockerfile.server`, `Dockerfile.client`, `packages/*/Dockerfile`, `docker-compose*.yml`, `nginx*.conf`, `src/index.ts`
+  - Files: `Dockerfile.server`, `Dockerfile.client`, `docker-compose*.yml`, `packages/client/nginx.conf`, `packages/server/src/index.ts`
 
 ## Wave 1 - PHI protection
 

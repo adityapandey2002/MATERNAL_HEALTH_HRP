@@ -2,6 +2,7 @@ import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import jwt from "@fastify/jwt";
 import fastify, { type FastifyReply, type FastifyRequest } from "fastify";
+import { sql } from "kysely";
 import { config } from "./config.js";
 import { closeDb, db } from "./db/client.js";
 import { authRoutes } from "./routes/auth.js";
@@ -56,6 +57,30 @@ app.decorate("authenticate", async (request: FastifyRequest, reply: FastifyReply
 });
 
 app.get("/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));
+
+app.get("/ready", async (_request, reply) => {
+  try {
+    const result = await sql<{ migration: string | null }>`
+      select max(id) as migration from schema_migrations
+    `.execute(db);
+    const migration = result.rows[0]?.migration ?? null;
+
+    if (!migration) {
+      return reply.code(503).send({ status: "not_ready", reason: "migrations" });
+    }
+
+    return {
+      status: "ready",
+      database: "ok",
+      migration,
+      version: config.appVersion,
+      sha: config.gitSha,
+    };
+  } catch (error) {
+    app.log.error({ err: error }, "Readiness check failed");
+    return reply.code(503).send({ status: "not_ready" });
+  }
+});
 
 app.register(authRoutes, { prefix: "/api/auth" });
 app.register(patientRoutes, { prefix: "/api/patients" });
