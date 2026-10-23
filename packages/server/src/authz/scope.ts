@@ -1,5 +1,5 @@
 import { FacilityLevel, UserRole } from "@hrp/shared";
-import type { Kysely } from "kysely";
+import { type Kysely, type RawBuilder, sql } from "kysely";
 import type { DB } from "../db/types.js";
 
 export const REFERRAL_NODAL = "REFERRAL_NODAL" as const;
@@ -100,6 +100,10 @@ export function escapeLikePattern(value: string): string {
 
 export function pathSubtreeLikePattern(path: string): string {
   return `${escapeLikePattern(path)}.%`;
+}
+
+export function facilityScopePredicate(actor: ActorScope, column: string): RawBuilder<boolean> {
+  return sql<boolean>`(${sql.ref(column)} = ${actor.facilityPath} OR ${sql.ref(column)} LIKE ${pathSubtreeLikePattern(actor.facilityPath)} ESCAPE '\\')`;
 }
 
 function buildResponsibilities(

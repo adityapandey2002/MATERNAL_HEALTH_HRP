@@ -60,8 +60,10 @@ export interface UserFixtures {
 
 export interface PatientFixtures {
   patientA: PatientFixture;
+  patientA2: PatientFixture;
   patientB: PatientFixture;
   visitA: VisitFixture;
+  visitA2: VisitFixture;
   visitB: VisitFixture;
 }
 
@@ -324,6 +326,19 @@ export async function seedPatients(
     .returning(["id", "facility_id", "name"])
     .executeTakeFirstOrThrow();
 
+  const patientA2 = await db
+    .insertInto("patients")
+    .values({
+      facility_id: facilities.villageA2.id,
+      registered_by: users.anmA.id,
+      name: "Kavita Devi",
+      age: 26,
+      phone: "9988700003",
+      risk_factors: JSON.stringify([]),
+    })
+    .returning(["id", "facility_id", "name"])
+    .executeTakeFirstOrThrow();
+
   const visitA = await db
     .insertInto("visits")
     .values({
@@ -333,6 +348,20 @@ export async function seedPatients(
       visit_number: 1,
       gestational_weeks: 14,
       visit_date: new Date("2026-02-10T00:00:00.000Z"),
+      danger_signs: JSON.stringify([]),
+    })
+    .returning(["id", "patient_id", "facility_id"])
+    .executeTakeFirstOrThrow();
+
+  const visitA2 = await db
+    .insertInto("visits")
+    .values({
+      patient_id: patientA2.id,
+      facility_id: facilities.villageA2.id,
+      conducted_by: users.anmA.id,
+      visit_number: 1,
+      gestational_weeks: 16,
+      visit_date: new Date("2026-02-11T00:00:00.000Z"),
       danger_signs: JSON.stringify([]),
     })
     .returning(["id", "patient_id", "facility_id"])
@@ -354,8 +383,10 @@ export async function seedPatients(
 
   return {
     patientA: { id: patientA.id, facilityId: patientA.facility_id, name: patientA.name },
+    patientA2: { id: patientA2.id, facilityId: patientA2.facility_id, name: patientA2.name },
     patientB: { id: patientB.id, facilityId: patientB.facility_id, name: patientB.name },
     visitA: { id: visitA.id, patientId: visitA.patient_id, facilityId: visitA.facility_id },
+    visitA2: { id: visitA2.id, patientId: visitA2.patient_id, facilityId: visitA2.facility_id },
     visitB: { id: visitB.id, patientId: visitB.patient_id, facilityId: visitB.facility_id },
   };
 }

@@ -3,6 +3,12 @@ import { CreatePatientSchema, UpdatePatientSchema } from "@hrp/shared/schemas";
 import type { CreatePatient, UpdatePatient } from "@hrp/shared/schemas";
 import type { FastifyPluginAsync } from "fastify";
 import { sql } from "kysely";
+import { assertCan } from "../authz/policy.js";
+import {
+  assertRequestedScope,
+  createDbActorLookup,
+  facilityScopePredicate,
+} from "../authz/scope.js";
 import { db } from "../db/client.js";
 import { mapPatientChanges, mapPatientToRow, toJson } from "../lib/mappers.js";
 import { oneOf, parsePagination, toBool } from "../lib/pagination.js";
@@ -20,17 +26,25 @@ export const patientRoutes: FastifyPluginAsync = async (app) => {
   app.get("/", async (request) => {
     const query = request.query as Record<string, unknown>;
     const { page, limit, offset, sort } = parsePagination(query, SORTABLE_COLUMNS, "created_at");
+    const requestedFacilityId =
+      typeof query.facilityId === "string" && query.facilityId.length > 0
+        ? query.facilityId
+        : undefined;
+    const actor = requestedFacilityId
+      ? await assertRequestedScope(request.actor, requestedFacilityId, createDbActorLookup(db))
+      : request.actor;
 
     // The block-level dashboard shows which ANM registered each woman, and
     // supervisors filter by ANM name. Joining keeps that lookup in one query.
     let base = db
       .selectFrom("patients")
-      .leftJoin("users as anm", "anm.id", "patients.registered_by");
+      .innerJoin("facilities", "facilities.id", "patients.facility_id")
+      .leftJoin("users as anm", "anm.id", "patients.registered_by")
+      .where(facilityScopePredicate(actor, "facilities.path"));
     const isHighRisk = toBool(query.isHighRisk);
     const riskLevel = oneOf(query.riskLevel, RISK_LEVELS);
 
-    if (typeof query.facilityId === "string")
-      base = base.where("patients.facility_id", "=", query.facilityId);
+    if (requestedFacilityId) base = base.where("patients.facility_id", "=", requestedFacilityId);
     if (riskLevel !== undefined) base = base.where("patients.risk_level", "=", riskLevel);
     if (isHighRisk !== undefined) base = base.where("patients.is_high_risk", "=", isHighRisk);
     if (typeof query.registeredBy === "string" && query.registeredBy.length > 0)
@@ -76,18 +90,31 @@ export const patientRoutes: FastifyPluginAsync = async (app) => {
     const { id } = request.params as { id: string };
     const patient = await db
       .selectFrom("patients")
+      .innerJoin("facilities", "facilities.id", "patients.facility_id")
       .leftJoin("users as anm", "anm.id", "patients.registered_by")
       .selectAll("patients")
       .select("anm.name as anm_name")
+      .select("facilities.path as facility_path")
       .where("patients.id", "=", id)
       .executeTakeFirst();
     if (!patient) return reply.code(404).send({ message: "Patient not found" });
+
+    assertCan(request.actor, "patient:read", {
+      type: "facility",
+      facilityPath: patient.facility_path,
+    });
+
     return serializePatient(patient, patient.anm_name);
   });
 
   app.post("/", { preValidation: validateBody(CreatePatientSchema) }, async (request, reply) => {
     const data = request.body as CreatePatient;
-    const user = request.user;
+    const actor = request.actor;
+
+    assertCan(actor, "patient:write", {
+      type: "facility",
+      facilityPath: actor.homeFacilityPath,
+    });
 
     const { score, level } = scoreUnregisteredPatient({
       name: data.name,
@@ -97,8 +124,8 @@ export const patientRoutes: FastifyPluginAsync = async (app) => {
     });
 
     const row = mapPatientToRow(data, {
-      facilityId: user.facilityId,
-      registeredBy: user.sub,
+      facilityId: actor.homeFacilityId,
+      registeredBy: actor.userId,
     });
 
     const result = await db
@@ -124,10 +151,17 @@ export const patientRoutes: FastifyPluginAsync = async (app) => {
 
       const existing = await db
         .selectFrom("patients")
-        .selectAll()
-        .where("id", "=", id)
+        .innerJoin("facilities", "facilities.id", "patients.facility_id")
+        .selectAll("patients")
+        .select("facilities.path as facility_path")
+        .where("patients.id", "=", id)
         .executeTakeFirst();
       if (!existing) return reply.code(404).send({ message: "Patient not found" });
+
+      assertCan(request.actor, "patient:write", {
+        type: "facility",
+        facilityPath: existing.facility_path,
+      });
 
       const row = mapPatientChanges(data);
 
@@ -160,7 +194,17 @@ export const patientRoutes: FastifyPluginAsync = async (app) => {
 
   app.delete("/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
-    await db.deleteFrom("patients").where("id", "=", id).execute();
-    return reply.code(204).send();
+    const existing = await db
+      .selectFrom("patients")
+      .innerJoin("facilities", "facilities.id", "patients.facility_id")
+      .select(["patients.id", "facilities.path as facility_path"])
+      .where("patients.id", "=", id)
+      .executeTakeFirst();
+    if (!existing) return reply.code(404).send({ message: "Patient not found" });
+
+    assertCan(request.actor, "patient:delete", {
+      type: "facility",
+      facilityPath: existing.facility_path,
+    });
   });
 };

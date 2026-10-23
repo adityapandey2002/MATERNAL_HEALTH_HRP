@@ -33,7 +33,7 @@ Completed modules: `secrets-config`, `database-lifecycle`, `production-packaging
   - Verify: unit tests; `npm run check:task`
   - Files: `packages/server/src/authz/*`, tests
 
-- [ ] Task: Enforce scope on patient and visit routes
+- [~] Task: Enforce scope on patient and visit routes
   - Acceptance: IDOR denied; list scope before pagination; audit reads
   - Verify: integration tests
   - Files: `routes/patients.ts`, `routes/visits.ts`
