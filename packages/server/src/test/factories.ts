@@ -1,6 +1,14 @@
 import bcrypt from "bcryptjs";
 import { type Kysely, sql } from "kysely";
-import type { DB, DbUserRole, Facility, SupervisionAlertRow, SyncQueueRow } from "../db/types.js";
+import type {
+  DB,
+  DbUserRole,
+  Facility,
+  ReferralRow,
+  ResponsibilityRow,
+  SupervisionAlertRow,
+  SyncQueueRow,
+} from "../db/types.js";
 
 export const TEST_PASSWORD = "password123";
 
@@ -83,6 +91,31 @@ export interface SyncQueueItemFixture {
   operation: SyncQueueRow["operation"];
   status: SyncQueueRow["status"];
   retryCount: number;
+}
+
+export interface ReferralFixture {
+  id: string;
+  patientId: string;
+  fromFacilityId: string;
+  toFacilityId: string;
+  referredBy: string;
+  urgency: ReferralRow["urgency"];
+  status: ReferralRow["status"];
+}
+
+export interface ReferralFixtures {
+  villageAToChcA: ReferralFixture;
+  villageA2ToHwcA: ReferralFixture;
+  chcAToDistrictA: ReferralFixture;
+  villageBToChcB: ReferralFixture;
+}
+
+export interface ResponsibilityFixture {
+  id: string;
+  userId: string;
+  responsibility: ResponsibilityRow["responsibility"];
+  scopeFacilityId: string;
+  grantedBy: string;
 }
 
 export interface SeedFixtures {
@@ -494,6 +527,115 @@ export async function seedSyncQueueItem(
     operation: row.operation,
     status: row.status,
     retryCount: row.retry_count,
+  };
+}
+
+export interface ReferralInput {
+  patientId: string;
+  fromFacilityId: string;
+  toFacilityId: string;
+  referredBy: string;
+  reason?: string;
+  urgency?: ReferralRow["urgency"];
+  status?: ReferralRow["status"];
+}
+
+export async function seedReferral(db: Kysely<DB>, input: ReferralInput): Promise<ReferralFixture> {
+  const row = await db
+    .insertInto("referrals")
+    .values({
+      patient_id: input.patientId,
+      from_facility_id: input.fromFacilityId,
+      to_facility_id: input.toFacilityId,
+      referred_by: input.referredBy,
+      reason: input.reason ?? "Test referral",
+      urgency: input.urgency ?? "AMBER",
+      status: input.status ?? "PENDING",
+    })
+    .returning([
+      "id",
+      "patient_id",
+      "from_facility_id",
+      "to_facility_id",
+      "referred_by",
+      "urgency",
+      "status",
+    ])
+    .executeTakeFirstOrThrow();
+
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    fromFacilityId: row.from_facility_id,
+    toFacilityId: row.to_facility_id,
+    referredBy: row.referred_by,
+    urgency: row.urgency,
+    status: row.status,
+  };
+}
+
+export async function seedReferralFixtures(
+  db: Kysely<DB>,
+  facilities: FacilityFixtures,
+  patients: PatientFixtures,
+  users: UserFixtures
+): Promise<ReferralFixtures> {
+  return {
+    villageAToChcA: await seedReferral(db, {
+      patientId: patients.patientA.id,
+      fromFacilityId: facilities.villageA.id,
+      toFacilityId: facilities.chcA.id,
+      referredBy: users.anmA.id,
+    }),
+    villageA2ToHwcA: await seedReferral(db, {
+      patientId: patients.patientA2.id,
+      fromFacilityId: facilities.villageA2.id,
+      toFacilityId: facilities.hwcA.id,
+      referredBy: users.anmA.id,
+    }),
+    chcAToDistrictA: await seedReferral(db, {
+      patientId: patients.patientA.id,
+      fromFacilityId: facilities.chcA.id,
+      toFacilityId: facilities.districtA.id,
+      referredBy: users.choA.id,
+    }),
+    villageBToChcB: await seedReferral(db, {
+      patientId: patients.patientB.id,
+      fromFacilityId: facilities.villageB.id,
+      toFacilityId: facilities.chcB.id,
+      referredBy: users.anmB.id,
+    }),
+  };
+}
+
+export interface ResponsibilityInput {
+  userId: string;
+  scopeFacilityId: string;
+  grantedBy: string;
+  responsibility?: ResponsibilityRow["responsibility"];
+}
+
+export async function seedResponsibility(
+  db: Kysely<DB>,
+  input: ResponsibilityInput
+): Promise<ResponsibilityFixture> {
+  const row = await db
+    .insertInto("responsibilities")
+    .values({
+      user_id: input.userId,
+      responsibility: input.responsibility ?? "REFERRAL_NODAL",
+      scope_facility_id: input.scopeFacilityId,
+      granted_by: input.grantedBy,
+    })
+    .returning(["id", "user_id", "responsibility", "scope_facility_id", "granted_by"])
+    .executeTakeFirstOrThrow();
+
+  return {
+    id: row.id,
+    userId: row.user_id,
+    responsibility: row.responsibility,
+    scopeFacilityId: row.scope_facility_id,
+    grantedBy: row.granted_by,
   };
 }
 

@@ -102,8 +102,40 @@ export function pathSubtreeLikePattern(path: string): string {
   return `${escapeLikePattern(path)}.%`;
 }
 
+function pathScopePredicate(path: string, column: string): RawBuilder<boolean> {
+  return sql<boolean>`(${sql.ref(column)} = ${path} OR ${sql.ref(column)} LIKE ${pathSubtreeLikePattern(path)} ESCAPE '\\')`;
+}
+
 export function facilityScopePredicate(actor: ActorScope, column: string): RawBuilder<boolean> {
-  return sql<boolean>`(${sql.ref(column)} = ${actor.facilityPath} OR ${sql.ref(column)} LIKE ${pathSubtreeLikePattern(actor.facilityPath)} ESCAPE '\\')`;
+  return pathScopePredicate(actor.facilityPath, column);
+}
+
+/**
+ * Referral visibility: an ANM only sees its own outbound referrals, while
+ * supervisors see referrals touching either endpoint of their subtree. A
+ * `REFERRAL_NODAL` grant widens that to either endpoint of the grant scope.
+ */
+export function referralVisibilityPredicate(
+  actor: ActorScope,
+  fromColumn: string,
+  toColumn: string
+): RawBuilder<boolean> {
+  const conditions: RawBuilder<boolean>[] = [];
+
+  if (actor.role === "ANM") {
+    conditions.push(sql<boolean>`(${sql.ref(fromColumn)} = ${actor.facilityPath})`);
+  } else {
+    conditions.push(pathScopePredicate(actor.facilityPath, fromColumn));
+    conditions.push(pathScopePredicate(actor.facilityPath, toColumn));
+  }
+
+  for (const grant of actor.responsibilities) {
+    if (grant.responsibility !== REFERRAL_NODAL) continue;
+    conditions.push(pathScopePredicate(grant.scopePath, fromColumn));
+    conditions.push(pathScopePredicate(grant.scopePath, toColumn));
+  }
+
+  return conditions.reduce((left, right) => sql<boolean>`(${left} OR ${right})`);
 }
 
 function buildResponsibilities(
