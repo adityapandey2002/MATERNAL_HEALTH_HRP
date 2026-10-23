@@ -6,17 +6,17 @@ import { BrandMark } from "./ui/BrandMark";
 import {
   ArrowRightIcon,
   BellIcon,
+  CalendarIcon,
   CogIcon,
   HomeIcon,
   LogoutIcon,
   MenuIcon,
-  UsersIcon,
   XIcon,
 } from "./ui/Icons";
 
 const navigation = [
   { path: "/", label: "Dashboard", icon: HomeIcon },
-  { path: "/patients", label: "Patients", icon: UsersIcon },
+  { path: "/follow-ups", label: "Follow Ups", icon: CalendarIcon },
   { path: "/referrals", label: "Referrals", icon: ArrowRightIcon },
   { path: "/supervision", label: "Supervision", icon: BellIcon },
   { path: "/settings", label: "Settings", icon: CogIcon },

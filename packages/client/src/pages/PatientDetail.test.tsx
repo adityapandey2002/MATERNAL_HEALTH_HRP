@@ -80,7 +80,7 @@ const createWrapper = (path = `/patients/${patient.id}`) => {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/patients/:id" element={children} />
-          <Route path="/patients" element={<p>Patients list</p>} />
+          <Route path="/" element={<p>Dashboard page</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -150,7 +150,7 @@ describe("PatientDetailPage", () => {
     await vi.waitFor(() => {
       expect(api.patients.delete).toHaveBeenCalledWith(patient.id);
     });
-    expect(await screen.findByText("Patients list")).toBeInTheDocument();
+    expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
   });
 
   it("shows a not-found state when the patient does not exist", async () => {

@@ -4,6 +4,7 @@ import Layout from "./components/Layout";
 import { api } from "./lib/api";
 import AddPatient from "./pages/AddPatient";
 import Dashboard from "./pages/Dashboard";
+import FollowUps from "./pages/FollowUps";
 import Login from "./pages/Login";
 import NewVisit from "./pages/NewVisit";
 import Offline from "./pages/Offline";
@@ -86,6 +87,7 @@ export default function App() {
           }
         >
           <Route path="/" element={<Dashboard />} />
+          <Route path="/follow-ups" element={<FollowUps />} />
           <Route path="/patients/new" element={<AddPatient />} />
           <Route path="/patients/:id" element={<PatientDetail />} />
           <Route path="/patients/:id/visit" element={<NewVisit />} />

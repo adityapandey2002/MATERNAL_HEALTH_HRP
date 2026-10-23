@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
+import PatientsSection from "./Patients";
 
 function StatCard({
   label,
@@ -188,32 +189,29 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-500">Overview of your high-risk pregnancy cases</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-gray-500">Overview of your high-risk pregnancy cases</p>
       </div>
 
-      <Link
-        to="/patients/new"
-        className="card flex items-center justify-between gap-4 p-6 bg-green-700 text-white transition hover:bg-green-800"
-      >
+      {/* Add HRP Woman — first action for every ANM on the front page */}
+      <div className="card flex items-center justify-between p-6 bg-green-50 border-green-200">
         <div className="flex items-center gap-4">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/15">
-            <PlusIcon className="w-7 h-7" />
-          </span>
+          <Link
+            to="/patients/new"
+            aria-label="Add a new HRP woman"
+            className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-green-700 text-white shadow-lg transition hover:bg-green-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-300"
+          >
+            <PlusIcon className="h-10 w-10" />
+          </Link>
           <div>
-            <p className="text-lg font-semibold">Add HRP Woman</p>
-            <p className="text-sm text-green-50">
+            <h2 className="text-lg font-bold text-gray-900">Add HRP Woman</h2>
+            <p className="text-sm text-gray-600">
               Register a high-risk pregnancy in under a minute
             </p>
           </div>
         </div>
-        <span aria-hidden="true" className="text-2xl">
-          →
-        </span>
-      </Link>
+      </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
@@ -246,9 +244,6 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">High-Risk Patients</h2>
-            <a href="/patients" className="text-sm text-green-600 hover:text-green-700">
-              View all
-            </a>
           </div>
           <div className="card-body p-0">
             <div className="table-container">
@@ -303,7 +298,7 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Follow-ups Due</h2>
-            <Link to="/patients" className="text-sm text-green-600 hover:text-green-700">
+            <Link to="/follow-ups" className="text-sm text-green-600 hover:text-green-700">
               View all
             </Link>
           </div>
@@ -415,6 +410,8 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <PatientsSection />
     </div>
   );
 }

@@ -93,7 +93,7 @@ describe("Dashboard", () => {
 
     render(<Dashboard />, { wrapper: createWrapper() });
 
-    expect(await screen.findByRole("link", { name: /add hrp woman/i })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /add a new hrp woman/i })).toBeInTheDocument();
     expect(screen.getAllByText("Rekha Devi").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Asha Ben").length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Follow-ups Due" })).toBeInTheDocument();

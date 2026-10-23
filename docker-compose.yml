@@ -45,10 +45,10 @@ services:
       dockerfile: packages/client/Dockerfile.dev
     working_dir: /app/packages/client
     environment:
-      # The client uses the relative "/api" base and Vite proxies it to the
-      # server, so requests stay same-origin. That keeps the httpOnly refresh
-      # cookie working without cross-origin cookie rules.
-      VITE_API_URL: ""
+      # The client calls /api/... and Vite proxies it to the server on the same
+      # origin, so the httpOnly refresh cookie works without cross-origin rules.
+      # Must NOT be empty (""), otherwise requests lose the /api prefix and 404.
+      VITE_API_URL: "/api"
       VITE_PROXY_TARGET: http://server:3000
     ports:
       - "5173:5173"

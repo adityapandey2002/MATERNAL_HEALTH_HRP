@@ -48,7 +48,7 @@ export default function PatientsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Patients</h1>
+          <h2 className="text-2xl font-bold text-gray-900">Patients</h2>
           <p className="text-gray-500">Manage high-risk pregnancy registrations</p>
         </div>
         <Link to="/patients/new" className="btn btn-primary">
