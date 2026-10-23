@@ -1,10 +1,19 @@
 import { UserRole } from "@hrp/shared";
-import type { Facility, Patient, Referral, SupervisionAlert, User, Visit } from "@hrp/shared";
+import type {
+  Facility,
+  Patient,
+  Referral,
+  SupervisionAlert,
+  SyncQueue,
+  User,
+  Visit,
+} from "@hrp/shared";
 import type {
   FacilityRow,
   PatientRow,
   ReferralRow,
   SupervisionAlertRow,
+  SyncQueueRow,
   UserRow,
   VisitRow,
 } from "../db/types.js";
@@ -134,5 +143,21 @@ export function serializeSupervisionAlert(row: SupervisionAlertRow): Supervision
     acknowledgedBy: row.acknowledged_by,
     acknowledgedAt: row.acknowledged_at,
     createdAt: row.created_at,
+  };
+}
+
+export function serializeSyncQueue(row: SyncQueueRow): SyncQueue {
+  return {
+    id: row.id,
+    facilityId: row.facility_id,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    operation: row.operation,
+    payload: row.payload,
+    status: row.status,
+    retryCount: row.retry_count,
+    lastError: row.last_error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }

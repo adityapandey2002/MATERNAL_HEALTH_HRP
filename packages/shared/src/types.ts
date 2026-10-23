@@ -150,6 +150,7 @@ export const ReferralSchema = z.object({
 
 export const SyncQueueSchema = z.object({
   id: z.string().uuid(),
+  facilityId: z.string().uuid(),
   entityType: z.enum(["PATIENT", "VISIT", "REFERRAL"]),
   entityId: z.string().uuid(),
   operation: z.enum(["CREATE", "UPDATE", "DELETE"]),

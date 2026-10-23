@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { type Kysely, sql } from "kysely";
-import type { DB, DbUserRole, Facility } from "../db/types.js";
+import type { DB, DbUserRole, Facility, SupervisionAlertRow, SyncQueueRow } from "../db/types.js";
 
 export const TEST_PASSWORD = "password123";
 
@@ -65,6 +65,24 @@ export interface PatientFixtures {
   visitA: VisitFixture;
   visitA2: VisitFixture;
   visitB: VisitFixture;
+}
+
+export interface SupervisionAlertFixture {
+  id: string;
+  facilityId: string;
+  type: SupervisionAlertRow["type"];
+  severity: SupervisionAlertRow["severity"];
+  acknowledged: boolean;
+}
+
+export interface SyncQueueItemFixture {
+  id: string;
+  facilityId: string;
+  entityType: SyncQueueRow["entity_type"];
+  entityId: string;
+  operation: SyncQueueRow["operation"];
+  status: SyncQueueRow["status"];
+  retryCount: number;
 }
 
 export interface SeedFixtures {
@@ -388,6 +406,94 @@ export async function seedPatients(
     visitA: { id: visitA.id, patientId: visitA.patient_id, facilityId: visitA.facility_id },
     visitA2: { id: visitA2.id, patientId: visitA2.patient_id, facilityId: visitA2.facility_id },
     visitB: { id: visitB.id, patientId: visitB.patient_id, facilityId: visitB.facility_id },
+  };
+}
+
+export interface SupervisionAlertInput {
+  facilityId: string;
+  type?: SupervisionAlertRow["type"];
+  severity?: SupervisionAlertRow["severity"];
+  message?: string;
+  relatedEntityId?: string | null;
+  acknowledged?: boolean;
+  createdAt?: Date;
+}
+
+export async function seedSupervisionAlert(
+  db: Kysely<DB>,
+  input: SupervisionAlertInput
+): Promise<SupervisionAlertFixture> {
+  const row = await db
+    .insertInto("supervision_alerts")
+    .values({
+      facility_id: input.facilityId,
+      type: input.type ?? "ANM_OFFLINE",
+      severity: input.severity ?? "AMBER",
+      message: input.message ?? "Test supervision alert",
+      related_entity_id: input.relatedEntityId ?? null,
+      acknowledged: input.acknowledged ?? false,
+      ...(input.createdAt ? { created_at: input.createdAt } : {}),
+    })
+    .returning(["id", "facility_id", "type", "severity", "acknowledged"])
+    .executeTakeFirstOrThrow();
+
+  return {
+    id: row.id,
+    facilityId: row.facility_id,
+    type: row.type,
+    severity: row.severity,
+    acknowledged: row.acknowledged,
+  };
+}
+
+export interface SyncQueueItemInput {
+  facilityId: string;
+  entityId: string;
+  entityType?: SyncQueueRow["entity_type"];
+  operation?: SyncQueueRow["operation"];
+  status?: SyncQueueRow["status"];
+  retryCount?: number;
+  lastError?: string | null;
+  payload?: Record<string, unknown>;
+  createdAt?: Date;
+}
+
+export async function seedSyncQueueItem(
+  db: Kysely<DB>,
+  input: SyncQueueItemInput
+): Promise<SyncQueueItemFixture> {
+  const row = await db
+    .insertInto("sync_queue")
+    .values({
+      facility_id: input.facilityId,
+      entity_type: input.entityType ?? "PATIENT",
+      entity_id: input.entityId,
+      operation: input.operation ?? "CREATE",
+      payload: JSON.stringify(input.payload ?? {}),
+      status: input.status ?? "PENDING",
+      retry_count: input.retryCount ?? 0,
+      last_error: input.lastError ?? null,
+      ...(input.createdAt ? { created_at: input.createdAt } : {}),
+    })
+    .returning([
+      "id",
+      "facility_id",
+      "entity_type",
+      "entity_id",
+      "operation",
+      "status",
+      "retry_count",
+    ])
+    .executeTakeFirstOrThrow();
+
+  return {
+    id: row.id,
+    facilityId: row.facility_id,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    operation: row.operation,
+    status: row.status,
+    retryCount: row.retry_count,
   };
 }
 
