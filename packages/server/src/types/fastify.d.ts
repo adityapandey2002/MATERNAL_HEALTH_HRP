@@ -1,5 +1,6 @@
-import "fastify";
 import type { UserRole } from "@hrp/shared";
+import "fastify";
+import type { ActorScope } from "../authz/scope.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -12,6 +13,7 @@ declare module "fastify" {
       role: UserRole;
       facilityId: string;
     };
+    actor: ActorScope;
   }
 }
 
