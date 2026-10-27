@@ -74,8 +74,8 @@ npm run dev:client   # Vite PWA      -> http://localhost:5173
 |------|-------------|------|
 | ANM | ANM001 | Asha Ben |
 | CHO | CHO001 | Dr. Priya Patel |
-| MO | MO001 | — |
-| Admin | ADM001 | — |
+| BHM | MO001 | Dr. Rajesh Kumar |
+| DHS | ADM001 | District Admin |
 
 ### Routes
 - `/` → **Add** — a single big circular `+` button (**Add HRP woman**) linking to the add form at `/patients/new`
