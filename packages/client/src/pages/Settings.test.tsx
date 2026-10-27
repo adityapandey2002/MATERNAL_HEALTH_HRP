@@ -9,6 +9,7 @@ vi.mock("../lib/api", () => ({
   api: {
     auth: { me: vi.fn() },
     facilities: { list: vi.fn() },
+    sync: { push: vi.fn() },
   },
 }));
 

@@ -9,19 +9,23 @@ vi.mock("../utils/sw", () => ({
 
 describe("OfflinePage", () => {
   beforeEach(() => {
-    Object.defineProperty(navigator, "onLine", { value: false, configurable: true });
-    localStorage.setItem("lastSyncTime", String(Date.now()));
+    vi.clearAllMocks();
+    Object.defineProperty(window, "location", {
+      value: { href: "http://localhost/", reload: vi.fn() },
+      writable: true,
+      configurable: true,
+    });
+    vi.mocked(localStorage.getItem).mockReturnValue(String(Date.now()));
   });
 
   afterEach(() => {
-    localStorage.clear();
-    Object.defineProperty(navigator, "onLine", { value: true, configurable: true });
+    vi.restoreAllMocks();
   });
 
   it("shows when data was last synced", async () => {
     render(<OfflinePage />);
 
     expect(await screen.findByText(/Last synced:/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: /offline/i })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "You're Offline" })).toBeInTheDocument();
   });
 });
