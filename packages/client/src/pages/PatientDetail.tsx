@@ -193,7 +193,7 @@ export default function PatientDetailPage() {
                     Score: <span className="font-medium text-gray-900">{p.riskScore}</span>
                   </div>
                   {p.isHighRisk && (
-                    <span className="text-sm text-red-600 font-medium">⚠ High-Risk Pregnancy</span>
+                    <span className="text-sm text-red-700 font-medium">⚠ High-Risk Pregnancy</span>
                   )}
                 </div>
                 {p.riskFactors.length > 0 && (

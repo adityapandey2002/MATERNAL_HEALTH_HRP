@@ -25,9 +25,9 @@ function StatCard({
 }
 
 const riskColors: Record<RiskLevel, string> = {
-  RED: "text-red-600",
-  AMBER: "text-amber-600",
-  GREEN: "text-green-600",
+  RED: "text-red-700",
+  AMBER: "text-amber-800",
+  GREEN: "text-green-700",
 };
 
 const riskBgColors: Record<RiskLevel, string> = {
@@ -265,7 +265,7 @@ export default function Dashboard() {
         <div className="card">
           <div className="card-header flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Follow-ups Due</h2>
-            <Link to="/follow-ups" className="text-sm text-green-600 hover:text-green-700">
+            <Link to="/follow-ups" className="text-sm text-green-700 hover:text-green-800">
               View all
             </Link>
           </div>
@@ -333,7 +333,7 @@ export default function Dashboard() {
         <div className="lg:col-span-2 card">
           <div className="card-header flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Supervision Alerts</h2>
-            <a href="/supervision" className="text-sm text-green-600 hover:text-green-700">
+            <a href="/supervision" className="text-sm text-green-700 hover:text-green-800">
               View all
             </a>
           </div>

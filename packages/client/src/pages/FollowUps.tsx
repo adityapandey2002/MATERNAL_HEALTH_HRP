@@ -68,11 +68,11 @@ export default function FollowUpsPage() {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="card p-6">
           <p className="text-sm font-medium text-gray-500">Overdue</p>
-          <p className="mt-1 text-3xl font-bold text-red-600">{counts.OVERDUE}</p>
+          <p className="mt-1 text-3xl font-bold text-red-700">{counts.OVERDUE}</p>
         </div>
         <div className="card p-6">
           <p className="text-sm font-medium text-gray-500">Due Now</p>
-          <p className="mt-1 text-3xl font-bold text-amber-600">{counts.DUE}</p>
+          <p className="mt-1 text-3xl font-bold text-amber-800">{counts.DUE}</p>
         </div>
         <div className="card p-6">
           <p className="text-sm font-medium text-gray-500">Upcoming</p>
