@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import bcrypt from "bcryptjs";
 import { db } from "./client.js";
 import { assertSeedAllowed } from "./seed-guard.js";
@@ -98,8 +100,7 @@ const FACILITIES: FacilitySeed[] = [
 /** Date columns are written as Date values. */
 const date = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
 
-export async function seed() {
-  assertSeedAllowed(process.env);
+export async function seedDatabase() {
   console.log("Seeding database...");
 
   await db.deleteFrom("responsibilities").execute();
@@ -393,5 +394,19 @@ export async function seed() {
   console.log("  DHS: ADM001 / password123");
 }
 
-await seed();
-await db.destroy();
+export async function seed() {
+  assertSeedAllowed(process.env);
+  await seedDatabase();
+}
+
+const isMain =
+  process.argv[1] !== undefined &&
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+
+if (isMain) {
+  try {
+    await seed();
+  } finally {
+    await db.destroy();
+  }
+}

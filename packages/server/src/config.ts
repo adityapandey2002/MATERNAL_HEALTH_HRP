@@ -20,6 +20,8 @@ const RawConfigSchema = z.object({
   CORS_ORIGINS: z.string().default(""),
   COOKIE_SECURE: booleanString.default(false),
   TRUST_PROXY: booleanString.default(false),
+  SERVE_CLIENT: booleanString.default(false),
+  CLIENT_DIST_PATH: z.string().min(1).default("packages/client/dist"),
   DB_POOL_MAX: z.coerce.number().int().positive().default(10),
   RATE_LIMIT_AUTH: z.coerce.number().int().positive().default(100),
   RATE_LIMIT_API: z.coerce.number().int().positive().default(500),
@@ -42,6 +44,8 @@ export interface AppConfig {
   corsOrigins: string[];
   cookieSecure: boolean;
   trustProxy: boolean;
+  serveClient: boolean;
+  clientDistPath: string;
   dbPoolMax: number;
   rateLimitAuth: number;
   rateLimitApi: number;
@@ -112,6 +116,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     corsOrigins,
     cookieSecure: isProduction ? true : raw.COOKIE_SECURE,
     trustProxy: isProduction ? true : raw.TRUST_PROXY,
+    serveClient: raw.SERVE_CLIENT,
+    clientDistPath: raw.CLIENT_DIST_PATH,
     dbPoolMax: raw.DB_POOL_MAX,
     rateLimitAuth: raw.RATE_LIMIT_AUTH,
     rateLimitApi: raw.RATE_LIMIT_API,

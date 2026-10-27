@@ -1,0 +1,25 @@
+# Free-tier demo deployment. Synthetic data only; do not load real patient data.
+# See docs/runbooks/free-demo-deploy.md for the full walkthrough.
+services:
+  - type: web
+    name: hrp-demo
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SEED_DEMO_DATA
+        value: "true"
+      - key: APP_VERSION
+        value: "0.1.0"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true

@@ -110,6 +110,8 @@ hrp/
 ├── .github/workflows/ci.yml
 ├── Dockerfile.server              # root-context production image
 ├── Dockerfile.client              # root-context production image
+├── Dockerfile                     # single-origin free-demo image
+├── render.yaml                    # Render blueprint for the free demo
 ├── docker-compose.yml             # local development stack
 ├── docker-compose.preview.yml     # built same-origin preview stack
 ├── docker-compose.prod.yml        # registry-image production stack
@@ -117,6 +119,7 @@ hrp/
 ├── AGENTS.md
 └── docs/
     ├── runbooks/deployment.md     # build, deploy, rollback
+    ├── runbooks/free-demo-deploy.md # Render + Neon, synthetic data only
     └── ideas/hrp-tracking-mvp.md
 ```
 
@@ -153,6 +156,16 @@ hrp/
 Both images build from the repository root with the root lockfile and workspace
 packages. The client image serves the PWA and proxies `/api`, `/health`, and
 `/ready` to the server, so browser traffic stays same-origin.
+
+### Free demo (Render + Neon)
+
+For a public demo with synthetic data only, `render.yaml` and `Dockerfile`
+deploy one free Render web service that serves both the API and the PWA from a
+single origin, backed by a free Neon Postgres database. Migrations and the
+one-time demo seed run automatically on boot. Follow
+[`docs/runbooks/free-demo-deploy.md`](docs/runbooks/free-demo-deploy.md).
+
+Do not load real patient data into the demo stack.
 
 ### Preview stack
 

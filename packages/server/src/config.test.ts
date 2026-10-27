@@ -60,6 +60,20 @@ describe("loadConfig", () => {
     expect(config.trustProxy).toBe(false);
   });
 
+  it("defaults to API-only mode for the client build", () => {
+    const config = loadConfig({});
+
+    expect(config.serveClient).toBe(false);
+    expect(config.clientDistPath).toBe("packages/client/dist");
+  });
+
+  it("accepts an explicit client build path", () => {
+    const config = loadConfig({ SERVE_CLIENT: "true", CLIENT_DIST_PATH: "/srv/client" });
+
+    expect(config.serveClient).toBe(true);
+    expect(config.clientDistPath).toBe("/srv/client");
+  });
+
   it("does not include secret values in validation errors", () => {
     const secret = "short-secret-value";
 

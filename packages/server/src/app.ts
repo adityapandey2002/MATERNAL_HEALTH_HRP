@@ -11,6 +11,7 @@ import { sql } from "kysely";
 import { AuthzError, createDbActorLookup, resolveActor } from "./authz/scope.js";
 import { config } from "./config.js";
 import { db } from "./db/client.js";
+import { registerClientStatic } from "./lib/static-client.js";
 import { authRoutes } from "./routes/auth.js";
 import { facilityRoutes } from "./routes/facilities.js";
 import { patientRoutes } from "./routes/patients.js";
@@ -79,6 +80,16 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.register(cookie);
+
+  app.addHook("onSend", async (_request, reply, payload) => {
+    reply.header("X-Content-Type-Options", "nosniff");
+    reply.header("X-Frame-Options", "DENY");
+    reply.header("Referrer-Policy", "strict-origin-when-cross-origin");
+    if (config.nodeEnv === "production") {
+      reply.header("Strict-Transport-Security", "max-age=31536000");
+    }
+    return payload;
+  });
 
   app.addContentTypeParser("application/json", { parseAs: "string" }, (_request, body, done) => {
     const raw = typeof body === "string" ? body.trim() : "";
@@ -158,6 +169,11 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   app.register(syncRoutes, { prefix: "/api/sync" });
   app.register(supervisionRoutes, { prefix: "/api/supervision" });
   app.register(queueRoutes, { prefix: "/api/queue" });
+
+  registerClientStatic(app, {
+    root: config.clientDistPath,
+    enabled: config.nodeEnv === "production" || config.serveClient,
+  });
 
   registerErrorHandler(app);
 
