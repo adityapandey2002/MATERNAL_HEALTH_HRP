@@ -98,7 +98,18 @@ const FACILITIES: FacilitySeed[] = [
 ];
 
 /** Date columns are written as Date values. */
-const date = (value: string): Date => new Date(`${value}T00:00:00.000Z`);
+const DAY_MS = 24 * 60 * 60 * 1000;
+const EDD_DAYS = 280;
+
+const daysFromToday = (days: number): Date => {
+  const now = new Date();
+  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  return new Date(today + days * DAY_MS);
+};
+
+const weeksFromToday = (weeks: number): Date => daysFromToday(weeks * 7);
+
+const addDays = (value: Date, days: number): Date => new Date(value.getTime() + days * DAY_MS);
 
 export async function seedDatabase() {
   console.log("Seeding database...");
@@ -203,6 +214,12 @@ export async function seedDatabase() {
 
   const anmId = getUserId("ANM001");
 
+  // Anchor the synthetic pregnancies to today so the demo never shows a
+  // gestation that is months overdue.
+  const rekhaLmp = weeksFromToday(-31);
+  const sunitaLmp = weeksFromToday(-24);
+  const meenaLmp = weeksFromToday(-34);
+
   // Insert patients
   const patients = await db
     .insertInto("patients")
@@ -218,8 +235,8 @@ export async function seedDatabase() {
         asha_name: "Sunita Devi",
         asha_phone: "9988776601",
         referred: true,
-        lmp: date("2025-01-15"),
-        edd: date("2025-10-22"),
+        lmp: rekhaLmp,
+        edd: addDays(rekhaLmp, EDD_DAYS),
         gravida: 2,
         para: 1,
         abortions: 0,
@@ -239,8 +256,8 @@ export async function seedDatabase() {
         asha_name: "Kavita Patel",
         asha_phone: "9988776602",
         referred: false,
-        lmp: date("2025-03-01"),
-        edd: date("2025-12-06"),
+        lmp: sunitaLmp,
+        edd: addDays(sunitaLmp, EDD_DAYS),
         gravida: 1,
         para: 0,
         abortions: 0,
@@ -260,8 +277,8 @@ export async function seedDatabase() {
         asha_name: "Rekha Ben",
         asha_phone: "9988776603",
         referred: false,
-        lmp: date("2025-02-10"),
-        edd: date("2025-11-17"),
+        lmp: meenaLmp,
+        edd: addDays(meenaLmp, EDD_DAYS),
         gravida: 3,
         para: 2,
         abortions: 0,
@@ -293,8 +310,8 @@ export async function seedDatabase() {
         facility_id: villageId,
         conducted_by: anmId,
         visit_number: 1,
-        gestational_weeks: 12,
-        visit_date: date("2025-04-01"),
+        gestational_weeks: 29,
+        visit_date: daysFromToday(-14),
         bp_systolic: 150,
         bp_diastolic: 95,
         hb: 6.8,
@@ -312,8 +329,8 @@ export async function seedDatabase() {
         facility_id: villageId,
         conducted_by: anmId,
         visit_number: 1,
-        gestational_weeks: 10,
-        visit_date: date("2025-05-10"),
+        gestational_weeks: 20,
+        visit_date: daysFromToday(-28),
         bp_systolic: 110,
         bp_diastolic: 70,
         hb: 11.2,
@@ -331,8 +348,8 @@ export async function seedDatabase() {
         facility_id: villageId,
         conducted_by: anmId,
         visit_number: 2,
-        gestational_weeks: 20,
-        visit_date: date("2025-06-25"),
+        gestational_weeks: 30,
+        visit_date: daysFromToday(-28),
         bp_systolic: 115,
         bp_diastolic: 75,
         hb: 12.5,

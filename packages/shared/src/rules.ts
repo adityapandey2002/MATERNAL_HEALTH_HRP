@@ -160,11 +160,46 @@ export function calculateRiskScore(
   return { score, level, factors };
 }
 
-export function calculateGestationalWeeks(lmp: Date | null): number {
+const WEEK_MS = 1000 * 60 * 60 * 24 * 7;
+const MAX_GESTATIONAL_WEEKS = 45;
+
+export function calculateGestationalWeeks(lmp: Date | null, now: Date = new Date()): number {
   if (!lmp) return 0;
-  const today = new Date();
-  const diff = today.getTime() - lmp.getTime();
-  return Math.max(0, Math.round(diff / (1000 * 60 * 60 * 24 * 7)));
+  const diff = now.getTime() - lmp.getTime();
+  return Math.max(0, Math.round(diff / WEEK_MS));
+}
+
+export interface GestationSource {
+  lmp?: string | Date | null;
+  edd?: string | Date | null;
+}
+
+function asValidDate(value: string | Date | null | undefined): Date | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Gestational age in weeks, preferring LMP and falling back to the EDD. The
+ * pages used to label "weeks until EDD" as GA, which understates gestation by
+ * up to 40 weeks. Clamped to 0-45 so an overdue or malformed date never renders
+ * a negative or impossible value.
+ */
+export function gestationalAgeWeeks(
+  source: GestationSource,
+  now: Date = new Date()
+): number | null {
+  const lmp = asValidDate(source.lmp);
+  if (lmp) {
+    return Math.min(MAX_GESTATIONAL_WEEKS, calculateGestationalWeeks(lmp, now));
+  }
+
+  const edd = asValidDate(source.edd);
+  if (!edd) return null;
+
+  const weeksUntilEdd = Math.round((edd.getTime() - now.getTime()) / WEEK_MS);
+  return Math.min(MAX_GESTATIONAL_WEEKS, Math.max(0, 40 - weeksUntilEdd));
 }
 
 export function getDueVisits(

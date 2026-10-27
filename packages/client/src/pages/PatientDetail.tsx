@@ -9,6 +9,7 @@ import {
   RiskLevel,
   type UpdatePatient,
   Visit,
+  gestationalAgeWeeks,
   getFollowUpPlan,
   getHrpReasonLabel,
 } from "@hrp/shared";
@@ -470,9 +471,7 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 function PatientDetailsCard({ patient }: { patient: Patient }) {
   const asha = [patient.ashaName, patient.ashaPhone].filter(Boolean).join(" · ") || "Not recorded";
-  const ga = patient.edd
-    ? `${Math.max(0, Math.round((new Date(patient.edd).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 7)))} weeks`
-    : "Unknown";
+  const ga = gestationalAgeWeeks(patient);
 
   return (
     <div className="card">
@@ -499,7 +498,7 @@ function PatientDetailsCard({ patient }: { patient: Patient }) {
           label="EDD"
           value={patient.edd ? format(new Date(patient.edd), "MMM d, yyyy") : "Not set"}
         />
-        <DetailRow label="GA" value={ga} />
+        <DetailRow label="GA" value={ga === null ? "Unknown" : `${ga} weeks`} />
         <DetailRow
           label="Registered"
           value={patient.createdAt ? format(new Date(patient.createdAt), "MMM d, yyyy") : "—"}

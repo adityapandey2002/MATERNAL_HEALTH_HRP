@@ -1,4 +1,11 @@
-import { Pagination, Patient, PatientFilter, type RiskLevel, getHrpReasonLabel } from "@hrp/shared";
+import {
+  Pagination,
+  Patient,
+  PatientFilter,
+  type RiskLevel,
+  gestationalAgeWeeks,
+  getHrpReasonLabel,
+} from "@hrp/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -126,17 +133,7 @@ export default function PatientsPage() {
                         <td className="font-medium">{p.name}</td>
                         <td>{p.age}</td>
                         <td>{p.phone ?? "—"}</td>
-                        <td>
-                          {p.edd
-                            ? Math.max(
-                                0,
-                                Math.round(
-                                  (new Date(p.edd).getTime() - Date.now()) /
-                                    (1000 * 60 * 60 * 24 * 7)
-                                )
-                              )
-                            : "—"}
-                        </td>
+                        <td>{gestationalAgeWeeks(p) ?? "—"}</td>
                         <td className="max-w-xs truncate">{getHrpReasonLabel(p.hrpReason)}</td>
                         <td className="text-center">
                           <RiskBadge level={p.riskLevel} />

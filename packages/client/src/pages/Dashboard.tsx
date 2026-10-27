@@ -1,4 +1,10 @@
-import { Patient, type RiskLevel, type SupervisionAlert, getFollowUpPlan } from "@hrp/shared";
+import {
+  Patient,
+  type RiskLevel,
+  type SupervisionAlert,
+  gestationalAgeWeeks,
+  getFollowUpPlan,
+} from "@hrp/shared";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
@@ -236,13 +242,7 @@ export default function Dashboard() {
                       <tr key={p.id}>
                         <td className="font-medium">{p.name}</td>
                         <td>{p.age}</td>
-                        <td>
-                          {p.edd
-                            ? Math.round(
-                                (new Date(p.edd).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 7)
-                              )
-                            : "—"}
-                        </td>
+                        <td>{gestationalAgeWeeks(p) ?? "—"}</td>
                         <td className="text-center">
                           <RiskIcon level={p.riskLevel} />
                         </td>

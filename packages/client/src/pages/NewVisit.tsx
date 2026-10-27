@@ -1,4 +1,11 @@
-import { type CreateVisit, type DangerSign, Patient, RiskLevel, Visit } from "@hrp/shared";
+import {
+  type CreateVisit,
+  type DangerSign,
+  Patient,
+  RiskLevel,
+  Visit,
+  gestationalAgeWeeks,
+} from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { addDays, format } from "date-fns";
 import { useEffect, useState } from "react";
@@ -134,12 +141,7 @@ export default function NewVisitPage() {
     return <div className="text-center py-12">Patient not found</div>;
   }
 
-  const gaWeeks = patient.edd
-    ? Math.max(
-        0,
-        Math.round((new Date(patient.edd).getTime() - Date.now()) / (1000 * 60 * 60 * 24 * 7))
-      )
-    : 0;
+  const gaWeeks = gestationalAgeWeeks(patient);
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -147,7 +149,8 @@ export default function NewVisitPage() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">New ANC Visit</h1>
           <p className="text-gray-500">
-            {patient.name} • Age {patient.age} • GA ~{gaWeeks} weeks
+            {patient.name} • Age {patient.age} •{" "}
+            {gaWeeks === null ? "GA unknown" : `GA ~${gaWeeks} weeks`}
           </p>
         </div>
         <button

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   calculateGestationalWeeks,
   calculateRiskScore,
+  gestationalAgeWeeks,
   getDueVisits,
   getRiskLevelColor,
   getUrgencyLabel,
@@ -241,6 +242,34 @@ describe("calculateGestationalWeeks", () => {
     lmp.setDate(lmp.getDate() + 14);
 
     expect(calculateGestationalWeeks(lmp)).toBe(0);
+  });
+});
+
+describe("gestationalAgeWeeks", () => {
+  const now = new Date("2026-10-27T00:00:00Z");
+
+  it("prefers the LMP when both dates exist", () => {
+    expect(gestationalAgeWeeks({ lmp: "2026-03-24T00:00:00Z", edd: "2026-12-29T00:00:00Z" }, now)).toBe(
+      31
+    );
+  });
+
+  it("falls back to the EDD instead of treating GA as unknown", () => {
+    expect(gestationalAgeWeeks({ edd: "2027-01-05T00:00:00Z" }, now)).toBe(30);
+  });
+
+  it("returns null when neither date is usable", () => {
+    expect(gestationalAgeWeeks({ lmp: null, edd: "not-a-date" }, now)).toBeNull();
+  });
+
+  it("counts an overdue pregnancy forward instead of going negative", () => {
+    expect(gestationalAgeWeeks({ edd: "2026-08-01T00:00:00Z" }, now)).toBe(45);
+  });
+
+  it("accepts Date instances and rejects impossible dates", () => {
+    expect(gestationalAgeWeeks({ lmp: new Date("2026-09-29T00:00:00Z") }, now)).toBe(4);
+    expect(gestationalAgeWeeks({ lmp: new Date("2026-10-10T00:00:00Z") }, now)).toBe(2);
+    expect(gestationalAgeWeeks({ lmp: new Date("2026-11-10T00:00:00Z") }, now)).toBe(0);
   });
 });
 
