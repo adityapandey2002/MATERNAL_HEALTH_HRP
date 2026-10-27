@@ -219,7 +219,7 @@ export default function NewVisitPage() {
             {VITALS.map((v) => (
               <div key={v.key}>
                 <label className="label" htmlFor={`vital-${v.key}`}>
-                  {v.label} <span className="text-gray-400">({v.unit})</span>
+                  {v.label} <span className="text-gray-600">({v.unit})</span>
                 </label>
                 <input
                   id={`vital-${v.key}`}

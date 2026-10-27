@@ -55,7 +55,7 @@ export default function SettingsPage() {
                     {user?.name ?? "Health Worker"}
                   </h2>
                   <p className="text-gray-500 capitalize">{user?.role?.toLowerCase() ?? "anm"}</p>
-                  <p className="text-sm text-gray-400">Employee ID: {user?.employeeId ?? "—"}</p>
+                  <p className="text-sm text-gray-600">Employee ID: {user?.employeeId ?? "—"}</p>
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

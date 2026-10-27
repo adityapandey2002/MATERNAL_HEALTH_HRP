@@ -67,7 +67,7 @@ export default function OfflinePage() {
             </ul>
           </div>
 
-          {lastSync && <p className="text-xs text-gray-400">Last synced: {lastSync}</p>}
+          {lastSync && <p className="text-xs text-gray-600">Last synced: {lastSync}</p>}
 
           <div className="mt-6 pt-6 border-t border-gray-200">
             <p className="text-sm text-gray-500">Waiting for connection…</p>

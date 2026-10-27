@@ -60,6 +60,7 @@ export default function ReferralsPage() {
         <div className="card-body p-4">
           <select
             className="input w-auto"
+            aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value as Referral["status"]);

@@ -91,6 +91,7 @@ export default function SupervisionPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <select
               className="input w-auto"
+              aria-label="Filter by alert type"
               value={typeFilter}
               onChange={(e) => {
                 setTypeFilter(e.target.value as SupervisionAlert["type"]);
@@ -105,6 +106,7 @@ export default function SupervisionPage() {
             </select>
             <select
               className="input w-auto"
+              aria-label="Filter by severity"
               value={severityFilter}
               onChange={(e) => {
                 setSeverityFilter(e.target.value as RiskLevel);
