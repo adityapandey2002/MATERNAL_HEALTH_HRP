@@ -192,4 +192,12 @@ describe("query building", () => {
 
     expect(fetchMock.mock.calls[0][0]).toBe("/api/sync/pull");
   });
+
+  it("loads a patient's visits from the by-patient endpoint", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse([]));
+
+    await api.visits.byPatient("p1");
+
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/visits/by-patient/p1");
+  });
 });

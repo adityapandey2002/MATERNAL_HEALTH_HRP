@@ -141,7 +141,7 @@ export const api = {
       request<Visit>("/visits", { method: "POST", body: JSON.stringify(data) }),
     update: (id: string, data: Partial<CreateVisit>) =>
       request<Visit>(`/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-    byPatient: (patientId: string) => request<Visit[]>(`/patients/${patientId}/visits`),
+    byPatient: (patientId: string) => request<Visit[]>(`/visits/by-patient/${patientId}`),
   },
 
   referrals: {

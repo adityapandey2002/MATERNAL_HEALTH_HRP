@@ -136,6 +136,11 @@ For local dev you can safely ignore this error — the app works without the SW 
 
 **Fix:** Run the `$env:PATH = "..."` line from section 2 in the current PowerShell window.
 
+### Source edits not picked up by the Docker dev server
+**Cause:** Vite's file watcher does not always see changes through the Windows bind mount, so it serves a stale module even after a browser reload.
+
+**Fix:** `docker compose restart client` (the server container uses `tsx watch` and normally reloads on its own). This only affects the Docker dev workflow; production builds the client from source.
+
 ## 8. Files changed by this guide
 - `docs/STARTUP.md` (this file)
 
