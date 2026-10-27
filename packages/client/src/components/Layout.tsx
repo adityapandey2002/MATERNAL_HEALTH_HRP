@@ -11,11 +11,13 @@ import {
   HomeIcon,
   LogoutIcon,
   MenuIcon,
+  PlusIcon,
   XIcon,
 } from "./ui/Icons";
 
 const navigation = [
-  { path: "/", label: "Dashboard", icon: HomeIcon },
+  { path: "/", label: "Add", icon: PlusIcon },
+  { path: "/dashboard", label: "Dashboard", icon: HomeIcon },
   { path: "/follow-ups", label: "Follow Ups", icon: CalendarIcon },
   { path: "/referrals", label: "Referrals", icon: ArrowRightIcon },
   { path: "/supervision", label: "Supervision", icon: BellIcon },

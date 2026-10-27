@@ -41,7 +41,7 @@ export default function AddPatientPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       queryClient.invalidateQueries({ queryKey: ["visits", "dashboard"] });
-      navigate("/");
+      navigate("/dashboard");
     },
   });
 

@@ -106,20 +106,6 @@ function CalendarIcon({ className }: { className?: string }) {
   );
 }
 
-function PlusIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-  );
-}
-
 export default function Dashboard() {
   const { data: patientsData, isLoading: patientsLoading } = useQuery({
     queryKey: ["patients", "dashboard"],
@@ -192,25 +178,6 @@ export default function Dashboard() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <p className="text-gray-500">Overview of your high-risk pregnancy cases</p>
-      </div>
-
-      {/* Add HRP Woman — first action for every ANM on the front page */}
-      <div className="card flex items-center justify-between p-6 bg-green-50 border-green-200">
-        <div className="flex items-center gap-4">
-          <Link
-            to="/patients/new"
-            aria-label="Add a new HRP woman"
-            className="flex h-20 w-20 shrink-0 items-center justify-center rounded-full bg-green-700 text-white shadow-lg transition hover:bg-green-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-green-300"
-          >
-            <PlusIcon className="h-10 w-10" />
-          </Link>
-          <div>
-            <h2 className="text-lg font-bold text-gray-900">Add HRP Woman</h2>
-            <p className="text-sm text-gray-600">
-              Register a high-risk pregnancy in under a minute
-            </p>
-          </div>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

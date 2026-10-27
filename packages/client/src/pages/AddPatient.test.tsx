@@ -48,7 +48,7 @@ const createWrapper = () => {
       <MemoryRouter initialEntries={["/patients/new"]}>
         <Routes>
           <Route path="/patients/new" element={children} />
-          <Route path="/" element={<p>Dashboard page</p>} />
+          <Route path="/dashboard" element={<p>Dashboard page</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>

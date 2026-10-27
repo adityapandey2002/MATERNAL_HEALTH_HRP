@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import { api } from "./lib/api";
+import AddHome from "./pages/AddHome";
 import AddPatient from "./pages/AddPatient";
 import Dashboard from "./pages/Dashboard";
 import FollowUps from "./pages/FollowUps";
@@ -86,7 +87,8 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<AddHome />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/follow-ups" element={<FollowUps />} />
           <Route path="/patients/new" element={<AddPatient />} />
           <Route path="/patients/:id" element={<PatientDetail />} />

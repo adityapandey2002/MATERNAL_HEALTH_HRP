@@ -64,7 +64,7 @@ export default function PatientDetailPage() {
     mutationFn: () => api.patients.delete(id ?? ""),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
-      navigate("/");
+      navigate("/dashboard");
     },
   });
 

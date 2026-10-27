@@ -81,7 +81,7 @@ describe("Dashboard", () => {
     vi.clearAllMocks();
   });
 
-  it("leads with the Add HRP Woman action and lists follow-ups", async () => {
+  it("lists follow-ups ordered by urgency", async () => {
     vi.mocked(api.patients.list).mockResolvedValue({
       data: [patient],
       total: 1,
@@ -93,9 +93,8 @@ describe("Dashboard", () => {
 
     render(<Dashboard />, { wrapper: createWrapper() });
 
-    expect(await screen.findByRole("link", { name: /add a new hrp woman/i })).toBeInTheDocument();
-    expect(screen.getAllByText("Rekha Devi").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Asha Ben").length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Rekha Devi")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Asha Ben")).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: "Follow-ups Due" })).toBeInTheDocument();
     // One ANC visit is recorded, so the plan starts at visit 2, which is
     // already past its window for an LMP in early January.
