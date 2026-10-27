@@ -42,6 +42,7 @@ vi.mock("../db/client", () => ({
       where: vi.fn(() => ({
         execute: vi.fn().mockResolvedValue({}),
       })),
+      execute: vi.fn().mockResolvedValue({}),
     })),
     destroy: vi.fn().mockResolvedValue(undefined),
   },

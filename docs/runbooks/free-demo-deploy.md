@@ -144,6 +144,10 @@ Then either restart the Render service or open a Render shell and run
 `node packages/server/dist/db/demo-bootstrap.js` (the service's shell keeps
 `SEED_DEMO_DATA` set).
 
+Alternatively, set `RESET_DEMO_DATA=true` on the Render service, restart it,
+and then unset the variable. The entrypoint truncates and reseeds on boot;
+leaving the variable set would wipe data on every restart.
+
 ### Rollback
 
 - **Bad app release:** Render dashboard → **Deploys** → previous deploy →

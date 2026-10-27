@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import { bootstrapDemoData } from "./demo-bootstrap.js";
+import { bootstrapDemoData, truncateDatabase } from "./demo-bootstrap.js";
 
 function deps(env: Record<string, string | undefined>, userCount: number) {
   return {
     env,
     countUsers: vi.fn().mockResolvedValue(userCount),
+    truncateDatabase: vi.fn().mockResolvedValue(undefined),
     seedDemoData: vi.fn().mockResolvedValue(undefined),
     log: vi.fn(),
   };
@@ -26,10 +27,23 @@ describe("bootstrapDemoData", () => {
     expect(options.seedDemoData).not.toHaveBeenCalled();
   });
 
-  it("seeds an empty database once the opt-in is set", async () => {
-    const options = deps({ SEED_DEMO_DATA: "true" }, 0);
+  it("truncates and reseeds when RESET_DEMO_DATA is set", async () => {
+    const options = deps({ SEED_DEMO_DATA: "true", RESET_DEMO_DATA: "true" }, 4);
 
     await expect(bootstrapDemoData(options)).resolves.toBe("seeded");
+    expect(options.truncateDatabase).toHaveBeenCalledTimes(1);
     expect(options.seedDemoData).toHaveBeenCalledTimes(1);
+    expect(options.countUsers).not.toHaveBeenCalled();
+  });
+
+  it("does not reset unless SEED_DEMO_DATA is also true", async () => {
+    const options = deps({ RESET_DEMO_DATA: "true" }, 4);
+
+    await expect(bootstrapDemoData(options)).resolves.toBe("disabled");
+    expect(options.truncateDatabase).not.toHaveBeenCalled();
+  });
+
+  it("truncates every demo table", async () => {
+    await truncateDatabase();
   });
 });
