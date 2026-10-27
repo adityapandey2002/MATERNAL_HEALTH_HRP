@@ -15,6 +15,24 @@ import Settings from "./pages/Settings";
 import Supervision from "./pages/Supervision";
 import { isOnline, onOnlineChange } from "./utils/sw";
 
+function LoadingScreen() {
+  return (
+    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-gradient-to-b from-green-50 to-white text-center">
+      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-600 text-2xl font-bold text-white shadow-lg">
+        HRP
+      </div>
+      <div className="space-y-1">
+        <h1 className="text-lg font-semibold text-gray-900">High-Risk Pregnancy Tracking</h1>
+        <p className="text-sm text-gray-500">of Araria</p>
+      </div>
+      <div className="flex items-center gap-2 text-sm text-gray-500">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+        <span>Waking up the server…</span>
+      </div>
+    </div>
+  );
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const [authed, setAuthed] = useState<boolean | null>(null);
 
@@ -30,8 +48,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       .catch(() => setAuthed(false));
   }, []);
 
-  if (authed === null)
-    return <div className="flex h-screen items-center justify-center">Loading…</div>;
+  if (authed === null) return <LoadingScreen />;
   if (!authed) return <Navigate to="/login" replace />;
 
   return <>{children}</>;
@@ -52,8 +69,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
       .catch(() => setAuthed(false));
   }, []);
 
-  if (authed === null)
-    return <div className="flex h-screen items-center justify-center">Loading…</div>;
+  if (authed === null) return <LoadingScreen />;
   if (authed) return <Navigate to="/" replace />;
   return <>{children}</>;
 }

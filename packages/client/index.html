@@ -9,10 +9,60 @@
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/pwa-192.png" />
     <title>High-Risk Pregnancy Tracking of Araria</title>
+    <style>
+      #boot-splash {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        background: linear-gradient(180deg, #f0fdf4, #ffffff);
+        color: #111827;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        text-align: center;
+      }
+      #boot-splash .logo {
+        width: 4rem;
+        height: 4rem;
+        border-radius: 1rem;
+        background: #16a34a;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1.25rem;
+        box-shadow: 0 10px 25px -5px rgba(22, 163, 74, 0.4);
+      }
+      #boot-splash .spinner {
+        width: 1rem;
+        height: 1rem;
+        border: 2px solid #16a34a;
+        border-top-color: transparent;
+        border-radius: 9999px;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="boot-splash">
+        <div class="logo">HRP</div>
+        <div>
+          <div style="font-weight:600;font-size:1.125rem">High-Risk Pregnancy Tracking</div>
+          <div style="font-size:0.875rem;color:#6b7280">of Araria</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:0.5rem;font-size:0.875rem;color:#6b7280">
+          <span class="spinner"></span>
+          <span>Waking up the server…</span>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
