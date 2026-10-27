@@ -210,13 +210,16 @@ ok(
   `limit=${JSON.parse(bigLimit.body).limit}`
 );
 
+// Hard deletion is denied for every role by design: maternal health records
+// need a retention/archive workflow, not a destructive delete. This asserts the
+// policy so a future change cannot silently turn DELETE into a data-loss path.
 const removed = await request({
   ...base,
   path: `/api/patients/${newPatient.id}`,
   method: "DELETE",
   headers: { Authorization: `Bearer ${token}` },
 });
-ok("delete patient returns 204", removed.status === 204, String(removed.status));
+ok("hard delete is forbidden by policy", removed.status === 403, String(removed.status));
 
 console.log("");
 if (failures > 0) {

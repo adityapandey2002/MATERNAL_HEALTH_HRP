@@ -60,14 +60,6 @@ export default function PatientDetailPage() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: () => api.patients.delete(id ?? ""),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-      navigate("/dashboard");
-    },
-  });
-
   const [form, setForm] = useState<Partial<CreatePatient>>({
     name: "",
     age: 25,
@@ -165,15 +157,6 @@ export default function PatientDetailPage() {
           <div className="flex gap-2">
             <button type="button" onClick={startEditing} className="btn btn-outline">
               Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (confirm("Delete this patient?")) deleteMutation.mutate();
-              }}
-              className="btn btn-danger"
-            >
-              Delete
             </button>
           </div>
         )}

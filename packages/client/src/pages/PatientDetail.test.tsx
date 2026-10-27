@@ -138,19 +138,12 @@ describe("PatientDetailPage", () => {
     });
   });
 
-  it("deletes the patient after confirmation", async () => {
-    vi.mocked(api.patients.delete).mockResolvedValue(undefined);
-    vi.spyOn(window, "confirm").mockReturnValue(true);
-
+  it("does not offer a hard-delete action", async () => {
     render(<PatientDetailPage />, { wrapper: createWrapper() });
 
     await screen.findByText("Previous C-section");
-    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
-
-    await vi.waitFor(() => {
-      expect(api.patients.delete).toHaveBeenCalledWith(patient.id);
-    });
-    expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit" })).toBeInTheDocument();
   });
 
   it("shows a not-found state when the patient does not exist", async () => {

@@ -1,5 +1,5 @@
 import { Pagination, Patient, PatientFilter, type RiskLevel, getHrpReasonLabel } from "@hrp/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
@@ -15,7 +15,6 @@ function RiskBadge({ level }: { level: RiskLevel }) {
 }
 
 export default function PatientsPage() {
-  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskLevel | "">("");
@@ -33,11 +32,6 @@ export default function PatientsPage() {
         anmName: anmFilter.trim() || undefined,
       }),
     placeholderData: (prev) => prev,
-  });
-
-  const _deleteMutation = useMutation({
-    mutationFn: api.patients.delete,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["patients"] }),
   });
 
   const patients = data?.data ?? [];
