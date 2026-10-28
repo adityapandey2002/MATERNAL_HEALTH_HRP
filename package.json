@@ -2,7 +2,9 @@
   "name": "hrp-tracking-platform",
   "version": "0.0.0",
   "private": true,
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
     "dev:client": "npm run dev --workspace=packages/client",
@@ -41,6 +43,7 @@
     "lighthouse": "^12.1.0",
     "size-limit": "^11.1.6",
     "typescript": "^5.6.0",
+    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^2.1.0"
   },
   "engines": {

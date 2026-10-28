@@ -8,7 +8,8 @@
   "exports": {
     ".": { "import": "./dist/index.js", "types": "./dist/index.d.ts" },
     "./schemas": { "import": "./dist/schemas.js", "types": "./dist/schemas.d.ts" },
-    "./rules": { "import": "./dist/rules.js", "types": "./dist/rules.d.ts" }
+    "./rules": { "import": "./dist/rules.js", "types": "./dist/rules.d.ts" },
+    "./date-utils": { "import": "./dist/date-utils.js", "types": "./dist/date-utils.d.ts" }
   },
   "scripts": {
     "build": "tsc",

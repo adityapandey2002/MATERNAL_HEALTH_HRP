@@ -14,6 +14,7 @@
     "check:bundle": "size-limit"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "@hrp/shared": "*",
     "@tanstack/react-query": "^5.56.0",
     "date-fns": "^3.6.0",

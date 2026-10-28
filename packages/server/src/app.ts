@@ -14,6 +14,10 @@ import { db } from "./db/client.js";
 import { registerClientStatic } from "./lib/static-client.js";
 import { authRoutes } from "./routes/auth.js";
 import { facilityRoutes } from "./routes/facilities.js";
+import { fieldLevelRoutes } from "./routes/field-level.js";
+import { followUpRoutes } from "./routes/follow-ups.js";
+import { hrpRoutes } from "./routes/hrp.js";
+import { nodalRoutes } from "./routes/nodal.js";
 import { patientRoutes } from "./routes/patients.js";
 import { queueRoutes } from "./routes/queue.js";
 import { referralRoutes } from "./routes/referrals.js";
@@ -163,6 +167,10 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.register(authRoutes, { prefix: "/api/auth" });
   app.register(patientRoutes, { prefix: "/api/patients" });
+  app.register(hrpRoutes, { prefix: "/api/hrp/patients" });
+  app.register(followUpRoutes, { prefix: "/api/hrp/follow-ups" });
+  app.register(nodalRoutes, { prefix: "/api/hrp/nodal" });
+  app.register(fieldLevelRoutes, { prefix: "/api/hrp/field-level" });
   app.register(visitRoutes, { prefix: "/api/visits" });
   app.register(referralRoutes, { prefix: "/api/referrals" });
   app.register(facilityRoutes, { prefix: "/api/facilities" });
