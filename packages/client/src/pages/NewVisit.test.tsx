@@ -27,6 +27,8 @@ const patient: Patient = {
   ashaName: "Sunita Devi",
   ashaPhone: "9988776655",
   referred: true,
+  isHrp: true,
+  followUpStatus: "PENDING",
   lmp: new Date(2026, 0, 1),
   edd: null,
   gravida: 2,

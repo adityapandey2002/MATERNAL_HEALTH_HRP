@@ -27,6 +27,8 @@ const basePatient: Patient = {
   ashaName: null,
   ashaPhone: null,
   referred: false,
+  isHrp: false,
+  followUpStatus: "PENDING",
   lmp: null,
   edd: null,
   gravida: 1,
