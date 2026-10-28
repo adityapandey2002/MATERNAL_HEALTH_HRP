@@ -20,10 +20,10 @@ export function FormField({ label, error, hint, required, id, children }: FormFi
 
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="block text-sm font-medium text-gray-700">
+      <label htmlFor={id} className="label">
         {label}
         {required && (
-          <span className="text-red-500 ml-1" aria-hidden="true">
+          <span className="ml-0.5 text-triage-red-solid" aria-hidden="true">
             *
           </span>
         )}
@@ -40,7 +40,7 @@ export function FormField({ label, error, hint, required, id, children }: FormFi
         </p>
       )}
       {hint && !error && (
-        <p id={hintId} className="text-xs text-gray-500">
+        <p id={hintId} className="text-xs text-ink-subtle">
           {hint}
         </p>
       )}
@@ -199,7 +199,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>((props, ref)
         ref={ref}
         type="checkbox"
         id={id}
-        className={`w-4 h-4 mt-0.5 text-green-600 rounded border-gray-300 focus:ring-green-500 ${(props.className ?? "") as string}`}
+        className={`mt-0.5 h-4 w-4 rounded-sm border-line-strong text-primary focus:ring-primary-ring ${(props.className ?? "") as string}`}
         {...rest}
       />
       <div className="flex flex-col">
