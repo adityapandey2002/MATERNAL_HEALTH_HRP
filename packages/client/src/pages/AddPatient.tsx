@@ -73,6 +73,8 @@ export default function AddPatientPage() {
       age: Number(form.age),
       hrpReason: form.hrpReason || null,
       referred: form.referred,
+      isHrp: false,
+      followUpStatus: "PENDING",
       ashaName: form.ashaName.trim() || null,
       ashaPhone: form.ashaPhone.replace(/\D/g, "") || null,
       lmp: form.lmp ? new Date(form.lmp) : null,
