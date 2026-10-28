@@ -13,7 +13,40 @@ export const FacilityLevel = z.enum([
 ]);
 export const UserRole = z.enum(["ANM", "CHO", "BHM", "DHS"]);
 
+export const NodalLevel = z.enum(["BLOCK", "DISTRICT"]);
+export type NodalLevel = "BLOCK" | "DISTRICT";
+
+/**
+ * HRP Complication dropdown — exactly 8 values, in this exact sequence.
+ * No additional values, no reordering.
+ */
+export const HrpComplication = z.enum([
+  "ANEMIA",
+  "PIH",
+  "GDM",
+  "SHORT_STATURE",
+  "PRE_LSCS",
+  "MULTI_GRAVIDA",
+  "TWINS_MULTIPLE_PREGNANCY",
+  "TEENAGE_PREGNANCY",
+]);
+export type HrpComplication =
+  | "ANEMIA"
+  | "PIH"
+  | "GDM"
+  | "SHORT_STATURE"
+  | "PRE_LSCS"
+  | "MULTI_GRAVIDA"
+  | "TWINS_MULTIPLE_PREGNANCY"
+  | "TEENAGE_PREGNANCY";
+
 export const RiskLevel = z.enum(["GREEN", "AMBER", "RED"]);
+
+export const HrpFollowUpStatus = z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]);
+export type HrpFollowUpStatus = "COMPLETE" | "PENDING" | "NOT_REACHABLE";
+
+export const HrpFollowUpTrack = z.enum(["IMMEDIATE_7_DAYS", "PMSMA_SESSION", "VHSND_COMMUNITY"]);
+export type HrpFollowUpTrack = "IMMEDIATE_7_DAYS" | "PMSMA_SESSION" | "VHSND_COMMUNITY";
 
 /**
  * Date field that accepts a Date (in-process) or an ISO date string (JSON
@@ -87,9 +120,15 @@ export const PatientSchema = z.object({
   phone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   hrpReason: HrpReason.nullable().optional(), // why this pregnancy is high-risk
+  hrpComplication: HrpComplication.nullable().optional(), // HRP complication dropdown (8 values)
   ashaName: z.string().nullable().optional(),
   ashaPhone: z.string().nullable().optional(),
   referred: z.boolean().default(false), // referred to a higher facility at registration
+  isHrp: z.boolean().default(false), // marked as high-risk pregnancy
+  // Automated follow-up scheduling (no manual toggle — server-calculated)
+  followUpTrack: HrpFollowUpTrack.nullable().optional(),
+  followUpScheduledDate: DateInput.nullable().optional(),
+  followUpStatus: HrpFollowUpStatus.default("PENDING"),
   lmp: DateInput.nullable().optional(), // Last Menstrual Period
   edd: DateInput.nullable().optional(), // Expected Date of Delivery
   gravida: z.number().int().min(0).default(0),
