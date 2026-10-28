@@ -65,7 +65,7 @@ export default function Layout() {
           </div>
           <button
             type="button"
-            className="lg:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="lg:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close navigation"
           >
@@ -103,7 +103,7 @@ export default function Layout() {
             <button
               type="button"
               onClick={handleLogout}
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100"
               aria-label="Logout"
             >
               <LogoutIcon className="w-5 h-5" />
@@ -116,7 +116,7 @@ export default function Layout() {
         <header className="sticky top-0 z-30 flex h-16 items-center gap-4 px-4 bg-white border-b border-gray-200 lg:px-6">
           <button
             type="button"
-            className="lg:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
+            className="lg:hidden p-2 rounded-md text-gray-500 hover:bg-gray-100"
             onClick={() => setSidebarOpen(true)}
             aria-label="Open navigation"
           >

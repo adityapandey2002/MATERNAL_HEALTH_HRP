@@ -249,9 +249,9 @@ describe("gestationalAgeWeeks", () => {
   const now = new Date("2026-10-27T00:00:00Z");
 
   it("prefers the LMP when both dates exist", () => {
-    expect(gestationalAgeWeeks({ lmp: "2026-03-24T00:00:00Z", edd: "2026-12-29T00:00:00Z" }, now)).toBe(
-      31
-    );
+    expect(
+      gestationalAgeWeeks({ lmp: "2026-03-24T00:00:00Z", edd: "2026-12-29T00:00:00Z" }, now)
+    ).toBe(31);
   });
 
   it("falls back to the EDD instead of treating GA as unknown", () => {

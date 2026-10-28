@@ -41,12 +41,12 @@ export function BrandMark({
       {title ? <title>{title}</title> : null}
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#22c55e" />
-          <stop offset="100%" stopColor="#15803d" />
+          <stop offset="0%" stopColor="#0d7a73" />
+          <stop offset="100%" stopColor="#005f5a" />
         </linearGradient>
       </defs>
 
-      <rect width="40" height="40" rx="9" fill={`url(#${gradientId})`} />
+      <rect width="40" height="40" rx="8" fill={`url(#${gradientId})`} />
 
       <g
         transform="translate(8.8 7.2)"
@@ -71,18 +71,23 @@ interface BrandLockupProps {
   size?: number;
   variant?: "full" | "compact";
   className?: string;
+  /** Second line under the product name. */
+  caption?: string;
 }
 
 /** Brand mark paired with the product wordmark. */
-export function BrandLockup({ size = 40, variant = "full", className }: BrandLockupProps) {
+export function BrandLockup({
+  size = 36,
+  variant = "compact",
+  className,
+  caption = "Araria district",
+}: BrandLockupProps) {
   return (
     <div className={`flex items-center gap-2.5 ${className ?? ""}`}>
       <BrandMark size={size} variant={variant} title={null} />
       <div className="min-w-0">
-        <p className="truncate text-base font-bold leading-tight text-gray-900">
-          High-Risk Pregnancy Tracking of Araria
-        </p>
-        <p className="truncate text-xs leading-tight text-gray-500">Maternal Risk Monitoring</p>
+        <p className="truncate text-sm font-semibold leading-tight text-ink">HRP Tracking</p>
+        <p className="truncate text-2xs leading-tight text-ink-subtle">{caption}</p>
       </div>
     </div>
   );
