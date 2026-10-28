@@ -8,6 +8,7 @@ import PatientDetailPage from "./PatientDetail";
 
 vi.mock("../lib/api", () => ({
   api: {
+    auth: { me: vi.fn() },
     patients: {
       get: vi.fn(),
       create: vi.fn(),
@@ -92,6 +93,18 @@ const createWrapper = (path = `/patients/${patient.id}`) => {
 describe("PatientDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(api.auth.me).mockResolvedValue({
+      id: "33333333-3333-4333-8333-333333333333",
+      employeeId: "ANM001",
+      name: "Asha Ben",
+      phone: "9988776655",
+      role: "ANM",
+      facilityId: "22222222-2222-4222-8222-222222222222",
+      language: "en",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     vi.mocked(api.patients.get).mockResolvedValue(patient);
     vi.mocked(api.patients.update).mockResolvedValue(patient);
     vi.mocked(api.visits.byPatient).mockResolvedValue([visit]);

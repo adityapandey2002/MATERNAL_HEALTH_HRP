@@ -23,7 +23,7 @@ $env:PATH = "C:\Users\ADITYA\AppData\Local\Programs\DockerDesktop\resources\bin;
 ### First time
 ```powershell
 # 1) Start Postgres only and wait for it to become healthy
-npm run db:up
+c
 
 # 2) Apply the database schema (idempotent) and load demo data
 npm run db:migrate
@@ -64,7 +64,7 @@ npm run dev:client   # Vite PWA      -> http://localhost:5173
 
 | Service | URL |
 |---------|-----|
-| Front (PWA) | http://localhost:5173 |
+| Front (Dashboard, PWA) | http://localhost:5173 |
 | API | http://localhost:3000 |
 | Health check | http://localhost:3000/health |
 
@@ -74,15 +74,13 @@ npm run dev:client   # Vite PWA      -> http://localhost:5173
 |------|-------------|------|
 | ANM | ANM001 | Asha Ben |
 | CHO | CHO001 | Dr. Priya Patel |
-| BHM | MO001 | Dr. Rajesh Kumar |
-| DHS | ADM001 | District Admin |
+| MO | MO001 | — |
+| Admin | ADM001 | — |
 
-### Routes
-- `/` → **Add** — a single big circular `+` button (**Add HRP woman**) linking to the add form at `/patients/new`
-- `/patients/new` → add form; saving returns to the Dashboard
-- `/dashboard` → **Dashboard** (stats, follow-ups due, patient list — no separate `/patients` page)
+### What lands on the front page
+- `/` → **Dashboard** (big circular `+` **Add HRP woman** button → add form at `/patients/new`, saving returns to Dashboard)
+- Patient list is now **inside Dashboard** (no separate `/patients` page)
 - `/follow-ups` → Follow Ups, ordered by need (overdue → due → upcoming)
-- Sidebar nav order: **Add**, Dashboard, Follow Ups, Referrals, Supervision, Settings
 
 ## 5. Verify the stack
 
@@ -135,11 +133,6 @@ For local dev you can safely ignore this error — the app works without the SW 
 **Cause:** Docker CLI not on `PATH`.
 
 **Fix:** Run the `$env:PATH = "..."` line from section 2 in the current PowerShell window.
-
-### Source edits not picked up by the Docker dev server
-**Cause:** Vite's file watcher does not always see changes through the Windows bind mount, so it serves a stale module even after a browser reload.
-
-**Fix:** `docker compose restart client` (the server container uses `tsx watch` and normally reloads on its own). This only affects the Docker dev workflow; production builds the client from source.
 
 ## 8. Files changed by this guide
 - `docs/STARTUP.md` (this file)

@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 interface BrandMarkProps {
   /** Rendered width and height in pixels. */
   size?: number;
@@ -25,7 +27,12 @@ export function BrandMark({
   title = "High-Risk Pregnancy Tracking of Araria",
   className,
 }: BrandMarkProps) {
-  const gradientId = `brand-mark-gradient-${variant}`;
+  // useId keeps the gradient unique per instance. Two copies of the mark can
+  // be mounted at once (desktop aside + mobile header); duplicate SVG ids make
+  // the second copy reference a gradient inside a display:none subtree, which
+  // renders as an empty fill.
+  const reactId = useId();
+  const gradientId = `brand-mark-gradient-${variant}-${reactId.replace(/:/g, "")}`;
 
   return (
     <svg

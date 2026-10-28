@@ -86,16 +86,16 @@ export function Pagination({
 
   return (
     <nav
-      className="flex items-center justify-between border-t border-gray-200 pt-4"
+      className="flex flex-col gap-2 border-t border-line-soft px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
       aria-label="Pagination"
     >
-      <p className="text-sm text-gray-500">
-        Showing {start} to {end} of {total}
+      <p className="tnum text-2xs text-ink-subtle">
+        Showing {start}–{end} of {total}
       </p>
       <div className="flex gap-2">
         <button
           type="button"
-          className="btn btn-outline btn-sm"
+          className="btn btn-secondary btn-sm"
           onClick={() => onPageChange(page - 1)}
           disabled={page === 1 || disabled}
           aria-label="Previous page"
@@ -104,7 +104,7 @@ export function Pagination({
         </button>
         <button
           type="button"
-          className="btn btn-outline btn-sm"
+          className="btn btn-secondary btn-sm"
           onClick={() => onPageChange(page + 1)}
           disabled={page === totalPages || disabled}
           aria-label="Next page"

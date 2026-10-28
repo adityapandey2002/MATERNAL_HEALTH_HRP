@@ -1,10 +1,15 @@
-import type { Pagination, Referral, ReferralFilter, RiskLevel } from "@hrp/shared";
+import type { Pagination, Referral, ReferralFilter } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useState } from "react";
+import { EmptyState } from "../components/ui/EmptyState";
+import { ArrowRightIcon, CheckIcon, XIcon } from "../components/ui/Icons";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Panel, PanelHeader } from "../components/ui/Panel";
+import { Pagination as PaginationControls } from "../components/ui/Table";
 import { api } from "../lib/api";
 
-function RiskBadge({ level }: { level: RiskLevel }) {
+function UrgencyBadge({ level }: { level: Referral["urgency"] }) {
   const config = {
     RED: { class: "badge-red", label: "Urgent" },
     AMBER: { class: "badge-amber", label: "Within 48h" },
@@ -23,6 +28,11 @@ function StatusBadge({ status }: { status: Referral["status"] }) {
   };
   const c = config[status];
   return <span className={`badge ${c.class}`}>{c.label}</span>;
+}
+
+/** Short identifier for a UUID, keeping the full value in the title attribute. */
+function shortId(id: string): string {
+  return id.length > 8 ? id.slice(0, 8) : id;
 }
 
 export default function ReferralsPage() {
@@ -50,145 +60,153 @@ export default function ReferralsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Referrals</h1>
-        <p className="text-gray-500">Manage patient referrals to higher facilities</p>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Oversight"
+        title="Referrals"
+        description="Manage patient referrals to higher facilities"
+      />
 
-      <div className="card">
-        <div className="card-body p-4">
-          <select
-            className="input w-auto"
-            aria-label="Filter by status"
-            value={statusFilter}
-            onChange={(e) => {
-              setStatusFilter(e.target.value as Referral["status"]);
-              setPage(1);
-            }}
-          >
-            <option value="">All Statuses</option>
-            <option value="PENDING">Pending</option>
-            <option value="ACCEPTED">Accepted</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="COMPLETED">Completed</option>
-          </select>
-        </div>
-      </div>
+      <Panel aria-label="Referral queue">
+        <PanelHeader
+          title="Referral queue"
+          description={`${total} ${total === 1 ? "referral" : "referrals"} matching the current filter`}
+          action={
+            <select
+              className="input min-h-control w-auto py-1.5"
+              aria-label="Filter by status"
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value as Referral["status"] | "");
+                setPage(1);
+              }}
+            >
+              <option value="">All Statuses</option>
+              <option value="PENDING">Pending</option>
+              <option value="ACCEPTED">Accepted</option>
+              <option value="REJECTED">Rejected</option>
+              <option value="COMPLETED">Completed</option>
+            </select>
+          }
+        />
 
-      <div className="card">
         {isLoading ? (
-          <div className="p-8 text-center animate-pulse">
-            <div className="h-8 bg-gray-200 rounded w-1/4 mx-auto mb-2" />
-            <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto" />
+          <div className="space-y-2 p-3 sm:p-4" aria-busy="true" aria-label="Loading referrals">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="h-14 animate-pulse rounded bg-line-soft" />
+            ))}
           </div>
+        ) : referrals.length === 0 ? (
+          <EmptyState
+            title="No referrals"
+            description="No referral matches this status filter. Referrals created during an ANC visit appear here."
+          />
         ) : (
-          <>
-            <div className="table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Patient</th>
-                    <th>From → To</th>
-                    <th>Reason</th>
-                    <th className="text-center">Urgency</th>
-                    <th className="text-center">Status</th>
-                    <th>Date</th>
-                    <th className="text-right">Actions</th>
+          <div className="table-container">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th scope="col">Patient</th>
+                  <th scope="col" className="hidden md:table-cell">
+                    From → To
+                  </th>
+                  <th scope="col">Reason</th>
+                  <th scope="col" className="text-center">
+                    Urgency
+                  </th>
+                  <th scope="col" className="text-center">
+                    Status
+                  </th>
+                  <th scope="col" className="hidden sm:table-cell">
+                    Date
+                  </th>
+                  <th scope="col" className="text-right">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {referrals.map((r) => (
+                  <tr key={r.id}>
+                    <td>
+                      <span className="tnum font-medium text-ink" title={r.patientId}>
+                        {shortId(r.patientId)}
+                      </span>
+                      <p className="text-2xs text-ink-subtle">Patient ID</p>
+                    </td>
+                    <td className="hidden md:table-cell">
+                      <span className="tnum inline-flex items-center gap-1 text-2xs text-ink-muted">
+                        <span title={r.fromFacilityId}>{shortId(r.fromFacilityId)}</span>
+                        <ArrowRightIcon className="h-3 w-3 text-ink-subtle" />
+                        <span title={r.toFacilityId}>{shortId(r.toFacilityId)}</span>
+                      </span>
+                    </td>
+                    <td className="max-w-64">
+                      <p className="truncate text-sm text-ink">{r.reason}</p>
+                    </td>
+                    <td className="text-center">
+                      <UrgencyBadge level={r.urgency} />
+                    </td>
+                    <td className="text-center">
+                      <StatusBadge status={r.status} />
+                    </td>
+                    <td className="tnum hidden whitespace-nowrap text-ink-muted sm:table-cell">
+                      {format(new Date(r.createdAt), "d MMM, HH:mm")}
+                    </td>
+                    <td className="text-right">
+                      {r.status === "PENDING" && (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            className="btn btn-success btn-sm"
+                            onClick={() =>
+                              updateMutation.mutate({ id: r.id, data: { status: "ACCEPTED" } })
+                            }
+                          >
+                            <CheckIcon className="h-3.5 w-3.5" />
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            onClick={() =>
+                              updateMutation.mutate({ id: r.id, data: { status: "REJECTED" } })
+                            }
+                          >
+                            <XIcon className="h-3.5 w-3.5" />
+                            Reject
+                          </button>
+                        </div>
+                      )}
+                      {r.status === "ACCEPTED" && (
+                        <button
+                          type="button"
+                          className="btn btn-primary btn-sm"
+                          onClick={() =>
+                            updateMutation.mutate({ id: r.id, data: { status: "COMPLETED" } })
+                          }
+                        >
+                          Complete
+                        </button>
+                      )}
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {referrals.length > 0 ? (
-                    referrals.map((r) => (
-                      <tr key={r.id}>
-                        <td className="font-medium">{r.patientId}</td>
-                        <td>
-                          {r.fromFacilityId} → {r.toFacilityId}
-                        </td>
-                        <td className="max-w-xs truncate">{r.reason}</td>
-                        <td className="text-center">
-                          <RiskBadge level={r.urgency} />
-                        </td>
-                        <td className="text-center">
-                          <StatusBadge status={r.status} />
-                        </td>
-                        <td>{format(new Date(r.createdAt), "MMM d, HH:mm")}</td>
-                        <td className="text-right">
-                          {r.status === "PENDING" && (
-                            <div className="flex items-center justify-end gap-2">
-                              <button
-                                type="button"
-                                className="btn btn-success btn-sm"
-                                onClick={() =>
-                                  updateMutation.mutate({ id: r.id, data: { status: "ACCEPTED" } })
-                                }
-                              >
-                                Accept
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn-danger btn-sm"
-                                onClick={() =>
-                                  updateMutation.mutate({ id: r.id, data: { status: "REJECTED" } })
-                                }
-                              >
-                                Reject
-                              </button>
-                            </div>
-                          )}
-                          {r.status === "ACCEPTED" && (
-                            <button
-                              type="button"
-                              className="btn btn-primary btn-sm"
-                              onClick={() =>
-                                updateMutation.mutate({ id: r.id, data: { status: "COMPLETED" } })
-                              }
-                            >
-                              Complete
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={7} className="text-center py-12 text-gray-500">
-                        No referrals
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-gray-200 pt-4">
-                <p className="text-sm text-gray-500">
-                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
-      </div>
+
+        {!isLoading && total > 0 ? (
+          <PaginationControls
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
+        ) : null}
+      </Panel>
     </div>
   );
 }

@@ -426,7 +426,12 @@ export function ArrowLeftIcon({ className }: { className?: string }) {
       stroke="currentColor"
       viewBox="0 0 24 24"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5 5-5m-5 5h12" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M11 17l-5-5 5-5m-5 5h12"
+      />
     </svg>
   );
 }
@@ -463,7 +468,12 @@ export function MapPinIcon({ className }: { className?: string }) {
         strokeWidth={2}
         d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
       />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+      />
     </svg>
   );
 }
@@ -476,8 +486,18 @@ export function ListChecksIcon({ className }: { className?: string }) {
       stroke="currentColor"
       viewBox="0 0 24 24"
     >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 6h11M9 12h11M9 18h11" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M9 6h11M9 12h11M9 18h11"
+      />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"
+      />
     </svg>
   );
 }
@@ -513,6 +533,43 @@ export function BuildingIcon({ className }: { className?: string }) {
         strokeLinejoin="round"
         strokeWidth={2}
         d="M3 21h18M5 21V5a2 2 0 012-2h6a2 2 0 012 2v16M15 21V9h4a2 2 0 012 2v10M9 7h2M9 11h2M9 15h2"
+      />
+    </svg>
+  );
+}
+export function WifiOffIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3l18 18" />
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M8.5 16.5a5 5 0 017 0M5 12.5a10 10 0 013.5-2.4M2 8.8a15 15 0 014.3-2.6M12 20h.01M15.5 10.1a10 10 0 013.5 2.4M17.7 6.2a15 15 0 014.3 2.6"
+      />
+    </svg>
+  );
+}
+export function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden="true"
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.4-9.4a2 2 0 112.8 2.8L11 17l-4 1 1-4 8.6-8.6z"
       />
     </svg>
   );

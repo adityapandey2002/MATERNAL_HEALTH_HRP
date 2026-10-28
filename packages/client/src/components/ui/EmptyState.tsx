@@ -9,19 +9,25 @@ interface EmptyStateProps {
   variant?: "block" | "row";
 }
 
-export function EmptyState({ icon, title, description, action, variant = "block" }: EmptyStateProps) {
+export function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  variant = "block",
+}: EmptyStateProps) {
   if (variant === "row") {
     return (
-      <div role="status" className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+      <output className="flex flex-col items-center gap-2 px-4 py-10 text-center">
         <p className="text-sm font-medium text-ink-muted">{title}</p>
         {description ? <p className="max-w-sm text-xs text-ink-subtle">{description}</p> : null}
         {action}
-      </div>
+      </output>
     );
   }
 
   return (
-    <div role="status" className="flex flex-col items-center gap-3 px-6 py-12 text-center">
+    <output className="flex flex-col items-center gap-3 px-6 py-12 text-center">
       {icon ? (
         <span
           aria-hidden="true"
@@ -37,6 +43,6 @@ export function EmptyState({ icon, title, description, action, variant = "block"
         ) : null}
       </div>
       {action}
-    </div>
+    </output>
   );
 }

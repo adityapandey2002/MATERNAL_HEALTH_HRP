@@ -6,9 +6,8 @@ import {
   HRP_REASONS,
   type HrpReason,
   type Patient,
-  RiskLevel,
   type UpdatePatient,
-  Visit,
+  type Visit,
   gestationalAgeWeeks,
   getFollowUpPlan,
   getHrpReasonLabel,
@@ -17,8 +16,32 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { RiskBadge, Select } from "../components/ui";
+import { EmptyState } from "../components/ui/EmptyState";
+import { FormField, Select } from "../components/ui/FormField";
+import {
+  AlertTriangleIcon,
+  ClipboardIcon,
+  MapPinIcon,
+  PencilIcon,
+  PhoneIcon,
+  PlusIcon,
+  UserIcon,
+} from "../components/ui/Icons";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
+import { RiskBadge, RiskStripe } from "../components/ui/RiskBadge";
 import { api } from "../lib/api";
+import {
+  bpTone,
+  dangerSignLabel,
+  formatBp,
+  formatHb,
+  gaLabel,
+  hbTone,
+  toneTextClass,
+  villageLabel,
+} from "../lib/clinical";
+import { useCanWriteClinical } from "../lib/session";
 
 const DANGER_SIGNS: { value: DangerSign; label: string }[] = [
   { value: "HYPERTENSION", label: "Hypertension / Pre-eclampsia" },
@@ -31,12 +54,25 @@ const DANGER_SIGNS: { value: DangerSign; label: string }[] = [
   { value: "EPILEPSY", label: "Epilepsy / Seizures" },
 ];
 
+const FOLLOW_UP_BADGE: Record<FollowUpStatus, string> = {
+  OVERDUE: "badge-red",
+  DUE: "badge-amber",
+  UPCOMING: "badge-gray",
+};
+
+const FOLLOW_UP_LABEL: Record<FollowUpStatus, string> = {
+  OVERDUE: "Overdue",
+  DUE: "Due",
+  UPCOMING: "Upcoming",
+};
+
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const isNew = id === "new";
   const [editing, setEditing] = useState(isNew);
+  const canWrite = useCanWriteClinical();
 
   const { data: patient, isLoading } = useQuery({
     queryKey: ["patients", id],
@@ -130,11 +166,29 @@ export default function PatientDetailPage() {
   };
 
   if (isLoading && !isNew) {
-    return <div className="flex h-64 items-center justify-center">Loading…</div>;
+    return (
+      <div className="space-y-4" aria-busy="true" aria-label="Loading patient record">
+        <div className="h-16 animate-pulse rounded-lg bg-line-soft" />
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="h-72 animate-pulse rounded-lg bg-line-soft lg:col-span-2" />
+          <div className="h-72 animate-pulse rounded-lg bg-line-soft" />
+        </div>
+      </div>
+    );
   }
 
   if (!isNew && !patient) {
-    return <div className="text-center py-12">Patient not found</div>;
+    return (
+      <EmptyState
+        title="Patient not found"
+        description="This record may have been removed or the link is incomplete."
+        action={
+          <Link to="/patients" className="btn btn-secondary btn-sm">
+            Back to register
+          </Link>
+        }
+      />
+    );
   }
 
   const p = patient ?? ({ ...form } as Patient);
@@ -142,312 +196,250 @@ export default function PatientDetailPage() {
   const followUpPlan = isNew ? [] : getFollowUpPlan(p, visits.length, 3);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {isNew ? "Register New Patient" : p.name}
-          </h1>
-          <p className="text-gray-500">
-            {isNew
-              ? "Enter patient details and risk factors"
-              : `Age ${p.age} • ${p.phone ?? "No phone"}`}
-          </p>
-        </div>
-        {!isNew && !editing && (
-          <div className="flex gap-2">
-            <button type="button" onClick={startEditing} className="btn btn-outline">
-              Edit
-            </button>
-          </div>
-        )}
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow={isNew ? "High-risk register" : "Patient record"}
+        title={isNew ? "Register new patient" : p.name}
+        description={
+          isNew
+            ? "Enter patient details and risk factors"
+            : `Age ${p.age} · ${p.phone ?? "No phone"} · ${villageLabel(p)}`
+        }
+        actions={
+          !isNew && !editing && canWrite ? (
+            <>
+              <Link to={`/patients/${p.id}/visit`} className="btn btn-primary">
+                <PlusIcon className="h-4 w-4" />
+                Record visit
+              </Link>
+              <button type="button" onClick={startEditing} className="btn btn-secondary">
+                <PencilIcon className="h-4 w-4" />
+                Edit
+              </button>
+            </>
+          ) : null
+        }
+      />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4">
         {!isNew && !editing ? (
-          <>
-            <div className="card">
-              <div className="card-header">
-                <h2 className="text-lg font-semibold">Risk Assessment</h2>
-              </div>
-              <div className="card-body">
-                <div className="flex flex-wrap items-center gap-4">
-                  <RiskBadge level={p.riskLevel} />
-                  <div className="text-sm text-gray-500">
-                    Score: <span className="font-medium text-gray-900">{p.riskScore}</span>
-                  </div>
-                  {p.isHighRisk && (
-                    <span className="text-sm text-red-700 font-medium">⚠ High-Risk Pregnancy</span>
-                  )}
-                </div>
-                {p.riskFactors.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {p.riskFactors.map((s) => (
-                      <span key={s} className="badge badge-amber">
-                        {DANGER_SIGNS.find((d) => d.value === s)?.label ?? s}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              <RiskPanel patient={p} />
+              <VisitHistory visits={visits} />
+              <FollowUpPlanCard plan={followUpPlan} />
             </div>
-
-            <PatientDetailsCard patient={p} />
-            <FollowUpPlanCard plan={followUpPlan} />
-          </>
+            <div className="space-y-4">
+              <PatientDetailsCard patient={p} />
+              {canWrite ? (
+                <Panel className="bg-primary-light">
+                  <PanelBody className="space-y-2">
+                    <h2 className="text-sm font-semibold text-primary-dark">Next action</h2>
+                    <p className="text-xs leading-relaxed text-ink-muted">
+                      Record the next ANC contact to update this woman's vitals and recompute her
+                      triage level.
+                    </p>
+                    <Link to={`/patients/${p.id}/visit`} className="btn btn-primary btn-sm">
+                      <ClipboardIcon className="h-3.5 w-3.5" />
+                      Record ANC visit
+                    </Link>
+                  </PanelBody>
+                </Panel>
+              ) : null}
+            </div>
+          </div>
         ) : (
-          <>
-            <div className="card">
-              <div className="card-header">
-                <h2 className="text-lg font-semibold">Basic Information</h2>
-              </div>
-              <div className="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="label" htmlFor="field-5">
-                    Name *
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="space-y-4 lg:col-span-2">
+              <Panel>
+                <PanelHeader
+                  title="Basic Information"
+                  description="Identity and obstetric history"
+                  action={<UserIcon className="h-4 w-4 text-ink-subtle" />}
+                />
+                <PanelBody className="grid gap-4 sm:grid-cols-2">
+                  <FormField label="Name" id="field-name" required>
+                    <input
+                      id="field-name"
+                      value={form.name}
+                      onChange={(e) => handleChange("name", e.target.value)}
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Age" id="field-age" required>
+                    <input
+                      id="field-age"
+                      type="number"
+                      min="15"
+                      max="55"
+                      value={form.age}
+                      onChange={(e) => handleChange("age", e.target.value)}
+                      required
+                    />
+                  </FormField>
+                  <FormField label="Phone" id="field-phone">
+                    <input
+                      id="field-phone"
+                      type="tel"
+                      value={form.phone ?? ""}
+                      onChange={(e) => handleChange("phone", e.target.value)}
+                      placeholder="+91 9XXXXXXXXX"
+                    />
+                  </FormField>
+                  <FormField label="Address" id="field-address">
+                    <textarea
+                      id="field-address"
+                      rows={2}
+                      value={form.address ?? ""}
+                      onChange={(e) => handleChange("address", e.target.value)}
+                    />
+                  </FormField>
+                  <div className="grid grid-cols-3 gap-3 sm:col-span-2">
+                    <FormField label="Gravida" id="field-gravida">
+                      <input
+                        id="field-gravida"
+                        type="number"
+                        min="0"
+                        value={form.gravida}
+                        onChange={(e) => handleChange("gravida", e.target.value)}
+                      />
+                    </FormField>
+                    <FormField label="Para" id="field-para">
+                      <input
+                        id="field-para"
+                        type="number"
+                        min="0"
+                        value={form.para}
+                        onChange={(e) => handleChange("para", e.target.value)}
+                      />
+                    </FormField>
+                    <FormField label="Abortions" id="field-abortions">
+                      <input
+                        id="field-abortions"
+                        type="number"
+                        min="0"
+                        value={form.abortions}
+                        onChange={(e) => handleChange("abortions", e.target.value)}
+                      />
+                    </FormField>
+                  </div>
+                  <FormField label="LMP (Last Menstrual Period)" id="field-lmp">
+                    <input
+                      id="field-lmp"
+                      type="date"
+                      value={form.lmp ? format(new Date(form.lmp), "yyyy-MM-dd") : ""}
+                      onChange={(e) =>
+                        handleChange("lmp", e.target.value ? new Date(e.target.value) : null)
+                      }
+                    />
+                  </FormField>
+                </PanelBody>
+              </Panel>
+
+              <Panel>
+                <PanelHeader
+                  title="HRP Details"
+                  description="Reason and village follow-up contacts"
+                  action={<PhoneIcon className="h-4 w-4 text-ink-subtle" />}
+                />
+                <PanelBody className="grid gap-4 sm:grid-cols-2">
+                  <div className="sm:col-span-2">
+                    <Select
+                      label="Reason for high-risk pregnancy"
+                      id="field-hrp-reason"
+                      options={[
+                        { value: "", label: "Not recorded" },
+                        ...HRP_REASONS.map((reason) => ({
+                          value: reason.value,
+                          label: reason.label,
+                        })),
+                      ]}
+                      value={form.hrpReason ?? ""}
+                      onChange={(e) =>
+                        handleChange("hrpReason", (e.target.value || null) as HrpReason | null)
+                      }
+                    />
+                  </div>
+                  <FormField label="ASHA name" id="field-asha-name">
+                    <input
+                      id="field-asha-name"
+                      value={form.ashaName ?? ""}
+                      onChange={(e) => handleChange("ashaName", e.target.value)}
+                    />
+                  </FormField>
+                  <FormField label="ASHA mobile number" id="field-asha-phone">
+                    <input
+                      id="field-asha-phone"
+                      type="tel"
+                      value={form.ashaPhone ?? ""}
+                      onChange={(e) => handleChange("ashaPhone", e.target.value)}
+                    />
+                  </FormField>
+                  <label
+                    htmlFor="field-referred"
+                    className="flex min-h-touch cursor-pointer items-center gap-3 rounded border border-line px-3 py-2 hover:bg-canvas sm:col-span-2"
+                  >
+                    <input
+                      id="field-referred"
+                      type="checkbox"
+                      checked={form.referred ?? false}
+                      onChange={(e) => handleChange("referred", e.target.checked)}
+                      className="h-4 w-4 rounded-sm border-line-strong text-primary focus:ring-primary-ring"
+                    />
+                    <span className="text-sm font-medium text-ink">
+                      Referred to a higher facility
+                    </span>
                   </label>
-                  <input
-                    id="field-5"
-                    className="input"
-                    value={form.name}
-                    onChange={(e) => handleChange("name", e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="field-6">
-                    Age *
-                  </label>
-                  <input
-                    id="field-6"
-                    type="number"
-                    className="input"
-                    min="15"
-                    max="55"
-                    value={form.age}
-                    onChange={(e) => handleChange("age", e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="field-7">
-                    Phone
-                  </label>
-                  <input
-                    id="field-7"
-                    type="tel"
-                    className="input"
-                    value={form.phone ?? ""}
-                    onChange={(e) => handleChange("phone", e.target.value)}
-                    placeholder="+91 9XXXXXXXXX"
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="field-8">
-                    Address
-                  </label>
-                  <textarea
-                    id="field-8"
-                    className="input"
-                    rows={2}
-                    value={form.address ?? ""}
-                    onChange={(e) => handleChange("address", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="field-9">
-                    Gravida
-                  </label>
-                  <input
-                    id="field-9"
-                    type="number"
-                    className="input"
-                    min="0"
-                    value={form.gravida}
-                    onChange={(e) => handleChange("gravida", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="field-10">
-                    Para
-                  </label>
-                  <input
-                    id="field-10"
-                    type="number"
-                    className="input"
-                    min="0"
-                    value={form.para}
-                    onChange={(e) => handleChange("para", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="field-11">
-                    Abortions
-                  </label>
-                  <input
-                    id="field-11"
-                    type="number"
-                    className="input"
-                    min="0"
-                    value={form.abortions}
-                    onChange={(e) => handleChange("abortions", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="field-12">
-                    LMP (Last Menstrual Period)
-                  </label>
-                  <input
-                    id="field-12"
-                    type="date"
-                    className="input"
-                    value={form.lmp ? format(new Date(form.lmp), "yyyy-MM-dd") : ""}
-                    onChange={(e) =>
-                      handleChange("lmp", e.target.value ? new Date(e.target.value) : null)
-                    }
-                  />
-                </div>
-              </div>
+                </PanelBody>
+              </Panel>
             </div>
 
-            <div className="card">
-              <div className="card-header">
-                <h2 className="text-lg font-semibold">HRP Details</h2>
-              </div>
-              <div className="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <Select
-                    label="Reason for high-risk pregnancy"
-                    id="field-hrp-reason"
-                    options={[
-                      { value: "", label: "Not recorded" },
-                      ...HRP_REASONS.map((reason) => ({
-                        value: reason.value,
-                        label: reason.label,
-                      })),
-                    ]}
-                    value={form.hrpReason ?? ""}
-                    onChange={(e) =>
-                      handleChange("hrpReason", (e.target.value || null) as HrpReason | null)
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="field-asha-name">
-                    ASHA name
-                  </label>
-                  <input
-                    id="field-asha-name"
-                    className="input"
-                    value={form.ashaName ?? ""}
-                    onChange={(e) => handleChange("ashaName", e.target.value)}
-                  />
-                </div>
-                <div>
-                  <label className="label" htmlFor="field-asha-phone">
-                    ASHA mobile number
-                  </label>
-                  <input
-                    id="field-asha-phone"
-                    type="tel"
-                    className="input"
-                    value={form.ashaPhone ?? ""}
-                    onChange={(e) => handleChange("ashaPhone", e.target.value)}
-                  />
-                </div>
-                <label className="md:col-span-2 flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition">
-                  <input
-                    type="checkbox"
-                    checked={form.referred ?? false}
-                    onChange={(e) => handleChange("referred", e.target.checked)}
-                    className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
-                  />
-                  <span className="text-sm font-medium text-gray-900">
-                    Referred to a higher facility
-                  </span>
-                </label>
-              </div>
-            </div>
-
-            <div className="card">
-              <div className="card-header">
-                <h2 className="text-lg font-semibold">Risk Factors (Danger Signs)</h2>
-              </div>
-              <div className="card-body">
-                <p className="text-sm text-gray-500 mb-4">
-                  Select all that apply. Risk score calculates automatically.
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-4">
+              <Panel>
+                <PanelHeader
+                  title="Risk Factors (Danger Signs)"
+                  description="Select all that apply. The risk score recalculates automatically."
+                  action={<AlertTriangleIcon className="h-4 w-4 text-ink-subtle" />}
+                />
+                <PanelBody className="space-y-2">
                   {DANGER_SIGNS.map((s) => (
                     <label
                       key={s.value}
-                      className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition"
+                      className={`flex min-h-touch cursor-pointer items-center gap-3 rounded border px-3 py-2 text-sm transition-colors ${
+                        form.riskFactors?.includes(s.value)
+                          ? "border-triage-red-line bg-triage-red-bg text-triage-red"
+                          : "border-line bg-surface text-ink-muted hover:bg-canvas"
+                      }`}
                     >
                       <input
                         type="checkbox"
                         checked={form.riskFactors?.includes(s.value) ?? false}
                         onChange={() => toggleRiskFactor(s.value)}
-                        className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                        className="h-4 w-4 shrink-0 rounded-sm border-line-strong text-triage-red-solid focus:ring-triage-red-line"
                       />
-                      <span className="text-sm font-medium text-gray-900">{s.label}</span>
+                      <span className="font-medium">{s.label}</span>
                     </label>
                   ))}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+                </PanelBody>
+              </Panel>
 
-        {!isNew && !editing && visits.length > 0 && (
-          <div className="card">
-            <div className="card-header flex items-center justify-between">
-              <h2 className="text-lg font-semibold">Visit History</h2>
-              <Link to={`/patients/${p.id}/visit`} className="btn btn-primary btn-sm">
-                New Visit
-              </Link>
-            </div>
-            <div className="card-body p-0">
-              <div className="table-container">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Visit #</th>
-                      <th>GA (wks)</th>
-                      <th>BP</th>
-                      <th>Hb</th>
-                      <th>Weight</th>
-                      <th>Risk Signs</th>
-                      <th>IFA</th>
-                      <th>Calcium</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visits.map((v) => (
-                      <tr key={v.id}>
-                        <td>{format(new Date(v.visitDate), "MMM d, yyyy")}</td>
-                        <td>{v.visitNumber}</td>
-                        <td>{v.gestationalWeeks}</td>
-                        <td>
-                          {v.bpSystolic && v.bpDiastolic ? `${v.bpSystolic}/${v.bpDiastolic}` : "—"}
-                        </td>
-                        <td>{v.hb ?? "—"}</td>
-                        <td>{v.weight ?? "—"}</td>
-                        <td>{v.dangerSigns.length > 0 ? v.dangerSigns.join(", ") : "—"}</td>
-                        <td>{v.ifaGiven ? "✓" : "—"}</td>
-                        <td>{v.calciumGiven ? "✓" : "—"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              {saveMutation.isError && (
+                <div
+                  className="rounded border border-triage-red-line bg-triage-red-bg px-4 py-3"
+                  role="alert"
+                >
+                  <p className="text-sm font-medium text-triage-red">
+                    Could not save the changes. Check the details and try again.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
 
         {editing && (
-          <div className="flex gap-3 pt-4 border-t border-gray-200">
-            <button type="button" onClick={() => setEditing(false)} className="btn btn-outline">
+          <div className="flex flex-col-reverse gap-2 border-t border-line pt-4 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setEditing(false)} className="btn btn-secondary">
               Cancel
             </button>
             <button type="submit" className="btn btn-primary" disabled={saveMutation.isPending}>
@@ -460,11 +452,155 @@ export default function PatientDetailPage() {
   );
 }
 
+function RiskPanel({ patient }: { patient: Patient }) {
+  return (
+    <Panel className="relative overflow-hidden">
+      <RiskStripe level={patient.riskLevel} />
+      <PanelBody className="space-y-3 pl-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <RiskBadge level={patient.riskLevel} size="lg" />
+          <span className="tnum text-sm text-ink-subtle">
+            Risk score <span className="font-semibold text-ink">{patient.riskScore}</span>
+          </span>
+          {patient.isHighRisk && <span className="badge badge-red">High-risk pregnancy</span>}
+        </div>
+
+        <div>
+          <p className="text-2xs font-semibold uppercase tracking-wider text-ink-subtle">
+            Reason for high-risk
+          </p>
+          <p className="mt-0.5 text-sm font-medium text-ink">
+            {getHrpReasonLabel(patient.hrpReason)}
+          </p>
+        </div>
+
+        {patient.riskFactors.length > 0 ? (
+          <div>
+            <p className="text-2xs font-semibold uppercase tracking-wider text-ink-subtle">
+              Danger signs on record
+            </p>
+            <ul className="mt-1.5 flex flex-wrap gap-1.5">
+              {patient.riskFactors.map((sign) => (
+                <li key={sign} className="badge badge-red">
+                  {dangerSignLabel(sign)}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className="text-xs text-ink-subtle">No danger signs recorded at registration.</p>
+        )}
+
+        <div className="flex flex-wrap gap-x-5 gap-y-1.5 border-t border-line-soft pt-3 text-xs text-ink-muted">
+          <span className="tnum">
+            <span className="text-ink-subtle">GA </span>
+            {gaLabel(patient)}
+          </span>
+          <span className="tnum">
+            <span className="text-ink-subtle">
+              G{patient.gravida}P{patient.para}A{patient.abortions}
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <MapPinIcon className="h-3.5 w-3.5 text-ink-subtle" />
+            {villageLabel(patient)}
+          </span>
+        </div>
+      </PanelBody>
+    </Panel>
+  );
+}
+
+function VisitHistory({ visits }: { visits: Visit[] }) {
+  const ordered = [...visits].sort(
+    (a, b) => new Date(b.visitDate).getTime() - new Date(a.visitDate).getTime()
+  );
+
+  return (
+    <Panel aria-label="Visit history">
+      <PanelHeader
+        title="Visit history"
+        description={`${visits.length} ${visits.length === 1 ? "contact" : "contacts"} recorded`}
+        action={<ClipboardIcon className="h-4 w-4 text-ink-subtle" />}
+      />
+      {ordered.length === 0 ? (
+        <EmptyState
+          title="No visits recorded"
+          description="Record the first ANC contact to start the vitals chart."
+        />
+      ) : (
+        <ol className="divide-y divide-line-soft">
+          {ordered.map((visit) => (
+            <li key={visit.id} className="px-4 py-3 sm:px-5">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <p className="text-sm font-semibold text-ink">
+                  Visit {visit.visitNumber}
+                  <span className="ml-2 text-xs font-normal text-ink-subtle">
+                    {format(new Date(visit.visitDate), "d MMM yyyy")}
+                  </span>
+                </p>
+                <p className="tnum text-2xs text-ink-subtle">GA {visit.gestationalWeeks} weeks</p>
+              </div>
+
+              <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded bg-canvas px-2.5 py-1.5">
+                  <dt className="text-2xs uppercase tracking-wide text-ink-subtle">BP</dt>
+                  <dd className={`tnum text-sm font-semibold ${toneTextClass(bpTone(visit))}`}>
+                    {formatBp(visit)}
+                  </dd>
+                </div>
+                <div className="rounded bg-canvas px-2.5 py-1.5">
+                  <dt className="text-2xs uppercase tracking-wide text-ink-subtle">Hb</dt>
+                  <dd className={`tnum text-sm font-semibold ${toneTextClass(hbTone(visit.hb))}`}>
+                    {formatHb(visit)}
+                  </dd>
+                </div>
+                <div className="rounded bg-canvas px-2.5 py-1.5">
+                  <dt className="text-2xs uppercase tracking-wide text-ink-subtle">Weight</dt>
+                  <dd className="tnum text-sm font-semibold text-ink">
+                    {visit.weight ?? "—"}
+                    {visit.weight ? <span className="ml-0.5 text-2xs font-normal">kg</span> : null}
+                  </dd>
+                </div>
+                <div className="rounded bg-canvas px-2.5 py-1.5">
+                  <dt className="text-2xs uppercase tracking-wide text-ink-subtle">Fetal HR</dt>
+                  <dd className="tnum text-sm font-semibold text-ink">
+                    {visit.fetalHeartRate ?? "—"}
+                    {visit.fetalHeartRate ? (
+                      <span className="ml-0.5 text-2xs font-normal">bpm</span>
+                    ) : null}
+                  </dd>
+                </div>
+              </dl>
+
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                {visit.dangerSigns.length > 0 ? (
+                  visit.dangerSigns.map((sign) => (
+                    <span key={sign} className="badge badge-red">
+                      {dangerSignLabel(sign)}
+                    </span>
+                  ))
+                ) : (
+                  <span className="badge badge-green">No danger signs</span>
+                )}
+                {visit.ifaGiven && <span className="badge badge-gray">IFA</span>}
+                {visit.calciumGiven && <span className="badge badge-gray">Calcium</span>}
+                {visit.albendazoleGiven && <span className="badge badge-gray">Albendazole</span>}
+                {visit.referred && <span className="badge badge-amber">Referred</span>}
+              </div>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Panel>
+  );
+}
+
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div>
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">{label}</p>
-      <p className="mt-1 text-gray-900">{value}</p>
+    <div className="field-row">
+      <dt>{label}</dt>
+      <dd>{value}</dd>
     </div>
   );
 }
@@ -474,84 +610,73 @@ function PatientDetailsCard({ patient }: { patient: Patient }) {
   const ga = gestationalAgeWeeks(patient);
 
   return (
-    <div className="card">
-      <div className="card-header">
-        <h2 className="text-lg font-semibold">Patient Details</h2>
-      </div>
-      <div className="card-body grid grid-cols-1 md:grid-cols-2 gap-4">
-        <DetailRow label="Name" value={patient.name} />
-        <DetailRow label="Age" value={`${patient.age} years`} />
-        <DetailRow label="Reason for High-Risk" value={getHrpReasonLabel(patient.hrpReason)} />
-        <DetailRow label="Referred" value={patient.referred ? "Yes" : "No"} />
-        <DetailRow label="ASHA Worker" value={asha} />
-        <DetailRow label="Registered By (ANM)" value={patient.anmName ?? "—"} />
-        <DetailRow label="Phone" value={patient.phone ?? "Not provided"} />
-        <DetailRow label="Address" value={patient.address ?? "Not provided"} />
-        <DetailRow label="Gravida" value={String(patient.gravida)} />
-        <DetailRow label="Para" value={String(patient.para)} />
-        <DetailRow label="Abortions" value={String(patient.abortions)} />
-        <DetailRow
-          label="LMP"
-          value={patient.lmp ? format(new Date(patient.lmp), "MMM d, yyyy") : "Not set"}
-        />
-        <DetailRow
-          label="EDD"
-          value={patient.edd ? format(new Date(patient.edd), "MMM d, yyyy") : "Not set"}
-        />
-        <DetailRow label="GA" value={ga === null ? "Unknown" : `${ga} weeks`} />
-        <DetailRow
-          label="Registered"
-          value={patient.createdAt ? format(new Date(patient.createdAt), "MMM d, yyyy") : "—"}
-        />
-      </div>
-    </div>
+    <Panel aria-label="Patient details">
+      <PanelHeader title="Patient Details" description="Registration and obstetric record" />
+      <PanelBody>
+        <dl>
+          <DetailRow label="Name" value={patient.name} />
+          <DetailRow label="Age" value={`${patient.age} years`} />
+          <DetailRow label="Referred" value={patient.referred ? "Yes" : "No"} />
+          <DetailRow label="ASHA Worker" value={asha} />
+          <DetailRow label="Registered By (ANM)" value={patient.anmName ?? "—"} />
+          <DetailRow label="Phone" value={patient.phone ?? "Not provided"} />
+          <DetailRow label="Address" value={patient.address ?? "Not provided"} />
+          <DetailRow label="Gravida" value={String(patient.gravida)} />
+          <DetailRow label="Para" value={String(patient.para)} />
+          <DetailRow label="Abortions" value={String(patient.abortions)} />
+          <DetailRow
+            label="LMP"
+            value={patient.lmp ? format(new Date(patient.lmp), "d MMM yyyy") : "Not set"}
+          />
+          <DetailRow
+            label="EDD"
+            value={patient.edd ? format(new Date(patient.edd), "d MMM yyyy") : "Not set"}
+          />
+          <DetailRow label="GA" value={ga === null ? "Unknown" : `${ga} weeks`} />
+          <DetailRow
+            label="Registered"
+            value={patient.createdAt ? format(new Date(patient.createdAt), "d MMM yyyy") : "—"}
+          />
+        </dl>
+      </PanelBody>
+    </Panel>
   );
 }
 
-const FOLLOW_UP_BADGE: Record<FollowUpStatus, string> = {
-  OVERDUE: "badge-red",
-  DUE: "badge-amber",
-  UPCOMING: "badge-gray",
-};
-
-const FOLLOW_UP_LABEL: Record<FollowUpStatus, string> = {
-  OVERDUE: "Overdue",
-  DUE: "Due",
-  UPCOMING: "Upcoming",
-};
-
 function FollowUpPlanCard({ plan }: { plan: FollowUpItem[] }) {
   return (
-    <div className="card">
-      <div className="card-header">
-        <h2 className="text-lg font-semibold">Follow-up Plan</h2>
-      </div>
-      <div className="card-body">
+    <Panel aria-label="Follow-up plan">
+      <PanelHeader
+        title="Follow-up Plan"
+        description="Generated from the recorded LMP"
+        action={<AlertTriangleIcon className="h-4 w-4 text-ink-subtle" />}
+      />
+      <PanelBody>
         {plan.length === 0 ? (
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-ink-subtle">
             Add an LMP date to generate follow-up dates for this pregnancy.
           </p>
         ) : (
-          <ol className="space-y-3">
+          <ol className="space-y-2">
             {plan.map((item) => (
               <li
                 key={item.visitNumber}
-                className="flex flex-col sm:flex-row sm:items-start gap-2 sm:gap-4 rounded-lg border border-gray-200 p-3"
+                className="flex flex-col gap-2 rounded border border-line px-3 py-2 sm:flex-row sm:items-center sm:gap-4"
               >
-                <span className={`badge ${FOLLOW_UP_BADGE[item.status]}`}>
+                <span className={`badge ${FOLLOW_UP_BADGE[item.status]} shrink-0`}>
                   {FOLLOW_UP_LABEL[item.status]}
                 </span>
-                <div>
-                  <p className="font-medium text-gray-900">
-                    Visit {item.visitNumber} · due {format(item.dueDate, "MMM d, yyyy")}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-ink">
+                    Visit {item.visitNumber} · due {format(item.dueDate, "d MMM yyyy")}
                   </p>
-                  <p className="text-sm text-gray-500">{item.tests.join(", ")}</p>
+                  <p className="text-xs text-ink-subtle">{item.tests.join(", ")}</p>
                 </div>
               </li>
             ))}
           </ol>
         )}
-      </div>
-    </div>
+      </PanelBody>
+    </Panel>
   );
 }

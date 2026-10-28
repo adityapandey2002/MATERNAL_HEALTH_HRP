@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import { api } from "./lib/api";
-import AddHome from "./pages/AddHome";
 import AddPatient from "./pages/AddPatient";
 import Dashboard from "./pages/Dashboard";
 import FollowUps from "./pages/FollowUps";
@@ -10,6 +9,7 @@ import Login from "./pages/Login";
 import NewVisit from "./pages/NewVisit";
 import Offline from "./pages/Offline";
 import PatientDetail from "./pages/PatientDetail";
+import Patients from "./pages/Patients";
 import Referrals from "./pages/Referrals";
 import Settings from "./pages/Settings";
 import Supervision from "./pages/Supervision";
@@ -17,16 +17,16 @@ import { isOnline, onOnlineChange } from "./utils/sw";
 
 function LoadingScreen() {
   return (
-    <div className="flex h-screen flex-col items-center justify-center gap-4 bg-gradient-to-b from-green-50 to-white text-center">
-      <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-green-600 text-2xl font-bold text-white shadow-lg">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary text-lg font-bold text-white">
         HRP
       </div>
-      <div className="space-y-1">
-        <h1 className="text-lg font-semibold text-gray-900">High-Risk Pregnancy Tracking</h1>
-        <p className="text-sm text-gray-500">of Araria</p>
+      <div>
+        <h1 className="text-base font-semibold text-ink">High-Risk Pregnancy Tracking</h1>
+        <p className="text-sm text-ink-subtle">of Araria</p>
       </div>
-      <div className="flex items-center gap-2 text-sm text-gray-500">
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-green-600 border-t-transparent" />
+      <div className="flex items-center gap-2 text-sm text-ink-subtle">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         <span>Waking up the server…</span>
       </div>
     </div>
@@ -103,9 +103,10 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={<AddHome />} />
+          <Route path="/" element={<Dashboard />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/follow-ups" element={<FollowUps />} />
+          <Route path="/patients" element={<Patients />} />
           <Route path="/patients/new" element={<AddPatient />} />
           <Route path="/patients/:id" element={<PatientDetail />} />
           <Route path="/patients/:id/visit" element={<NewVisit />} />

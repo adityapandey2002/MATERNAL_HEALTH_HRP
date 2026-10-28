@@ -1,118 +1,58 @@
 import {
-  Patient,
+  type FollowUpStatus,
+  type Patient,
   type RiskLevel,
   type SupervisionAlert,
-  gestationalAgeWeeks,
+  type UserRole,
+  type Visit,
   getFollowUpPlan,
+  getHrpReasonLabel,
 } from "@hrp/shared";
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { PatientList } from "../components/PatientList";
+import { EmptyState } from "../components/ui/EmptyState";
+import {
+  ActivityIcon,
+  AlertTriangleIcon,
+  ArrowRightIcon,
+  CalendarIcon,
+  ClipboardIcon,
+  PhoneIcon,
+  PlusIcon,
+  SyncIcon,
+  UsersIcon,
+} from "../components/ui/Icons";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Panel, PanelHeader } from "../components/ui/Panel";
+import { RiskBadge, RiskStripe } from "../components/ui/RiskBadge";
+import { StatTile } from "../components/ui/Stat";
 import { api } from "../lib/api";
-import PatientsSection from "./Patients";
+import {
+  bpTone,
+  formatBp,
+  formatHb,
+  gaLabel,
+  hbTone,
+  latestVisitByPatient,
+  toneTextClass,
+} from "../lib/clinical";
+import { useUserRole } from "../lib/session";
+import { isOnline, onOnlineChange } from "../utils/sw";
 
-function StatCard({
-  label,
-  value,
-  icon,
-  color,
-}: { label: string; value: string | number; icon: React.ReactNode; color: string }) {
-  return (
-    <div className="card p-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-gray-500">{label}</p>
-          <p className="mt-1 text-3xl font-bold text-gray-900">{value}</p>
-        </div>
-        <div className={`p-3 rounded-lg ${color}`}>{icon}</div>
-      </div>
-    </div>
-  );
-}
-
-const riskColors: Record<RiskLevel, string> = {
-  RED: "text-red-700",
-  AMBER: "text-amber-800",
-  GREEN: "text-green-700",
-};
-
-const riskBgColors: Record<RiskLevel, string> = {
-  RED: "bg-red-100",
-  AMBER: "bg-amber-100",
-  GREEN: "bg-green-100",
-};
-
-function RiskIcon({ level, className }: { level: RiskLevel; className?: string }) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${riskBgColors[level]} ${riskColors[level]} ${className ?? ""}`}
-    >
-      {level === "RED" && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
-      {level === "AMBER" && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
-      {level === "GREEN" && <span className="w-1.5 h-1.5 rounded-full bg-current" />}
-      {level}
-    </span>
-  );
-}
-
-function UsersIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"
-      />
-    </svg>
-  );
-}
-
-function AlertTriangleIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-      />
-    </svg>
-  );
-}
-
-function CalendarIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-      />
-    </svg>
-  );
-}
+const RISK_ORDER: Record<RiskLevel, number> = { RED: 0, AMBER: 1, GREEN: 2 };
 
 export default function Dashboard() {
+  const role = useUserRole();
+  const [online, setOnline] = useState(true);
+
+  useEffect(() => {
+    setOnline(navigator.onLine);
+    return onOnlineChange(setOnline);
+  }, []);
+
   const { data: patientsData, isLoading: patientsLoading } = useQuery({
     queryKey: ["patients", "dashboard"],
     queryFn: () => api.patients.list({ page: 1, limit: 100 }),
@@ -131,254 +71,422 @@ export default function Dashboard() {
   const patients = patientsData?.data ?? [];
   const visits = visitsData?.data ?? [];
   const alerts = (alertsData?.data as SupervisionAlert[]) ?? [];
+  const latestVisits = latestVisitByPatient(visits);
 
-  const highRiskCount = patients.filter((p) => p.riskLevel === "RED").length;
-  const mediumRiskCount = patients.filter((p) => p.riskLevel === "AMBER").length;
-  const _lowRiskCount = patients.filter((p) => p.riskLevel === "GREEN").length;
-
-  // Count recorded visits per woman so the follow-up plan starts at her next
-  // ANC contact rather than repeating contacts already done.
   const completedByPatient = new Map<string, number>();
   for (const visit of visits) {
     completedByPatient.set(visit.patientId, (completedByPatient.get(visit.patientId) ?? 0) + 1);
   }
 
-  const allFollowUps = patients.flatMap((patient) =>
-    getFollowUpPlan(patient, completedByPatient.get(patient.id) ?? 0, 1).map((item) => ({
-      patient,
-      ...item,
-    }))
-  );
-  const followUpsDueCount = allFollowUps.filter((item) => item.status !== "UPCOMING").length;
-  const followUps = allFollowUps
-    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())
-    .slice(0, 6);
+  const followUps = patients
+    .flatMap((patient) =>
+      getFollowUpPlan(patient, completedByPatient.get(patient.id) ?? 0, 1).map((item) => ({
+        patient,
+        ...item,
+      }))
+    )
+    .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
+
+  const dueFollowUps = followUps.filter((item) => item.status !== "UPCOMING");
+  const duePatientIds = new Set(dueFollowUps.map((item) => item.patient.id));
+
+  const counts = {
+    total: patients.length,
+    red: patients.filter((p) => p.riskLevel === "RED").length,
+    amber: patients.filter((p) => p.riskLevel === "AMBER").length,
+    green: patients.filter((p) => p.riskLevel === "GREEN").length,
+    due: duePatientIds.size,
+  };
 
   if (patientsLoading || visitsLoading || alertsLoading) {
+    return <DashboardSkeleton />;
+  }
+
+  if (role === "ANM") {
     return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="card p-6 animate-pulse">
-              <div className="h-4 bg-gray-200 rounded w-1/4 mb-2" />
-              <div className="h-8 bg-gray-200 rounded w-1/2" />
-            </div>
-          ))}
-        </div>
-        <div className="card">
-          <div className="p-4 border-b border-gray-200 animate-pulse">
-            <div className="h-4 bg-gray-200 rounded w-1/4" />
-          </div>
-          <div className="p-4 space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-12 bg-gray-200 rounded animate-pulse" />
-            ))}
-          </div>
-        </div>
-      </div>
+      <FieldDashboard
+        patients={patients}
+        latestVisits={latestVisits}
+        dueFollowUps={dueFollowUps}
+        counts={counts}
+        online={online}
+      />
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500">Overview of your high-risk pregnancy cases</p>
+    <OversightDashboard
+      role={role}
+      patients={patients}
+      latestVisits={latestVisits}
+      alerts={alerts}
+      counts={counts}
+    />
+  );
+}
+
+interface DashboardCounts {
+  total: number;
+  red: number;
+  amber: number;
+  green: number;
+  due: number;
+}
+
+type DueFollowUp = {
+  patient: Patient;
+  visitNumber: number;
+  dueDate: Date;
+  status: FollowUpStatus;
+  tests: string[];
+};
+
+interface FieldDashboardProps {
+  patients: Patient[];
+  latestVisits: Map<string, Visit>;
+  dueFollowUps: DueFollowUp[];
+  counts: DashboardCounts;
+  online: boolean;
+}
+
+function FieldDashboard({
+  patients,
+  latestVisits,
+  dueFollowUps,
+  counts,
+  online,
+}: FieldDashboardProps) {
+  const urgent = [...patients]
+    .filter((patient) => patient.riskLevel !== "GREEN")
+    .sort((a, b) => RISK_ORDER[a.riskLevel] - RISK_ORDER[b.riskLevel])
+    .slice(0, 4);
+
+  const urgentIds = new Set(urgent.map((patient) => patient.id));
+  const routine = dueFollowUps.filter((item) => !urgentIds.has(item.patient.id)).slice(0, 5);
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow={`${format(new Date(), "EEEE d MMMM")} · Araria`}
+        title="Today"
+        description={`${counts.due} ANC contacts due · ${counts.red} high-risk ${
+          counts.red === 1 ? "woman needs" : "women need"
+        } attention`}
+        actions={
+          <Link to="/patients/new" className="btn btn-primary">
+            <PlusIcon className="h-4 w-4" />
+            Register woman
+          </Link>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+        <StatTile
+          label="Due visits"
+          value={counts.due}
+          hint="Today and overdue"
+          icon={<CalendarIcon className="h-4 w-4" />}
+          tone="primary"
+        />
+        <StatTile
+          label="High risk"
+          value={counts.red}
+          hint="Red triage"
+          icon={<AlertTriangleIcon className="h-4 w-4" />}
+          tone="red"
+        />
+        <StatTile
+          label="Active mothers"
+          value={counts.total}
+          hint="In your register"
+          icon={<UsersIcon className="h-4 w-4" />}
+        />
+        <StatTile
+          label="Data status"
+          value={online ? "Synced" : "Offline"}
+          hint={online ? "Changes saved" : "Saved on this device"}
+          icon={<SyncIcon className="h-4 w-4" />}
+          tone={online ? "green" : "amber"}
+          compact
+        />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          label="Total Patients"
-          value={patients.length}
-          icon={<UsersIcon className="w-8 h-8 text-blue-600" />}
-          color="bg-blue-100"
-        />
-        <StatCard
-          label="High Risk (Red)"
-          value={highRiskCount}
-          icon={<AlertTriangleIcon className="w-8 h-8 text-red-600" />}
-          color="bg-red-100"
-        />
-        <StatCard
-          label="Medium Risk (Amber)"
-          value={mediumRiskCount}
-          icon={<AlertTriangleIcon className="w-8 h-8 text-amber-600" />}
-          color="bg-amber-100"
-        />
-        <StatCard
-          label="Follow-ups Due"
-          value={followUpsDueCount}
-          icon={<CalendarIcon className="w-8 h-8 text-green-600" />}
-          color="bg-green-100"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="card">
-          <div className="card-header flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">High-Risk Patients</h2>
-          </div>
-          <div className="card-body p-0">
-            <div className="table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Age</th>
-                    <th>GA (wks)</th>
-                    <th className="text-center">Risk</th>
-                    <th>Last Visit</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {patients
-                    .filter((p) => p.riskLevel !== "GREEN")
-                    .sort((a, b) => {
-                      const riskOrder: Record<RiskLevel, number> = { RED: 0, AMBER: 1, GREEN: 2 };
-                      return riskOrder[a.riskLevel] - riskOrder[b.riskLevel];
-                    })
-                    .slice(0, 10)
-                    .map((p) => (
-                      <tr key={p.id}>
-                        <td className="font-medium">{p.name}</td>
-                        <td>{p.age}</td>
-                        <td>{gestationalAgeWeeks(p) ?? "—"}</td>
-                        <td className="text-center">
-                          <RiskIcon level={p.riskLevel} />
-                        </td>
-                        <td>{p.updatedAt ? format(new Date(p.updatedAt), "MMM d") : "—"}</td>
-                      </tr>
-                    ))}
-                  {patients.filter((p) => p.riskLevel !== "GREEN").length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="text-center py-8 text-gray-500">
-                        No high-risk patients
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Follow-ups Due</h2>
-            <Link to="/follow-ups" className="text-sm text-green-700 hover:text-green-800">
-              View all
+      <Panel aria-labelledby="urgent-heading">
+        <PanelHeader
+          id="urgent-heading"
+          title={`Urgent attention (${urgent.length})`}
+          description="Danger signs recorded at the last contact"
+          action={
+            <Link
+              to="/follow-ups"
+              className="text-2xs font-semibold uppercase tracking-wide text-primary hover:underline"
+            >
+              Needs visit
             </Link>
+          }
+        />
+        {urgent.length === 0 ? (
+          <EmptyState
+            title="No high-risk patients"
+            description="No woman in your register is currently flagged red or amber."
+          />
+        ) : (
+          <ul className="space-y-2 p-3 sm:p-4">
+            {urgent.map((patient) => (
+              <li key={patient.id}>
+                <UrgentPatientCard patient={patient} visit={latestVisits.get(patient.id)} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Panel aria-labelledby="routine-heading">
+        <PanelHeader
+          id="routine-heading"
+          title="Routine ANC due"
+          description="Scheduled for today"
+          action={
+            <span className="tnum text-2xs font-semibold text-ink-subtle">{routine.length}</span>
+          }
+        />
+        {routine.length === 0 ? (
+          <EmptyState title="No follow-ups due" description="Nothing scheduled for today." />
+        ) : (
+          <ul className="divide-y divide-line-soft">
+            {routine.map(({ patient, visitNumber, status }) => (
+              <li
+                key={`${patient.id}-${visitNumber}`}
+                className="flex items-center gap-3 px-4 py-3"
+              >
+                <span
+                  aria-hidden="true"
+                  className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full bg-canvas text-xs font-bold text-ink-muted sm:flex"
+                >
+                  {patient.name.charAt(0).toUpperCase()}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink">{patient.name}</p>
+                  <p className="tnum truncate text-2xs text-ink-subtle">
+                    {gaLabel(patient)} · ANC {visitNumber}
+                    {status === "OVERDUE" ? " · overdue" : ""}
+                  </p>
+                </div>
+                <Link
+                  to={`/patients/${patient.id}/visit`}
+                  className="btn btn-secondary btn-sm"
+                  aria-label={`Record visit for ${patient.name}`}
+                >
+                  <ClipboardIcon className="h-3.5 w-3.5" />
+                  Checkup
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+
+      <Link
+        to="/follow-ups"
+        className="panel flex items-center gap-3 p-3 transition-colors hover:bg-canvas sm:p-4"
+      >
+        <span
+          aria-hidden="true"
+          className="flex h-9 w-9 items-center justify-center rounded bg-primary-light text-primary-dark"
+        >
+          <ClipboardIcon className="h-4 w-4" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-ink">Review all follow-ups</span>
+          <span className="block text-2xs text-ink-subtle">
+            Every ANC contact that needs action
+          </span>
+        </span>
+        <ArrowRightIcon className="h-4 w-4 text-ink-subtle" />
+      </Link>
+    </div>
+  );
+}
+
+function UrgentPatientCard({ patient, visit }: { patient: Patient; visit: Visit | undefined }) {
+  const phone = patient.phone?.replace(/\s+/g, "");
+
+  return (
+    <article className="relative overflow-hidden rounded border border-line bg-surface">
+      <RiskStripe level={patient.riskLevel} />
+      <div className="py-3 pl-4 pr-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-ink">{patient.name}</p>
+            <p className="tnum truncate text-2xs text-ink-subtle">
+              {gaLabel(patient)} · {patient.age} yrs · G{patient.gravida}P{patient.para}
+            </p>
           </div>
-          <div className="card-body p-0">
-            <div className="table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Patient</th>
-                    <th>ANM</th>
-                    <th>Next Contact</th>
-                    <th>Tests</th>
-                    <th className="text-center">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {followUps.length > 0 ? (
-                    followUps.map(({ patient, visitNumber, dueDate, status, tests }) => (
-                      <tr key={`${patient.id}-${visitNumber}`}>
-                        <td className="font-medium">
-                          <Link
-                            to={`/patients/${patient.id}`}
-                            className="text-green-700 hover:text-green-800"
-                          >
-                            {patient.name}
-                          </Link>
-                        </td>
-                        <td>{patient.anmName ?? "—"}</td>
-                        <td>
-                          Visit {visitNumber} · {format(dueDate, "MMM d")}
-                        </td>
-                        <td className="max-w-xs truncate">{tests.slice(0, 2).join(", ")}</td>
-                        <td className="text-center">
-                          <span
-                            className={`badge ${
-                              status === "OVERDUE"
-                                ? "badge-red"
-                                : status === "DUE"
-                                  ? "badge-amber"
-                                  : "badge-gray"
-                            }`}
-                          >
-                            {status === "OVERDUE"
-                              ? "Overdue"
-                              : status === "DUE"
-                                ? "Due"
-                                : "Upcoming"}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="text-center py-8 text-gray-500">
-                        No follow-ups due
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <RiskBadge level={patient.riskLevel} size="sm" />
         </div>
 
-        <div className="lg:col-span-2 card">
-          <div className="card-header flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Supervision Alerts</h2>
-            <a href="/supervision" className="text-sm text-green-700 hover:text-green-800">
-              View all
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded bg-canvas px-2.5 py-1.5 text-xs">
+          <span className="inline-flex items-center gap-1">
+            <ActivityIcon className="h-3.5 w-3.5 text-ink-subtle" />
+            <span className="text-ink-subtle">BP</span>
+            <span className={`tnum font-semibold ${toneTextClass(bpTone(visit))}`}>
+              {formatBp(visit)}
+            </span>
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="text-ink-subtle">Hb</span>
+            <span className={`tnum font-semibold ${toneTextClass(hbTone(visit?.hb))}`}>
+              {formatHb(visit)}
+            </span>
+          </span>
+          <span className="min-w-0 truncate text-2xs font-medium text-triage-red">
+            {getHrpReasonLabel(patient.hrpReason)}
+          </span>
+        </div>
+
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          {phone ? (
+            <a href={`tel:${phone}`} className="btn btn-secondary btn-sm">
+              <PhoneIcon className="h-3.5 w-3.5" />
+              Call
             </a>
-          </div>
-          <div className="card-body p-0">
-            <div className="table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Type</th>
-                    <th>Message</th>
-                    <th>Facility</th>
-                    <th>Severity</th>
-                    <th>Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {alerts.length > 0 ? (
-                    alerts.slice(0, 10).map((a) => (
-                      <tr key={a.id}>
-                        <td className="text-sm font-medium capitalize">
-                          {a.type.replace(/_/g, " ")}
-                        </td>
-                        <td className="max-w-xs truncate">{a.message}</td>
-                        <td>{a.facilityId}</td>
-                        <td className="text-center">
-                          <RiskIcon level={a.severity} />
-                        </td>
-                        <td>{format(new Date(a.createdAt), "MMM d, HH:mm")}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={5} className="text-center py-8 text-gray-500">
-                        No alerts
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          ) : (
+            <span className="btn btn-secondary btn-sm opacity-50" aria-disabled="true">
+              <PhoneIcon className="h-3.5 w-3.5" />
+              No phone
+            </span>
+          )}
+          <Link
+            to={`/patients/${patient.id}/visit`}
+            className="btn btn-primary btn-sm"
+            aria-label={`Start checkup for ${patient.name}`}
+          >
+            <ClipboardIcon className="h-3.5 w-3.5" />
+            Checkup
+          </Link>
         </div>
       </div>
+    </article>
+  );
+}
 
-      <PatientsSection />
+function OversightDashboard({
+  role,
+  patients,
+  latestVisits,
+  alerts,
+  counts,
+}: {
+  role: UserRole;
+  patients: Patient[];
+  latestVisits: Map<string, Visit>;
+  alerts: SupervisionAlert[];
+  counts: DashboardCounts;
+}) {
+  const title = role === "CHO" ? "Triage line list" : "District overview";
+  const sorted = [...patients].sort((a, b) => RISK_ORDER[a.riskLevel] - RISK_ORDER[b.riskLevel]);
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow={`${format(new Date(), "d MMMM yyyy")} · Araria district`}
+        title={title}
+        description="High-risk maternal cohort, ordered by triage level"
+        actions={
+          // Only ANM and CHO hold patient:write on the server; nodal officers
+          // read the cohort, so a Register button would only earn them a 403.
+          role === "CHO" ? (
+            <Link to="/patients/new" className="btn btn-primary">
+              <PlusIcon className="h-4 w-4" />
+              Register woman
+            </Link>
+          ) : undefined
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+        <StatTile label="Total cohort" value={counts.total} hint="Active registrations" />
+        <StatTile
+          label="High risk"
+          value={counts.red}
+          hint="Red triage"
+          tone="red"
+          icon={<AlertTriangleIcon className="h-4 w-4" />}
+        />
+        <StatTile
+          label="Moderate"
+          value={counts.amber}
+          hint="Active monitoring"
+          tone="amber"
+          icon={<AlertTriangleIcon className="h-4 w-4" />}
+        />
+        <StatTile
+          label="Visits due"
+          value={counts.due}
+          hint="Today and overdue"
+          tone="primary"
+          icon={<CalendarIcon className="h-4 w-4" />}
+        />
+      </div>
+
+      <Panel aria-labelledby="cohort-heading">
+        <PanelHeader
+          id="cohort-heading"
+          title="Clinical triage"
+          description={`${counts.total} women in cohort`}
+          action={
+            <Link to="/patients" className="btn btn-secondary btn-sm">
+              Full register
+            </Link>
+          }
+        />
+        <PatientList patients={sorted} latestVisits={latestVisits} />
+      </Panel>
+
+      <Panel aria-labelledby="alerts-heading">
+        <PanelHeader
+          id="alerts-heading"
+          title="Supervision alerts"
+          description="Unacknowledged signals from the field"
+          action={
+            <Link to="/supervision" className="btn btn-secondary btn-sm">
+              Open supervision
+            </Link>
+          }
+        />
+        {alerts.length === 0 ? (
+          <EmptyState title="No alerts" description="No unacknowledged supervision signals." />
+        ) : (
+          <ul className="divide-y divide-line-soft">
+            {alerts.slice(0, 5).map((alert) => (
+              <li key={alert.id} className="flex items-start gap-3 px-4 py-3">
+                <RiskBadge level={alert.severity} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm text-ink">{alert.message}</p>
+                  <p className="text-2xs text-ink-subtle">
+                    {alert.type.replace(/_/g, " ").toLowerCase()} ·{" "}
+                    {format(new Date(alert.createdAt), "d MMM, HH:mm")}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-5" aria-busy="true" aria-label="Loading dashboard">
+      <div className="h-16 animate-pulse rounded-lg bg-line-soft" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-20 animate-pulse rounded-lg bg-line-soft" />
+        ))}
+      </div>
+      <div className="h-64 animate-pulse rounded-lg bg-line-soft" />
     </div>
   );
 }

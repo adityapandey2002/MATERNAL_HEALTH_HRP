@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { XIcon } from "./Icons";
 
 interface SheetProps {
@@ -48,12 +48,12 @@ export function Sheet({ open, onClose, title, description, children }: SheetProp
         className="absolute inset-0 bg-ink/40"
         onClick={onClose}
       />
-      <div
-        role="dialog"
+      <dialog
+        open
         aria-modal="true"
         aria-labelledby="sheet-title"
         aria-describedby={description ? "sheet-description" : undefined}
-        className="relative w-full max-w-lg rounded-t-xl border border-line bg-surface shadow-overlay"
+        className="static m-0 w-full max-w-lg rounded-t-xl border border-line bg-surface p-0 shadow-overlay"
       >
         <div className="flex items-start justify-between gap-4 border-b border-line-soft px-4 py-3">
           <div>
@@ -77,7 +77,7 @@ export function Sheet({ open, onClose, title, description, children }: SheetProp
           </button>
         </div>
         <div className="pb-safe max-h-[70vh] overflow-y-auto px-2 py-2">{children}</div>
-      </div>
+      </dialog>
     </div>
   );
 }

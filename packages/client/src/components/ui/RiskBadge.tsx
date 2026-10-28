@@ -22,7 +22,6 @@ const sizeClasses: Record<"sm" | "md" | "lg", string> = {
   md: "",
   lg: "px-2.5 py-1 text-xs",
 };
-
 const colors: Record<RiskLevel, string> = {
   RED: "bg-triage-red-solid",
   AMBER: "bg-triage-amber-solid",
@@ -44,7 +43,10 @@ const levelNames: Record<RiskLevel, string> = {
 export function RiskBadge({ level, showLabel = true, size = "md" }: RiskBadgeProps) {
   const c = config[level];
   return (
-    <span data-testid="risk-badge" className={`badge ${c.class} ${sizeClasses[size]}`}>
+    <span
+      data-testid="risk-badge"
+      className={`badge whitespace-nowrap ${c.class} ${sizeClasses[size]}`}
+    >
       <span aria-hidden="true" className="inline-flex">
         {c.icon}
       </span>

@@ -3,9 +3,9 @@ import { describe, expect, it } from "vitest";
 import { RiskBadge, RiskDot } from "./RiskBadge";
 
 const LABELS = {
-  RED: "High Risk",
-  AMBER: "Medium Risk",
-  GREEN: "Low Risk",
+  RED: "High risk",
+  AMBER: "Moderate",
+  GREEN: "Routine",
 } as const;
 
 describe("RiskBadge", () => {
@@ -32,13 +32,24 @@ describe("RiskBadge", () => {
 
   it("applies size classes correctly", () => {
     const { rerender } = render(<RiskBadge level="RED" size="sm" />);
-    expect(screen.getByTestId("risk-badge")).toHaveClass("px-2 py-0.5 text-xs");
+    expect(screen.getByTestId("risk-badge")).toHaveClass("px-1.5 py-0 text-2xs");
 
     rerender(<RiskBadge level="RED" size="md" />);
-    expect(screen.getByTestId("risk-badge")).toHaveClass("px-2.5 py-1 text-sm");
+    expect(screen.getByTestId("risk-badge")).not.toHaveClass("px-1.5");
 
     rerender(<RiskBadge level="RED" size="lg" />);
-    expect(screen.getByTestId("risk-badge")).toHaveClass("px-3 py-1.5 text-base");
+    expect(screen.getByTestId("risk-badge")).toHaveClass("px-2.5 py-1 text-xs");
+  });
+
+  it("uses the triage token for each risk level", () => {
+    const { rerender } = render(<RiskBadge level="RED" />);
+    expect(screen.getByTestId("risk-badge")).toHaveClass("badge-red");
+
+    rerender(<RiskBadge level="AMBER" />);
+    expect(screen.getByTestId("risk-badge")).toHaveClass("badge-amber");
+
+    rerender(<RiskBadge level="GREEN" />);
+    expect(screen.getByTestId("risk-badge")).toHaveClass("badge-green");
   });
 
   it("does not announce every badge on the page as a live region", () => {
@@ -53,24 +64,24 @@ describe("RiskBadge", () => {
 describe("RiskDot", () => {
   it("renders correct color for each risk level", () => {
     const { rerender } = render(<RiskDot level="RED" />);
-    expect(screen.getByTestId("risk-dot")).toHaveClass("bg-red-500");
+    expect(screen.getByTestId("risk-dot")).toHaveClass("bg-triage-red-solid");
 
     rerender(<RiskDot level="AMBER" />);
-    expect(screen.getByTestId("risk-dot")).toHaveClass("bg-amber-500");
+    expect(screen.getByTestId("risk-dot")).toHaveClass("bg-triage-amber-solid");
 
     rerender(<RiskDot level="GREEN" />);
-    expect(screen.getByTestId("risk-dot")).toHaveClass("bg-green-500");
+    expect(screen.getByTestId("risk-dot")).toHaveClass("bg-triage-green-solid");
   });
 
   it("applies size classes correctly", () => {
     const { rerender } = render(<RiskDot level="RED" size="sm" />);
-    expect(screen.getByTestId("risk-dot")).toHaveClass("w-2 h-2");
+    expect(screen.getByTestId("risk-dot")).toHaveClass("h-1.5 w-1.5");
 
     rerender(<RiskDot level="RED" size="md" />);
-    expect(screen.getByTestId("risk-dot")).toHaveClass("w-3 h-3");
+    expect(screen.getByTestId("risk-dot")).toHaveClass("h-2 w-2");
 
     rerender(<RiskDot level="RED" size="lg" />);
-    expect(screen.getByTestId("risk-dot")).toHaveClass("w-4 h-4");
+    expect(screen.getByTestId("risk-dot")).toHaveClass("h-2.5 w-2.5");
   });
 
   it("exposes the risk level as an accessible name", () => {

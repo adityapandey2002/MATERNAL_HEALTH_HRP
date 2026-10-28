@@ -22,13 +22,16 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@hrp/shared": path.resolve(__dirname, "../shared/dist/index.js"),
+      // Specific subpath aliases must come before the bare package alias:
+      // Vite matches string aliases by prefix, so "@hrp/shared" would
+      // otherwise swallow "@hrp/shared/schemas" and friends.
       "@hrp/shared/rules": path.resolve(__dirname, "../shared/dist/rules.js"),
       "@hrp/shared/rules.js": path.resolve(__dirname, "../shared/dist/rules.js"),
       "@hrp/shared/schemas": path.resolve(__dirname, "../shared/dist/schemas.js"),
       "@hrp/shared/schemas.js": path.resolve(__dirname, "../shared/dist/schemas.js"),
       "@hrp/shared/date-utils": path.resolve(__dirname, "../shared/dist/date-utils.js"),
       "@hrp/shared/date-utils.js": path.resolve(__dirname, "../shared/dist/date-utils.js"),
+      "@hrp/shared": path.resolve(__dirname, "../shared/dist/index.js"),
     },
   },
 });

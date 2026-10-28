@@ -1,293 +1,342 @@
-import { Facility, User } from "@hrp/shared";
+import type { UserRole } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { BrandMark } from "../components/ui/BrandMark";
+import { BellIcon, CheckIcon, InfoIcon, SyncIcon, UserIcon } from "../components/ui/Icons";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { api } from "../lib/api";
+import { initialsFor } from "../lib/nav";
+
+type SettingsTab = "profile" | "sync" | "notifications" | "about";
+
+const ROLE_LABEL: Record<UserRole, string> = {
+  ANM: "ANM · field worker",
+  CHO: "CHO · facility",
+  BHM: "Block nodal officer",
+  DHS: "District officer",
+};
+
+const NOTIFICATION_PREFS = [
+  {
+    id: "due_visits",
+    label: "Due visit reminders",
+    description: "Get notified when ANC visits are due",
+  },
+  {
+    id: "high_risk",
+    label: "High-risk alerts",
+    description: "Immediate alerts for red-flagged patients",
+  },
+  {
+    id: "sync_status",
+    label: "Sync status",
+    description: "Know when sync completes or fails",
+  },
+] as const;
+
+type NotificationId = (typeof NOTIFICATION_PREFS)[number]["id"];
+
+const DEFAULT_PREFS: Record<NotificationId, boolean> = {
+  due_visits: true,
+  high_risk: true,
+  sync_status: true,
+};
+
+function readPrefs(): Record<NotificationId, boolean> {
+  try {
+    const stored = localStorage.getItem("hrp.notificationPrefs");
+    if (!stored) return DEFAULT_PREFS;
+    const parsed = JSON.parse(stored) as Partial<Record<NotificationId, boolean>>;
+    return { ...DEFAULT_PREFS, ...parsed };
+  } catch {
+    return DEFAULT_PREFS;
+  }
+}
 
 export default function SettingsPage() {
   const queryClient = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"profile" | "sync" | "notifications" | "about">(
-    "profile"
-  );
+  const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
+  const [prefs, setPrefs] = useState<Record<NotificationId, boolean>>(DEFAULT_PREFS);
+
+  useEffect(() => {
+    setPrefs(readPrefs());
+  }, []);
 
   const { data: user } = useQuery({ queryKey: ["auth", "me"], queryFn: api.auth.me });
   const { data: facilities } = useQuery({ queryKey: ["facilities"], queryFn: api.facilities.list });
 
   const syncMutation = useMutation({
     mutationFn: api.sync.push,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sync"] }),
+    onSuccess: () => {
+      localStorage.setItem("lastSyncTime", String(Date.now()));
+      queryClient.invalidateQueries({ queryKey: ["sync"] });
+    },
   });
 
-  return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
+  const facilityList = Array.isArray(facilities) ? facilities : [];
+  const facilityName = facilityList.find((f) => f.id === user?.facilityId)?.name;
 
-      <div className="card">
-        <div className="border-b border-gray-200">
-          <nav className="flex gap-1 p-1" aria-label="Settings tabs">
-            {[
-              { id: "profile", label: "Profile", icon: UserIcon },
-              { id: "sync", label: "Sync", icon: SyncIcon },
-              { id: "notifications", label: "Notifications", icon: BellIcon },
-              { id: "about", label: "About", icon: InfoIcon },
-            ].map((tab) => (
-              <button
-                type="button"
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${activeTab === tab.id ? "bg-green-50 text-green-700" : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"}`}
-              >
-                <tab.icon className="w-4 h-4" />
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+  const togglePref = (id: NotificationId, value: boolean) => {
+    const next = { ...prefs, [id]: value };
+    setPrefs(next);
+    try {
+      localStorage.setItem("hrp.notificationPrefs", JSON.stringify(next));
+    } catch {
+      // A full or blocked storage quota must not break the settings screen.
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Account"
+        title="Settings"
+        description="Your profile, device sync and notification preferences"
+      />
+
+      <div className="grid gap-4 lg:grid-cols-4">
+        <div className="lg:col-span-1">
+          <Panel className="lg:sticky lg:top-20">
+            <div className="p-2">
+              <SegmentedControl
+                className="lg:hidden"
+                label="Settings sections"
+                value={activeTab}
+                onChange={setActiveTab}
+                options={[
+                  { value: "profile", label: "Profile" },
+                  { value: "sync", label: "Sync" },
+                  { value: "notifications", label: "Alerts" },
+                  { value: "about", label: "About" },
+                ]}
+              />
+              <nav aria-label="Settings sections" className="hidden lg:block">
+                <ul className="space-y-0.5">
+                  {[
+                    { id: "profile" as const, label: "Profile", icon: UserIcon },
+                    { id: "sync" as const, label: "Sync", icon: SyncIcon },
+                    { id: "notifications" as const, label: "Notifications", icon: BellIcon },
+                    { id: "about" as const, label: "About", icon: InfoIcon },
+                  ].map((tab) => {
+                    const selected = activeTab === tab.id;
+                    return (
+                      <li key={tab.id}>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab(tab.id)}
+                          aria-pressed={selected}
+                          className={`flex min-h-touch w-full items-center gap-2.5 rounded px-3 text-sm font-medium transition-colors ${
+                            selected
+                              ? "bg-primary text-white"
+                              : "text-ink-muted hover:bg-canvas hover:text-ink"
+                          }`}
+                        >
+                          <tab.icon className={`h-4 w-4 ${selected ? "" : "text-ink-subtle"}`} />
+                          {tab.label}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </nav>
+            </div>
+          </Panel>
         </div>
 
-        <div className="card-body p-6">
+        <div className="lg:col-span-3">
           {activeTab === "profile" && (
-            <div className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-                  <UserIcon className="w-8 h-8 text-green-600" />
+            <Panel>
+              <PanelHeader title="Profile" description="Identity issued by your facility" />
+              <PanelBody className="space-y-5">
+                <div className="flex items-center gap-4">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-primary text-lg font-bold text-white"
+                  >
+                    {initialsFor(user?.name)}
+                  </span>
+                  <div className="min-w-0">
+                    <h2 className="truncate text-base font-semibold text-ink">
+                      {user?.name ?? "Health Worker"}
+                    </h2>
+                    <p className="text-sm text-ink-subtle">
+                      {user ? ROLE_LABEL[user.role] : "Field worker"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-ink-subtle">
+                      Employee ID: {user?.employeeId ?? "—"}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">
-                    {user?.name ?? "Health Worker"}
-                  </h2>
-                  <p className="text-gray-500 capitalize">{user?.role?.toLowerCase() ?? "anm"}</p>
-                  <p className="text-sm text-gray-600">Employee ID: {user?.employeeId ?? "—"}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <span className="label">Phone</span>
-                  <p className="text-gray-900">{user?.phone ?? "Not set"}</p>
-                </div>
-                <div>
-                  <span className="label">Facility</span>
-                  <p className="text-gray-900">
-                    {facilities?.find((f) => f.id === user?.facilityId)?.name ?? "Not assigned"}
-                  </p>
-                </div>
-                <div>
-                  <span className="label">Language</span>
-                  <p className="text-gray-900">{user?.language ?? "Hindi"}</p>
-                </div>
-              </div>
-            </div>
+
+                <dl className="grid gap-x-6 sm:grid-cols-2">
+                  <div className="field-row">
+                    <dt>Phone</dt>
+                    <dd>{user?.phone ?? "Not set"}</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Facility</dt>
+                    <dd className="truncate">{facilityName ?? "Not assigned"}</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Language</dt>
+                    <dd>{user?.language ?? "Hindi"}</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Account status</dt>
+                    <dd>
+                      {user?.isActive === false ? (
+                        <span className="badge badge-red">Inactive</span>
+                      ) : (
+                        <span className="badge badge-green">Active</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </PanelBody>
+            </Panel>
           )}
 
           {activeTab === "sync" && (
-            <div className="space-y-6">
-              <div className="p-4 rounded-lg bg-gray-50">
-                <h3 className="font-medium text-gray-900">Data Synchronization</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Your data syncs automatically when online. Tap to force sync now.
-                </p>
-              </div>
-              <button
-                type="button"
-                className="btn btn-primary w-full"
-                onClick={() => syncMutation.mutate({ patients: [], visits: [], referrals: [] })}
-                disabled={syncMutation.isPending}
-              >
-                {syncMutation.isPending ? (
-                  <>
-                    {" "}
-                    <svg
-                      aria-hidden="true"
-                      className="animate-spin w-5 h-5"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
+            <Panel>
+              <PanelHeader title="Sync" description="Device data and server synchronisation" />
+              <PanelBody className="space-y-5">
+                <div className="rounded border border-info-line bg-info-bg px-4 py-3">
+                  <h3 className="text-sm font-semibold text-info">Automatic sync is on</h3>
+                  <p className="mt-1 text-sm text-ink-muted">
+                    Records save on this device first and sync when the connection returns. Use the
+                    button below to force a sync now.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn btn-primary btn-block"
+                  onClick={() => syncMutation.mutate({ patients: [], visits: [], referrals: [] })}
+                  disabled={syncMutation.isPending}
+                >
+                  {syncMutation.isPending ? (
+                    <>
+                      <span
+                        aria-hidden="true"
+                        className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
                       />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>{" "}
-                    Syncing…{" "}
-                  </>
-                ) : (
-                  "Sync Now"
+                      Syncing…
+                    </>
+                  ) : (
+                    <>
+                      <SyncIcon className="h-4 w-4" />
+                      Sync Now
+                    </>
+                  )}
+                </button>
+
+                {syncMutation.isSuccess && (
+                  <p className="flex items-center justify-center gap-1.5 text-sm text-triage-green">
+                    <CheckIcon className="h-4 w-4" />
+                    Sync complete
+                  </p>
                 )}
-              </button>
-              <p className="text-sm text-gray-500 text-center">Last sync: Just now</p>
-            </div>
+
+                <dl className="grid gap-x-6 sm:grid-cols-2">
+                  <div className="field-row">
+                    <dt>Storage</dt>
+                    <dd>IndexedDB on this device</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Server</dt>
+                    <dd>PostgreSQL</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Mode</dt>
+                    <dd>Background / manual</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Offline access</dt>
+                    <dd>
+                      <span className="badge badge-green">Enabled</span>
+                    </dd>
+                  </div>
+                </dl>
+              </PanelBody>
+            </Panel>
           )}
 
           {activeTab === "notifications" && (
-            <div className="space-y-4">
-              <h3 className="font-medium text-gray-900">Notification Preferences</h3>
-              <div className="space-y-3">
-                {[
-                  {
-                    id: "due_visits",
-                    label: "Due Visit Reminders",
-                    desc: "Get notified when ANC visits are due",
-                  },
-                  {
-                    id: "high_risk",
-                    label: "High-Risk Alerts",
-                    desc: "Immediate alerts for red-flagged patients",
-                  },
-                  {
-                    id: "sync_status",
-                    label: "Sync Status",
-                    desc: "Know when sync completes or fails",
-                  },
-                ].map((n) => (
-                  <label
-                    key={n.id}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50"
-                  >
-                    <div>
-                      <p className="font-medium text-gray-900">{n.label}</p>
-                      <p className="text-sm text-gray-500">{n.desc}</p>
-                    </div>
-                    <input
-                      type="checkbox"
-                      defaultChecked
-                      className="w-5 h-5 text-green-600 rounded border-gray-300"
-                    />
-                  </label>
-                ))}
-              </div>
-            </div>
+            <Panel>
+              <PanelHeader
+                title="Notification preferences"
+                description="Saved on this device only"
+              />
+              <PanelBody>
+                <div className="space-y-2">
+                  {NOTIFICATION_PREFS.map((pref) => (
+                    <label
+                      key={pref.id}
+                      htmlFor={`pref-${pref.id}`}
+                      className="flex min-h-touch cursor-pointer items-center justify-between gap-4 rounded border border-line px-3 py-2.5 hover:bg-canvas"
+                    >
+                      <span>
+                        <span className="block text-sm font-medium text-ink">{pref.label}</span>
+                        <span className="block text-xs text-ink-subtle">{pref.description}</span>
+                      </span>
+                      <input
+                        id={`pref-${pref.id}`}
+                        type="checkbox"
+                        checked={prefs[pref.id]}
+                        onChange={(e) => togglePref(pref.id, e.target.checked)}
+                        className="h-5 w-5 shrink-0 rounded-sm border-line-strong text-primary focus:ring-primary-ring"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </PanelBody>
+            </Panel>
           )}
 
           {activeTab === "about" && (
-            <div className="space-y-4">
-              <div className="flex items-center gap-4 p-4 rounded-lg bg-gray-50">
-                <svg
-                  aria-hidden="true"
-                  className="w-12 h-12 text-green-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
-                  />
-                </svg>
-                <div>
-                  <h3 className="font-semibold text-gray-900">
-                    High-Risk Pregnancy Tracking of Araria
-                  </h3>
-                  <p className="text-sm text-gray-500">Version 0.1.0 (MVP)</p>
+            <Panel>
+              <PanelHeader title="About" description="Build and platform information" />
+              <PanelBody className="space-y-5">
+                <div className="flex items-center gap-4 rounded border border-line-soft bg-canvas p-4">
+                  <BrandMark size={44} variant="full" title={null} />
+                  <div>
+                    <h2 className="text-sm font-semibold text-ink">
+                      High-Risk Pregnancy Tracking of Araria
+                    </h2>
+                    <p className="text-xs text-ink-subtle">Version 0.1.0 (MVP)</p>
+                  </div>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-gray-500">Build</p>
-                  <p className="font-medium">Development</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Platform</p>
-                  <p className="font-medium">PWA (Offline-first)</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Database</p>
-                  <p className="font-medium">IndexedDB + PostgreSQL</p>
-                </div>
-                <div>
-                  <p className="text-gray-500">Sync</p>
-                  <p className="font-medium">Background / Manual</p>
-                </div>
-              </div>
-              <div className="pt-4 border-t border-gray-200">
-                <p className="text-sm text-gray-500">
-                  Built for India's National Health Mission · High-Risk Pregnancy Tracking of Araria
+
+                <dl className="grid gap-x-6 sm:grid-cols-2">
+                  <div className="field-row">
+                    <dt>Build</dt>
+                    <dd>Development</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Platform</dt>
+                    <dd>PWA (offline-first)</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Database</dt>
+                    <dd>IndexedDB + PostgreSQL</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Sync</dt>
+                    <dd>Background / manual</dd>
+                  </div>
+                </dl>
+
+                <p className="border-t border-line-soft pt-4 text-xs leading-relaxed text-ink-subtle">
+                  Built for India's National Health Mission. This deployment carries synthetic demo
+                  data only and must not be used for real patient records.
                 </p>
-              </div>
-            </div>
+              </PanelBody>
+            </Panel>
           )}
         </div>
       </div>
     </div>
-  );
-}
-
-function UserIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-      />
-    </svg>
-  );
-}
-function SyncIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-      />
-    </svg>
-  );
-}
-function BellIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-      />
-    </svg>
-  );
-}
-function InfoIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-      />
-    </svg>
   );
 }

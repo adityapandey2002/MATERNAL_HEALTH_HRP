@@ -1,31 +1,31 @@
-import {
-  Pagination,
-  Patient,
-  PatientFilter,
-  type RiskLevel,
-  gestationalAgeWeeks,
-  getHrpReasonLabel,
-} from "@hrp/shared";
+import { type RiskLevel, gestationalAgeWeeks } from "@hrp/shared";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { PatientList } from "../components/PatientList";
+import { EmptyState } from "../components/ui/EmptyState";
+import { PlusIcon, SearchIcon } from "../components/ui/Icons";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Panel } from "../components/ui/Panel";
+import { SegmentedControl } from "../components/ui/SegmentedControl";
+import { Pagination } from "../components/ui/Table";
 import { api } from "../lib/api";
+import { latestVisitByPatient } from "../lib/clinical";
+import { useCanWriteClinical } from "../lib/session";
 
-function RiskBadge({ level }: { level: RiskLevel }) {
-  const config = {
-    RED: { class: "badge-red", label: "High Risk" },
-    AMBER: { class: "badge-amber", label: "Medium Risk" },
-    GREEN: { class: "badge-green", label: "Low Risk" },
-  };
-  const c = config[level];
-  return <span className={`badge ${c.class}`}>{c.label}</span>;
-}
+const RISK_OPTIONS: { value: RiskLevel | ""; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "RED", label: "High" },
+  { value: "AMBER", label: "Moderate" },
+  { value: "GREEN", label: "Routine" },
+];
 
 export default function PatientsPage() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [riskFilter, setRiskFilter] = useState<RiskLevel | "">("");
   const [anmFilter, setAnmFilter] = useState("");
+  const canRegister = useCanWriteClinical();
   const limit = 20;
 
   const { data, isLoading, error } = useQuery({
@@ -41,183 +41,115 @@ export default function PatientsPage() {
     placeholderData: (prev) => prev,
   });
 
+  const { data: visitsData } = useQuery({
+    queryKey: ["visits", "register", { limit: 100 }],
+    queryFn: () => api.visits.list({ page: 1, limit: 100 }),
+    staleTime: 60 * 1000,
+  });
+
   const patients = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / limit);
+  const latestVisits = latestVisitByPatient(visitsData?.data ?? []);
+
+  const resetTo = <T,>(setter: (value: T) => void) => {
+    return (value: T) => {
+      setter(value);
+      setPage(1);
+    };
+  };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Patients</h2>
-          <p className="text-gray-500">Manage high-risk pregnancy registrations</p>
-        </div>
-        <Link to="/patients/new" className="btn btn-primary">
-          <PlusIcon className="w-5 h-5" /> Add HRP Woman
-        </Link>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow="Register"
+        title="Patients"
+        description={`${total} ${total === 1 ? "woman" : "women"} in the high-risk register`}
+        actions={
+          canRegister ? (
+            <Link to="/patients/new" className="btn btn-primary">
+              <PlusIcon className="h-4 w-4" />
+              Add HRP woman
+            </Link>
+          ) : undefined
+        }
+      />
 
-      <div className="card">
-        <div className="card-body p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="search"
-                placeholder="Search by name, phone, ID…"
-                className="input pl-10"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setPage(1);
-                }}
-              />
-            </div>
+      <Panel aria-label="Patient register">
+        <div className="space-y-3 border-b border-line-soft p-3 sm:p-4">
+          <div className="relative">
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
+            <input
+              type="search"
+              placeholder="Search by name, phone or ID"
+              aria-label="Search patients"
+              className="input pl-9"
+              value={search}
+              onChange={(e) => resetTo(setSearch)(e.target.value)}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <SegmentedControl
+              label="Filter by risk level"
+              options={RISK_OPTIONS}
+              value={riskFilter}
+              onChange={resetTo(setRiskFilter)}
+            />
             <input
               type="search"
               placeholder="Filter by ANM name"
-              className="input lg:w-56"
+              className="input sm:w-56"
               aria-label="Filter by ANM name"
               value={anmFilter}
-              onChange={(e) => {
-                setAnmFilter(e.target.value);
-                setPage(1);
-              }}
+              onChange={(e) => resetTo(setAnmFilter)(e.target.value)}
             />
-            <select
-              className="input w-auto"
-              aria-label="Filter by risk level"
-              value={riskFilter}
-              onChange={(e) => {
-                setRiskFilter(e.target.value as RiskLevel);
-                setPage(1);
-              }}
-            >
-              <option value="">All Risk Levels</option>
-              <option value="RED">High Risk (Red)</option>
-              <option value="AMBER">Medium Risk (Amber)</option>
-              <option value="GREEN">Low Risk (Green)</option>
-            </select>
           </div>
         </div>
-      </div>
 
-      <div className="card">
         {isLoading ? (
-          <div className="p-8 text-center">
-            <div className="animate-spin w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full mx-auto mb-2" />
-            <p className="text-gray-500">Loading patients…</p>
-          </div>
+          <PatientListSkeleton />
         ) : error ? (
-          <div className="p-8 text-center text-red-600">Failed to load patients</div>
+          <EmptyState
+            title="Could not load patients"
+            description="Check the connection and try again."
+          />
         ) : (
-          <>
-            <div className="table-container">
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Age</th>
-                    <th>Phone</th>
-                    <th>GA (wks)</th>
-                    <th>Reason</th>
-                    <th className="text-center">Risk</th>
-                    <th>ANM</th>
-                    <th className="text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {patients.length > 0 ? (
-                    patients.map((p) => (
-                      <tr key={p.id}>
-                        <td className="font-medium">{p.name}</td>
-                        <td>{p.age}</td>
-                        <td>{p.phone ?? "—"}</td>
-                        <td>{gestationalAgeWeeks(p) ?? "—"}</td>
-                        <td className="max-w-xs truncate">{getHrpReasonLabel(p.hrpReason)}</td>
-                        <td className="text-center">
-                          <RiskBadge level={p.riskLevel} />
-                        </td>
-                        <td>{p.anmName ?? "—"}</td>
-                        <td className="text-right">
-                          <Link to={`/patients/${p.id}`} className="btn btn-outline btn-sm">
-                            View
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan={8} className="text-center py-12 text-gray-500">
-                        No patients found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between border-t border-gray-200 pt-4">
-                <p className="text-sm text-gray-500">
-                  Showing {(page - 1) * limit + 1} to {Math.min(page * limit, total)} of {total}{" "}
-                  patients
-                </p>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                  >
-                    Previous
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-outline btn-sm"
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                  >
-                    Next
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+          <PatientList
+            patients={patients}
+            latestVisits={latestVisits}
+            emptyTitle="No patients found"
+            emptyDescription="Try a different search, risk level or ANM name."
+          />
         )}
-      </div>
+
+        {!isLoading && !error && total > 0 ? (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            limit={limit}
+            onPageChange={setPage}
+          />
+        ) : null}
+      </Panel>
+
+      <p className="text-2xs text-ink-subtle">
+        Gestational age is calculated from the recorded LMP, falling back to the EDD.{" "}
+        {patients.filter((p) => gestationalAgeWeeks(p) === null).length > 0
+          ? `${patients.filter((p) => gestationalAgeWeeks(p) === null).length} on this page have no dating yet.`
+          : ""}
+      </p>
     </div>
   );
 }
 
-function PlusIcon({ className }: { className?: string }) {
+function PatientListSkeleton() {
   return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-    </svg>
-  );
-}
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      viewBox="0 0 24 24"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth={2}
-        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-      />
-    </svg>
+    <div className="space-y-2 p-3 sm:p-4" aria-busy="true" aria-label="Loading patients">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <div key={i} className="h-16 animate-pulse rounded bg-line-soft" />
+      ))}
+    </div>
   );
 }

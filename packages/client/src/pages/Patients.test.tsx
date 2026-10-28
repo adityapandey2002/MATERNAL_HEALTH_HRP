@@ -8,9 +8,12 @@ import PatientsPage from "./Patients";
 
 vi.mock("../lib/api", () => ({
   api: {
+    auth: { me: vi.fn() },
     patients: {
       list: vi.fn(),
-      delete: vi.fn(),
+    },
+    visits: {
+      list: vi.fn(),
     },
   },
 }));
@@ -56,26 +59,40 @@ const createWrapper = () => {
 describe("PatientsPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(api.auth.me).mockResolvedValue({
+      id: "33333333-3333-4333-8333-333333333333",
+      employeeId: "ANM001",
+      name: "Asha Ben",
+      phone: "9988776655",
+      role: "ANM",
+      facilityId: "22222222-2222-4222-8222-222222222222",
+      language: "en",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
     vi.mocked(api.patients.list).mockResolvedValue({
       data: [patient],
       total: 1,
       page: 1,
       limit: 20,
     });
+    vi.mocked(api.visits.list).mockResolvedValue({ data: [], total: 0, page: 1, limit: 100 });
   });
 
   it("shows the reason and the ANM who registered each woman", async () => {
     render(<PatientsPage />, { wrapper: createWrapper() });
 
-    expect(await screen.findByText("Rekha Devi")).toBeInTheDocument();
-    expect(screen.getByText("Previous C-section")).toBeInTheDocument();
+    expect((await screen.findAllByText("Rekha Devi")).length).toBeGreaterThan(0);
+    // The desktop table and the mobile card stack both render the reason.
+    expect(screen.getAllByText("Previous C-section").length).toBeGreaterThan(0);
     expect(screen.getByText("Asha Ben")).toBeInTheDocument();
   });
 
   it("refilters the block list by ANM name", async () => {
     render(<PatientsPage />, { wrapper: createWrapper() });
 
-    await screen.findByText("Rekha Devi");
+    await screen.findAllByText("Rekha Devi");
     fireEvent.change(screen.getByLabelText("Filter by ANM name"), { target: { value: "Asha" } });
 
     await vi.waitFor(() => {
@@ -88,8 +105,8 @@ describe("PatientsPage", () => {
   it("refilters by risk level", async () => {
     render(<PatientsPage />, { wrapper: createWrapper() });
 
-    await screen.findByText("Rekha Devi");
-    fireEvent.change(screen.getByLabelText("Filter by risk level"), { target: { value: "AMBER" } });
+    await screen.findAllByText("Rekha Devi");
+    fireEvent.click(screen.getByRole("button", { name: "Moderate" }));
 
     await vi.waitFor(() => {
       expect(api.patients.list).toHaveBeenLastCalledWith(
@@ -103,6 +120,6 @@ describe("PatientsPage", () => {
 
     render(<PatientsPage />, { wrapper: createWrapper() });
 
-    expect(await screen.findByText("No patients found")).toBeInTheDocument();
+    expect((await screen.findAllByText("No patients found")).length).toBeGreaterThan(0);
   });
 });

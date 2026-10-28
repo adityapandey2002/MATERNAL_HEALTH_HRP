@@ -1,6 +1,6 @@
 import type { Patient } from "@hrp/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../lib/api";
@@ -87,12 +87,14 @@ describe("FollowUpsPage", () => {
 
     render(<FollowUpsPage />, { wrapper: createWrapper() });
 
-    expect(await screen.findByText("Overdue Woman")).toBeInTheDocument();
+    expect((await screen.findAllByText("Overdue Woman")).length).toBeGreaterThan(0);
     const rows = screen.getAllByRole("row");
     expect(rows[1]).toHaveTextContent("Overdue Woman");
     expect(rows[2]).toHaveTextContent("Due Woman");
     expect(rows[3]).toHaveTextContent("Upcoming Woman");
-    expect(screen.getAllByRole("link", { name: /record visit/i })).toHaveLength(3);
+    // The mobile card stack and the desktop table both offer the action.
+    const table = screen.getByRole("table");
+    expect(within(table).getAllByRole("link", { name: /record visit/i })).toHaveLength(3);
   });
 
   it("shows the empty state when nothing is pending", async () => {

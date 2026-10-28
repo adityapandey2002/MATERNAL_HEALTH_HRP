@@ -1,25 +1,37 @@
 import {
   type CreateVisit,
   type DangerSign,
-  Patient,
-  RiskLevel,
-  Visit,
+  type Patient,
   gestationalAgeWeeks,
+  getHrpReasonLabel,
 } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { addDays, format } from "date-fns";
+import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { EmptyState } from "../components/ui/EmptyState";
+import {
+  ActivityIcon,
+  AlertTriangleIcon,
+  ArrowLeftIcon,
+  ClipboardIcon,
+  DropletIcon,
+  PhoneIcon,
+} from "../components/ui/Icons";
+import { PageHeader } from "../components/ui/PageHeader";
+import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
+import { RiskBadge } from "../components/ui/RiskBadge";
 import { api } from "../lib/api";
+import { gaLabel, villageLabel } from "../lib/clinical";
 
 const VITALS = [
-  { key: "bpSystolic", label: "BP Systolic", type: "number", min: 70, max: 250, unit: "mmHg" },
-  { key: "bpDiastolic", label: "BP Diastolic", type: "number", min: 40, max: 150, unit: "mmHg" },
-  { key: "hb", label: "Hemoglobin", type: "number", step: 0.1, min: 3, max: 18, unit: "g/dL" },
-  { key: "weight", label: "Weight", type: "number", step: 0.1, min: 30, max: 150, unit: "kg" },
-  { key: "fundalHeight", label: "Fundal Height", type: "number", min: 10, max: 50, unit: "cm" },
-  { key: "fetalHeartRate", label: "Fetal HR", type: "number", min: 60, max: 200, unit: "bpm" },
-];
+  { key: "bpSystolic", label: "BP Systolic", min: 70, max: 250, unit: "mmHg", step: 1 },
+  { key: "bpDiastolic", label: "BP Diastolic", min: 40, max: 150, unit: "mmHg", step: 1 },
+  { key: "hb", label: "Hemoglobin", min: 3, max: 18, unit: "g/dL", step: 0.1 },
+  { key: "weight", label: "Weight", min: 30, max: 150, unit: "kg", step: 0.1 },
+  { key: "fundalHeight", label: "Fundal Height", min: 10, max: 50, unit: "cm", step: 1 },
+  { key: "fetalHeartRate", label: "Fetal HR", min: 60, max: 200, unit: "bpm", step: 1 },
+] as const;
 
 const DANGER_SIGNS: { value: DangerSign; label: string }[] = [
   { value: "HYPERTENSION", label: "Hypertension / Pre-eclampsia" },
@@ -33,10 +45,10 @@ const DANGER_SIGNS: { value: DangerSign; label: string }[] = [
 ];
 
 const SUPPLEMENTS = [
-  { key: "ifaGiven", label: "IFA Given" },
-  { key: "calciumGiven", label: "Calcium Given" },
-  { key: "albendazoleGiven", label: "Albendazole Given" },
-];
+  { key: "ifaGiven", label: "IFA given" },
+  { key: "calciumGiven", label: "Calcium given" },
+  { key: "albendazoleGiven", label: "Albendazole given" },
+] as const;
 
 function toNumber(value?: string): number | null {
   if (!value) return null;
@@ -80,22 +92,15 @@ export default function NewVisitPage() {
   const [notes, setNotes] = useState("");
 
   useEffect(() => {
-    if (visitsData && visitsData.length > 0) {
-      const sorted = visitsData.sort((a, b) => b.visitNumber - a.visitNumber);
-      const lastVisit = sorted[0];
-      if (!lastVisit) return;
-      setVisitNumber(lastVisit.visitNumber + 1);
-      setGestationalWeeks(lastVisit.gestationalWeeks);
-    }
+    if (!visitsData || visitsData.length === 0) return;
+    const lastVisit = [...visitsData].sort((a, b) => b.visitNumber - a.visitNumber)[0];
+    if (lastVisit) setVisitNumber(lastVisit.visitNumber + 1);
   }, [visitsData]);
 
   useEffect(() => {
-    if (patient?.edd) {
-      const edd = new Date(patient.edd);
-      const today = new Date();
-      const weeks = Math.round((today.getTime() - edd.getTime()) / (1000 * 60 * 60 * 24 * 7)) * -1;
-      if (weeks > 0) setGestationalWeeks(weeks);
-    }
+    if (!patient) return;
+    const weeks = gestationalAgeWeeks(patient);
+    if (weeks !== null) setGestationalWeeks(weeks);
   }, [patient]);
 
   const toggleDangerSign = (sign: DangerSign) => {
@@ -134,225 +139,295 @@ export default function NewVisitPage() {
   };
 
   if (patientLoading) {
-    return <div className="flex h-64 items-center justify-center">Loading patient…</div>;
+    return (
+      <div className="space-y-4" aria-busy="true" aria-label="Loading patient">
+        <div className="h-16 animate-pulse rounded-lg bg-line-soft" />
+        <div className="h-64 animate-pulse rounded-lg bg-line-soft" />
+      </div>
+    );
   }
 
   if (!patient) {
-    return <div className="text-center py-12">Patient not found</div>;
+    return (
+      <EmptyState
+        title="Patient not found"
+        description="This record may have been removed or the link is incomplete."
+      />
+    );
   }
 
-  const gaWeeks = gestationalAgeWeeks(patient);
-
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">New ANC Visit</h1>
-          <p className="text-gray-500">
-            {patient.name} • Age {patient.age} •{" "}
-            {gaWeeks === null ? "GA unknown" : `GA ~${gaWeeks} weeks`}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => navigate(`/patients/${id}`)}
-          className="btn btn-outline"
-        >
-          Cancel
-        </button>
-      </div>
+    <div className="space-y-5">
+      <PageHeader
+        eyebrow={patient.name}
+        title="Record ANC visit"
+        description={`Age ${patient.age} · ${gaLabel(patient)} · ${getHrpReasonLabel(patient.hrpReason)}`}
+        actions={
+          <button
+            type="button"
+            onClick={() => navigate(`/patients/${id}`)}
+            className="btn btn-secondary"
+          >
+            <ArrowLeftIcon className="h-4 w-4" />
+            Back to record
+          </button>
+        }
+      />
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="card">
-          <div className="card-header">
-            <h2 className="text-lg font-semibold">Visit Details</h2>
-          </div>
-          <div className="card-body grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div>
-              <label className="label" htmlFor="field-1">
-                Visit Number *
-              </label>
-              <input
-                id="field-1"
-                type="number"
-                className="input"
-                min="1"
-                value={visitNumber}
-                onChange={(e) => setVisitNumber(Number(e.target.value))}
-                required
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="field-2">
-                Gestational Age (weeks) *
-              </label>
-              <input
-                id="field-2"
-                type="number"
-                className="input"
-                min="0"
-                max="45"
-                value={gestationalWeeks}
-                onChange={(e) => setGestationalWeeks(Number(e.target.value))}
-                required
-              />
-            </div>
-            <div>
-              <label className="label" htmlFor="field-3">
-                Visit Date *
-              </label>
-              <input
-                id="field-3"
-                type="date"
-                className="input"
-                value={visitDate}
-                onChange={(e) => setVisitDate(e.target.value)}
-                required
-                max={format(new Date(), "yyyy-MM-dd")}
-              />
-            </div>
-          </div>
-        </div>
+      <PatientStrip patient={patient} />
 
-        <div className="card">
-          <div className="card-header">
-            <h2 className="text-lg font-semibold">Vitals</h2>
-          </div>
-          <div className="card-body grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {VITALS.map((v) => (
-              <div key={v.key}>
-                <label className="label" htmlFor={`vital-${v.key}`}>
-                  {v.label} <span className="text-gray-600">({v.unit})</span>
+      <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
+          <Panel>
+            <PanelHeader
+              title="Visit details"
+              description="Contact number, gestational age and date"
+              action={<CalendarBadge date={visitDate} />}
+            />
+            <PanelBody className="grid gap-4 sm:grid-cols-3">
+              <div>
+                <label className="label" htmlFor="visit-number">
+                  Visit Number *
                 </label>
                 <input
-                  id={`vital-${v.key}`}
+                  id="visit-number"
                   type="number"
-                  className="input"
-                  min={v.min}
-                  max={v.max}
-                  step={v.step ?? 1}
-                  value={vitals[v.key] ?? ""}
-                  onChange={(e) => setVitals((prev) => ({ ...prev, [v.key]: e.target.value }))}
-                  placeholder={v.unit}
+                  className="input mt-1.5"
+                  min="1"
+                  value={visitNumber}
+                  onChange={(e) => setVisitNumber(Number(e.target.value))}
+                  required
                 />
               </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <h2 className="text-lg font-semibold">Danger Signs Observed</h2>
-          </div>
-          <div className="card-body">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {DANGER_SIGNS.map((s) => (
-                <label
-                  key={s.value}
-                  className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition"
-                >
-                  <input
-                    type="checkbox"
-                    checked={dangerSigns.includes(s.value)}
-                    onChange={() => toggleDangerSign(s.value)}
-                    className="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500"
-                  />
-                  <span className="text-sm font-medium text-gray-900">{s.label}</span>
+              <div>
+                <label className="label" htmlFor="visit-ga">
+                  Gestational Age (weeks) *
                 </label>
+                <input
+                  id="visit-ga"
+                  type="number"
+                  className="input mt-1.5"
+                  min="0"
+                  max="45"
+                  value={gestationalWeeks}
+                  onChange={(e) => setGestationalWeeks(Number(e.target.value))}
+                  required
+                />
+              </div>
+              <div>
+                <label className="label" htmlFor="visit-date">
+                  Visit Date *
+                </label>
+                <input
+                  id="visit-date"
+                  type="date"
+                  className="input mt-1.5"
+                  value={visitDate}
+                  onChange={(e) => setVisitDate(e.target.value)}
+                  required
+                  max={format(new Date(), "yyyy-MM-dd")}
+                />
+              </div>
+            </PanelBody>
+          </Panel>
+
+          <Panel>
+            <PanelHeader
+              title="Vitals"
+              description="Leave a field blank when it was not measured"
+              action={<ActivityIcon className="h-4 w-4 text-ink-subtle" />}
+            />
+            <PanelBody className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {VITALS.map((v) => (
+                <div key={v.key}>
+                  <label className="label" htmlFor={`vital-${v.key}`}>
+                    {v.label}{" "}
+                    <span className="font-normal normal-case text-ink-subtle">({v.unit})</span>
+                  </label>
+                  <input
+                    id={`vital-${v.key}`}
+                    type="number"
+                    inputMode="decimal"
+                    className="input mt-1.5 tnum"
+                    min={v.min}
+                    max={v.max}
+                    step={v.step}
+                    value={vitals[v.key] ?? ""}
+                    onChange={(e) => setVitals((prev) => ({ ...prev, [v.key]: e.target.value }))}
+                    placeholder={v.unit}
+                  />
+                </div>
               ))}
-            </div>
-          </div>
+            </PanelBody>
+          </Panel>
+
+          <Panel>
+            <PanelHeader
+              title="Danger signs observed"
+              description="Select every sign present at this contact"
+              action={
+                dangerSigns.length > 0 ? (
+                  <span className="badge badge-red">{dangerSigns.length} selected</span>
+                ) : (
+                  <AlertTriangleIcon className="h-4 w-4 text-ink-subtle" />
+                )
+              }
+            />
+            <PanelBody>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {DANGER_SIGNS.map((s) => (
+                  <label
+                    key={s.value}
+                    className={`flex min-h-touch cursor-pointer items-center gap-3 rounded border px-3 py-2 text-sm transition-colors ${
+                      dangerSigns.includes(s.value)
+                        ? "border-triage-red-line bg-triage-red-bg text-triage-red"
+                        : "border-line bg-surface text-ink-muted hover:bg-canvas"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={dangerSigns.includes(s.value)}
+                      onChange={() => toggleDangerSign(s.value)}
+                      className="h-4 w-4 shrink-0 rounded-sm border-line-strong text-triage-red-solid focus:ring-triage-red-line"
+                    />
+                    <span className="font-medium">{s.label}</span>
+                  </label>
+                ))}
+              </div>
+            </PanelBody>
+          </Panel>
         </div>
 
-        <div className="card">
-          <div className="card-header">
-            <h2 className="text-lg font-semibold">Supplements Given</h2>
-          </div>
-          <div className="card-body">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="space-y-4">
+          <Panel>
+            <PanelHeader
+              title="Supplements"
+              description="Given at this contact"
+              action={<DropletIcon className="h-4 w-4 text-ink-subtle" />}
+            />
+            <PanelBody className="space-y-2">
               {SUPPLEMENTS.map((s) => (
                 <label
                   key={s.key}
-                  className="flex items-center gap-3 p-3 rounded-lg border cursor-pointer hover:bg-gray-50 transition"
+                  className="flex min-h-touch cursor-pointer items-center justify-between gap-3 rounded border border-line px-3 py-2 text-sm font-medium text-ink-muted hover:bg-canvas"
                 >
+                  {s.label}
                   <input
                     type="checkbox"
                     checked={supplements[s.key] ?? false}
                     onChange={() => toggleSupplement(s.key)}
-                    className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
+                    className="h-4 w-4 shrink-0 rounded-sm border-line-strong text-primary focus:ring-primary-ring"
                   />
-                  <span className="text-sm font-medium text-gray-900">{s.label}</span>
                 </label>
               ))}
-            </div>
-          </div>
-        </div>
+            </PanelBody>
+          </Panel>
 
-        <div className="card">
-          <div className="card-header">
-            <h2 className="text-lg font-semibold">Referral</h2>
-          </div>
-          <div className="card-body space-y-4">
-            <label className="flex items-center gap-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={referred}
-                onChange={(e) => setReferred(e.target.checked)}
-                className="w-4 h-4 text-green-600 rounded border-gray-300 focus:ring-green-500"
-              />
-              <span className="font-medium text-gray-900">Refer to higher facility</span>
-            </label>
-            {referred && (
-              <div>
-                <label className="label" htmlFor="field-4">
-                  Reason for Referral *
-                </label>
-                <textarea
-                  id="field-4"
-                  className="input"
-                  rows={3}
-                  value={referralReason}
-                  onChange={(e) => setReferralReason(e.target.value)}
-                  placeholder="Describe clinical reason for referral…"
-                  required
-                />
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="card">
-          <div className="card-header">
-            <h2 className="text-lg font-semibold">Notes</h2>
-          </div>
-          <div className="card-body">
-            <textarea
-              className="input"
-              rows={3}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Additional clinical notes…"
+          <Panel>
+            <PanelHeader
+              title="Referral"
+              description="Escalate to a higher facility"
+              action={<ClipboardIcon className="h-4 w-4 text-ink-subtle" />}
             />
-          </div>
-        </div>
+            <PanelBody className="space-y-4">
+              <label
+                htmlFor="visit-referred"
+                className="flex min-h-touch cursor-pointer items-center gap-3 rounded border border-line px-3 py-2 hover:bg-canvas"
+              >
+                <input
+                  id="visit-referred"
+                  type="checkbox"
+                  checked={referred}
+                  onChange={(e) => setReferred(e.target.checked)}
+                  className="h-4 w-4 shrink-0 rounded-sm border-line-strong text-primary focus:ring-primary-ring"
+                />
+                <span className="text-sm font-medium text-ink">Refer to higher facility</span>
+              </label>
+              {referred && (
+                <div>
+                  <label className="label" htmlFor="referral-reason">
+                    Reason for Referral *
+                  </label>
+                  <textarea
+                    id="referral-reason"
+                    className="input mt-1.5"
+                    rows={3}
+                    value={referralReason}
+                    onChange={(e) => setReferralReason(e.target.value)}
+                    placeholder="Describe clinical reason for referral…"
+                    required
+                  />
+                </div>
+              )}
+            </PanelBody>
+          </Panel>
 
-        <div className="flex gap-3 pt-4 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={() => navigate(`/patients/${id}`)}
-            className="btn btn-outline flex-1"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="btn btn-primary flex-1"
-            disabled={createMutation.isPending}
-          >
-            {createMutation.isPending ? "Saving…" : "Save Visit"}
-          </button>
+          <Panel>
+            <PanelHeader title="Notes" description="Optional clinical notes" />
+            <PanelBody>
+              <label className="sr-only" htmlFor="visit-notes">
+                Clinical notes
+              </label>
+              <textarea
+                id="visit-notes"
+                className="input"
+                rows={4}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Additional clinical notes…"
+              />
+            </PanelBody>
+          </Panel>
+
+          <div className="space-y-2">
+            <button
+              type="submit"
+              className="btn btn-primary btn-lg btn-block"
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? "Saving…" : "Save Visit"}
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(`/patients/${id}`)}
+              className="btn btn-secondary btn-block"
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </form>
     </div>
+  );
+}
+
+function PatientStrip({ patient }: { patient: Patient }) {
+  return (
+    <div className="panel flex flex-wrap items-center gap-x-5 gap-y-2 px-4 py-3">
+      <RiskBadge level={patient.riskLevel} size="sm" />
+      <span className="tnum text-sm text-ink-muted">
+        <span className="text-ink-subtle">GA </span>
+        {gaLabel(patient)}
+      </span>
+      <span className="tnum text-sm text-ink-muted">
+        <span className="text-ink-subtle">
+          G{patient.gravida}P{patient.para}A{patient.abortions}
+        </span>
+      </span>
+      <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
+        <PhoneIcon className="h-3.5 w-3.5 text-ink-subtle" />
+        {patient.phone ?? "No phone"}
+      </span>
+      <span className="text-sm text-ink-subtle">{villageLabel(patient)}</span>
+      {patient.ashaName && <span className="text-sm text-ink-subtle">ASHA {patient.ashaName}</span>}
+    </div>
+  );
+}
+
+function CalendarBadge({ date }: { date: string }) {
+  return (
+    <span className="tnum badge badge-gray">
+      {format(new Date(`${date}T00:00:00`), "d MMM yyyy")}
+    </span>
   );
 }

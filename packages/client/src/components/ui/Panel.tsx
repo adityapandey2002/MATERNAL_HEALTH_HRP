@@ -35,15 +35,18 @@ export function PanelHeader({
   return (
     <div className={`panel-header ${className ?? ""}`}>
       <div className="min-w-0">
-        <Heading
-          id={id}
-          className="text-sm font-semibold tracking-tight text-ink sm:text-base"
-        >
+        <Heading id={id} className="text-sm font-semibold tracking-tight text-ink sm:text-base">
           {title}
         </Heading>
         {description ? <p className="mt-0.5 text-xs text-ink-subtle">{description}</p> : null}
       </div>
-      {action ? <div className="flex shrink-0 items-center gap-2">{action}</div> : null}
+      {/* max-w-full lets chip rows wrap inside the panel instead of
+          overflowing the viewport at 320 px. */}
+      {action ? (
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2 max-sm:has-[>svg:only-child]:hidden">
+          {action}
+        </div>
+      ) : null}
     </div>
   );
 }

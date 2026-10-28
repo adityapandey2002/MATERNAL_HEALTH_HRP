@@ -26,10 +26,9 @@ export function SegmentedControl<T extends string>({
   className,
 }: SegmentedControlProps<T>) {
   return (
-    <div
-      role="group"
+    <fieldset
       aria-label={label}
-      className={`no-scrollbar flex gap-1.5 overflow-x-auto ${className ?? ""}`}
+      className={`no-scrollbar m-0 flex min-w-0 flex-wrap gap-1.5 border-0 p-0 ${className ?? ""}`}
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -58,6 +57,6 @@ export function SegmentedControl<T extends string>({
           </button>
         );
       })}
-    </div>
+    </fieldset>
   );
 }
