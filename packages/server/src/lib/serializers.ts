@@ -1,6 +1,7 @@
 import { UserRole } from "@hrp/shared";
 import type {
   Facility,
+  FollowUp,
   Patient,
   Referral,
   SupervisionAlert,
@@ -10,6 +11,7 @@ import type {
 } from "@hrp/shared";
 import type {
   FacilityRow,
+  FollowUpRow,
   PatientRow,
   ReferralRow,
   SupervisionAlertRow,
@@ -38,6 +40,11 @@ export function serializePatient(row: PatientRow, anmName?: string | null): Pati
     phone: row.phone,
     address: row.address,
     hrpReason: (row.hrp_reason ?? null) as Patient["hrpReason"],
+    hrpComplication: (row.hrp_complication ?? null) as Patient["hrpComplication"],
+    isHrp: row.is_hrp,
+    followUpTrack: row.follow_up_track as Patient["followUpTrack"],
+    followUpScheduledDate: row.follow_up_scheduled_date,
+    followUpStatus: row.follow_up_status as Patient["followUpStatus"],
     ashaName: row.asha_name,
     ashaPhone: row.asha_phone,
     referred: row.referred,
@@ -157,6 +164,24 @@ export function serializeSyncQueue(row: SyncQueueRow): SyncQueue {
     status: row.status,
     retryCount: row.retry_count,
     lastError: row.last_error,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function serializeFollowUp(row: FollowUpRow): FollowUp {
+  return {
+    id: row.id,
+    patientId: row.patient_id,
+    assignedToUserId: row.assigned_to_user_id,
+    assignedByUserId: row.assigned_by_user_id,
+    level: row.level,
+    status: row.status,
+    track: row.track,
+    scheduledDate: row.scheduled_date,
+    completedAt: row.completed_at,
+    completedByUserId: row.completed_by_user_id,
+    notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

@@ -1,3 +1,4 @@
+import type { HrpComplication } from "@hrp/shared";
 import type {
   CreatePatient,
   CreateReferral,
@@ -52,9 +53,11 @@ export function mapPatientToRow(
     phone: data.phone ?? null,
     address: data.address ?? null,
     hrp_reason: data.hrpReason ?? null,
+    hrp_complication: data.hrpComplication ?? null,
     asha_name: data.ashaName ?? null,
     asha_phone: data.ashaPhone ?? null,
     referred: data.referred,
+    is_hrp: data.isHrp ?? false,
     lmp: toDate(data.lmp) ?? null,
     edd: toDate(data.edd) ?? null,
     gravida: data.gravida,
@@ -75,6 +78,8 @@ export function mapPatientChanges(data: UpdatePatient): Updateable<DB["patients"
   if (data.address !== undefined) row.address = data.address ?? null;
   if (data.abhaId !== undefined) row.abha_id = data.abhaId ?? null;
   if (data.hrpReason !== undefined) row.hrp_reason = data.hrpReason ?? null;
+  if (data.hrpComplication !== undefined) row.hrp_complication = data.hrpComplication ?? null;
+  if (data.isHrp !== undefined) row.is_hrp = data.isHrp;
   if (data.ashaName !== undefined) row.asha_name = data.ashaName ?? null;
   if (data.ashaPhone !== undefined) row.asha_phone = data.ashaPhone ?? null;
   if (data.referred !== undefined) row.referred = data.referred;
