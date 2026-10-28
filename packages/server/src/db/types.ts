@@ -50,9 +50,11 @@ export interface Patient {
   phone: string | null;
   address: string | null;
   hrp_reason: string | null;
+  hrp_complication: string | null;
   asha_name: string | null;
   asha_phone: string | null;
   referred: Generated<boolean>;
+  is_hrp: Generated<boolean>;
   lmp: Date | null;
   edd: Date | null;
   gravida: Generated<number>;
@@ -62,6 +64,9 @@ export interface Patient {
   risk_level: Generated<"GREEN" | "AMBER" | "RED">;
   risk_score: Generated<number>;
   is_high_risk: Generated<boolean>;
+  follow_up_track: "IMMEDIATE_7_DAYS" | "PMSMA_SESSION" | "VHSND_COMMUNITY" | null;
+  follow_up_scheduled_date: Date | null;
+  follow_up_status: Generated<"PENDING" | "COMPLETE" | "NOT_REACHABLE">;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }
@@ -158,6 +163,9 @@ export interface DB {
   sync_queue: SyncQueue;
   supervision_alerts: SupervisionAlert;
   responsibilities: Responsibility;
+  follow_ups: FollowUp;
+  user_nodal_designations: UserNodalDesignation;
+  field_level_lists: FieldLevelList;
   schema_migrations: SchemaMigration;
 }
 
@@ -170,3 +178,41 @@ export type ReferralRow = Selectable<DB["referrals"]>;
 export type SyncQueueRow = Selectable<DB["sync_queue"]>;
 export type SupervisionAlertRow = Selectable<DB["supervision_alerts"]>;
 export type ResponsibilityRow = Selectable<DB["responsibilities"]>;
+export type FollowUpRow = Selectable<DB["follow_ups"]>;
+export type UserNodalDesignationRow = Selectable<DB["user_nodal_designations"]>;
+export type FieldLevelListRow = Selectable<DB["field_level_lists"]>;
+
+export interface FollowUp {
+  id: Generated<string>;
+  patient_id: string;
+  assigned_to_user_id: string;
+  assigned_by_user_id: string;
+  level: "BLOCK_NODAL" | "CHO" | "ANM";
+  status: Generated<"PENDING" | "COMPLETE" | "NOT_REACHABLE">;
+  track: "IMMEDIATE_7_DAYS" | "PMSMA_SESSION" | "VHSND_COMMUNITY";
+  scheduled_date: Generated<Date>;
+  completed_at: Date | null;
+  completed_by_user_id: string | null;
+  notes: string | null;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface UserNodalDesignation {
+  id: Generated<string>;
+  user_id: string;
+  nodal_level: "BLOCK" | "DISTRICT";
+  facility_id: string;
+  is_active: Generated<boolean>;
+  created_at: Generated<Date>;
+  updated_at: Generated<Date>;
+}
+
+export interface FieldLevelList {
+  id: Generated<string>;
+  facility_id: string;
+  district_list_id: string;
+  activated_by: string;
+  activated_at: Generated<Date>;
+  is_active: Generated<boolean>;
+}
