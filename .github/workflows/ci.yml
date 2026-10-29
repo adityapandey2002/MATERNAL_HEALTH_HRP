@@ -75,6 +75,7 @@ jobs:
       - name: Run tests with coverage
         run: npm run check:task
         env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
           DATABASE_URL: postgresql://hrp:test@localhost:5432/hrp
           JWT_SECRET: test-secret-for-ci-only-at-least-32-characters
           JWT_REFRESH_SECRET: test-refresh-secret-for-ci-only-at-least-32-characters
@@ -128,10 +129,18 @@ jobs:
           semgrep --version
           osv-scanner --version
 
+      - name: Migrate and seed the test database
+        run: |
+          npm run db:migrate
+          npm run db:seed
+        env:
+          DATABASE_URL: postgresql://hrp:test@localhost:5432/hrp
+
       - name: Full gate (types, lint, secrets, coverage, semgrep, osv)
         run: npm run check:full
         env:
           CI: "true"
+          NODE_OPTIONS: "--max-old-space-size=4096"
           DATABASE_URL: postgresql://hrp:test@localhost:5432/hrp
           JWT_SECRET: test-secret-for-ci-only-at-least-32-characters
           JWT_REFRESH_SECRET: test-refresh-secret-for-ci-only-at-least-32-characters
