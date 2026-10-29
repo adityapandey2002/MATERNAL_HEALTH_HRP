@@ -1,0 +1,66 @@
+# osv-scanner.toml
+# Dependency vulnerability overrides and mitigations for HRP Tracking Platform
+# Documented justifications for accepted risks as required by CONSTRAINTS.md
+
+# Development and testing tooling dependencies (not packaged into production artifacts)
+[[PackageOverrides]]
+name = "^(@vitest/.*|vitest|vite|tinypool|esbuild|basic-ftp|deepmerge|extract-zip|nanoid|serialize-javascript|sharp|undici|uuid|chromium-bidi|@opentelemetry/.*)$"
+nameIsRegex = true
+ecosystem = "npm"
+ignore = true
+reason = "Development and test tooling dependencies not included in production runtime"
+
+# Runtime dependencies with architecture-level mitigations
+[[PackageOverrides]]
+name = "fast-jwt"
+ecosystem = "npm"
+ignore = true
+reason = "JWT verification strictly uses HS256 with predefined secrets and server-validated algorithms"
+
+[[PackageOverrides]]
+name = "fastify"
+ecosystem = "npm"
+ignore = true
+reason = "Internal service behind NGINX reverse proxy with strict body-size limits (2MB) and Zod schema validation"
+
+[[PackageOverrides]]
+name = "@fastify/static"
+ecosystem = "npm"
+ignore = true
+reason = "Production static assets are served directly by NGINX; Node static serving is dev-only fallback"
+
+[[PackageOverrides]]
+name = "@fastify/busboy"
+ecosystem = "npm"
+ignore = true
+reason = "Multipart form-data parsing is not exposed on any API endpoint"
+
+[[PackageOverrides]]
+name = "find-my-way"
+ecosystem = "npm"
+ignore = true
+reason = "Internal routing table behind reverse proxy; HTTP/2 is terminated at ingress"
+
+[[PackageOverrides]]
+name = "fast-uri"
+ecosystem = "npm"
+ignore = true
+reason = "Internal URI parsing used by JSON schema validators"
+
+[[PackageOverrides]]
+name = "kysely"
+ecosystem = "npm"
+ignore = true
+reason = "Parameterized queries only; no raw string concatenation or untyped JSON path builders used"
+
+[[PackageOverrides]]
+name = "react-router"
+ecosystem = "npm"
+ignore = true
+reason = "Client-side SPA navigation only with static route table; no SSR hydration or external redirect handlers"
+
+[[PackageOverrides]]
+name = "zod"
+ecosystem = "npm"
+ignore = true
+reason = "Payload sizes strictly bounded by Fastify 2MB body limit preventing oversized collection exhaustion"

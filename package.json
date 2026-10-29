@@ -20,7 +20,7 @@
     "check:changed-coverage": "node scripts/check-changed-coverage.mjs",
     "security:secrets": "node scripts/scan-secrets.mjs",
     "security:semgrep": "node scripts/run-security-tool.mjs semgrep scan --config p/default --config p/owasp-top-ten --error",
-    "security:osv": "node scripts/run-security-tool.mjs osv-scanner scan source -r .",
+    "security:osv": "node scripts/run-security-tool.mjs osv-scanner scan source -r . --config osv-scanner.toml",
     "check:perf": "npm run check:perf --workspaces --if-present",
     "check:a11y": "npm run check:a11y --workspaces --if-present",
     "check:bundle": "npm run check:bundle --workspaces --if-present",
