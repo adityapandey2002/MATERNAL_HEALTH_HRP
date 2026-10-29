@@ -1,5 +1,5 @@
 import { scheduleFollowUp } from "@hrp/shared";
-import { calculateRiskScore } from "@hrp/shared/rules.js";
+import { calculateRiskScore } from "@hrp/shared/rules";
 import { CreatePatientSchema, HrpPatientFilterSchema } from "@hrp/shared/schemas";
 import type { CreatePatient, HrpPatientFilter } from "@hrp/shared/schemas";
 import type { FastifyPluginAsync } from "fastify";

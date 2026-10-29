@@ -11,7 +11,7 @@
     "dev:server": "npm run dev --workspace=packages/server",
     "build": "npm run build --workspaces --if-present",
     "precheck:fast": "npm run build --workspace=packages/shared",
-    "check:fast": "biome check --error-on-warnings scripts && npm run check:fast --workspaces --if-present && npm run security:secrets",
+    "check:fast": "node scripts/check-shared-exports.mjs && biome check --error-on-warnings scripts && npm run check:fast --workspaces --if-present && npm run security:secrets",
     "precheck:task": "npm run build --workspace=packages/shared",
     "check:task": "npm run check:fast && npm run coverage && npm run check:changed-coverage",
     "precheck:full": "npm run build --workspace=packages/shared",
