@@ -6,6 +6,7 @@ import {
   DateInput,
   FacilityLevel,
   FacilitySchema,
+  HrpComplication,
   PatientSchema,
   ReferralSchema,
   RiskLevel,
@@ -238,6 +239,63 @@ export type FollowUp = Omit<z.infer<typeof CreateFollowUpSchema>, "scheduledDate
   scheduledDate: Date | string;
 };
 
+/**
+ * A follow-up row with the patient and attribution context the shared line
+ * list needs. The server joins these in; the client never re-fetches users to
+ * label a row.
+ */
+export interface FollowUpListItem extends FollowUp {
+  patientName: string;
+  patientAge: number;
+  patientPhone: string | null;
+  patientRiskLevel: RiskLevel;
+  hrpComplication: HrpComplication | null;
+  village: string | null;
+  assignedToName: string | null;
+  assignedToRole: string | null;
+  completedByName: string | null;
+  completedByRole: string | null;
+}
+
+export const DispatchFollowUpSchema = z.object({
+  patientIds: z.array(z.string().uuid()).min(1).max(100),
+  assignedToUserId: z.string().uuid(),
+  track: z.enum(["IMMEDIATE_7_DAYS", "PMSMA_SESSION", "VHSND_COMMUNITY"]),
+  scheduledDate: z.string().datetime().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export type DispatchFollowUp = z.infer<typeof DispatchFollowUpSchema>;
+
+/* ============================================================================
+ * Staff provisioning schemas (Block Nodal creates HRP Helpdesk accounts)
+ * ============================================================================ */
+
+export const CreateStaffSchema = z.object({
+  name: z.string().min(2).max(120),
+  email: z.string().email().max(120),
+  phone: z.string().regex(/^\d{10}$/),
+  password: z.string().min(8).max(72),
+  role: z.literal("HELPDESK").default("HELPDESK"),
+});
+
+export type CreateStaff = z.infer<typeof CreateStaffSchema>;
+
+export const StaffMemberSchema = z.object({
+  id: z.string().uuid(),
+  employeeId: z.string().min(1),
+  name: z.string().min(1),
+  email: z.string().nullable().optional(),
+  phone: z.string().min(1),
+  role: UserRole,
+  facilityId: z.string().uuid(),
+  facilityName: z.string().nullable().optional(),
+  isActive: z.boolean(),
+  createdAt: DateInput,
+});
+
+export type StaffMember = z.infer<typeof StaffMemberSchema>;
+
 /* ============================================================================
  * Extended patient filter with HRP-specific fields
  * ============================================================================ */
@@ -245,18 +303,7 @@ export type FollowUp = Omit<z.infer<typeof CreateFollowUpSchema>, "scheduledDate
 export const HrpPatientFilterSchema = PatientFilterSchema.extend({
   isHrp: BooleanInput.optional(),
   isReferred: BooleanInput.optional(),
-  hrpComplication: z
-    .enum([
-      "ANEMIA",
-      "PIH",
-      "GDM",
-      "SHORT_STATURE",
-      "PRE_LSCS",
-      "MULTI_GRAVIDA",
-      "TWINS_MULTIPLE_PREGNANCY",
-      "TEENAGE_PREGNANCY",
-    ])
-    .optional(),
+  hrpComplication: HrpComplication.optional(),
   followUpStatus: z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]).optional(),
 });
 
@@ -276,13 +323,14 @@ export const apiSchemas = {
     update: UpdateFollowUpSchema,
     filter: FollowUpFilterSchema,
     schedule: ScheduleFollowUpSchema,
+    dispatch: DispatchFollowUpSchema,
   },
   nodal: { dashboard: NodalDashboardSchema },
   fieldLevel: {
     activate: FieldLevelActivateSchema,
     deactivate: FieldLevelDeactivateSchema,
   },
-  auth: { login: LoginSchema, refresh: RefreshTokenSchema },
+  auth: { login: LoginSchema, refresh: RefreshTokenSchema, staff: CreateStaffSchema },
   pagination: PaginationSchema,
   supervision: { filter: SupervisionFilterSchema },
   sync: { payload: SyncPayloadSchema, response: SyncResponseSchema, pull: SyncPullQuerySchema },

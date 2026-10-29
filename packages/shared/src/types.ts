@@ -11,13 +11,13 @@ export const FacilityLevel = z.enum([
   "DISTRICT",
   "STATE",
 ]);
-export const UserRole = z.enum(["ANM", "CHO", "BHM", "DHS"]);
+export const UserRole = z.enum(["ANM", "CHO", "BHM", "DHS", "HELPDESK"]);
 
 export const NodalLevel = z.enum(["BLOCK", "DISTRICT"]);
 export type NodalLevel = "BLOCK" | "DISTRICT";
 
 /**
- * HRP Complication dropdown — exactly 8 values, in this exact sequence.
+ * HRP Complication dropdown — exactly 9 values, in this exact sequence.
  * No additional values, no reordering.
  */
 export const HrpComplication = z.enum([
@@ -29,6 +29,7 @@ export const HrpComplication = z.enum([
   "MULTI_GRAVIDA",
   "TWINS_MULTIPLE_PREGNANCY",
   "TEENAGE_PREGNANCY",
+  "EDEMA",
 ]);
 export type HrpComplication =
   | "ANEMIA"
@@ -38,7 +39,8 @@ export type HrpComplication =
   | "PRE_LSCS"
   | "MULTI_GRAVIDA"
   | "TWINS_MULTIPLE_PREGNANCY"
-  | "TEENAGE_PREGNANCY";
+  | "TEENAGE_PREGNANCY"
+  | "EDEMA";
 
 export const RiskLevel = z.enum(["GREEN", "AMBER", "RED"]);
 
@@ -99,6 +101,8 @@ export const FacilitySchema = z.object({
 export const UserSchema = z.object({
   id: z.string().uuid(),
   employeeId: z.string().min(1),
+  /** Login email. Only staff accounts provisioned by a nodal officer set one. */
+  email: z.string().nullable().optional(),
   name: z.string().min(1),
   phone: z.string().min(10),
   role: UserRole,
