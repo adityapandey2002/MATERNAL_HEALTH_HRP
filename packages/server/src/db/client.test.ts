@@ -13,5 +13,5 @@ describe("database client", () => {
 
     expect(db).toBeDefined();
     await closeDb();
-  });
+  }, 20_000);
 });

@@ -49,18 +49,32 @@ const ACTOR_FACILITIES: Record<UserRole, { path: string; level: FacilityLevel }>
   CHO: { path: HWC_PATH, level: "HWC" },
   BHM: { path: BLOCK_PATH, level: "BLOCK" },
   DHS: { path: DISTRICT_PATH, level: "DISTRICT" },
+  HELPDESK: { path: BLOCK_PATH, level: "BLOCK" },
 };
 
 const EXPECTED_ALLOWED: Record<UserRole, ReadonlySet<Action>> = {
-  ANM: new Set([...BASE_READS, ...CLINICAL_WRITE_ACTIONS]),
-  CHO: new Set([...BASE_READS, ...CLINICAL_WRITE_ACTIONS, ...SUPERVISION_ACTIONS]),
-  BHM: new Set([...BASE_READS, ...SUPERVISION_ACTIONS]),
+  ANM: new Set([...BASE_READS, ...CLINICAL_WRITE_ACTIONS, "followup:manage"]),
+  CHO: new Set([
+    ...BASE_READS,
+    ...CLINICAL_WRITE_ACTIONS,
+    ...SUPERVISION_ACTIONS,
+    "followup:manage",
+  ]),
+  BHM: new Set([...BASE_READS, ...SUPERVISION_ACTIONS, "staff:manage", "followup:manage"]),
   DHS: new Set([
     ...BASE_READS,
     ...SUPERVISION_ACTIONS,
     "patient:archive",
     "audit:read",
     "admin:manage",
+    "staff:manage",
+    "followup:manage",
+  ]),
+  HELPDESK: new Set([
+    ...BASE_READS,
+    ...CLINICAL_WRITE_ACTIONS,
+    "referral:respond",
+    "followup:manage",
   ]),
 };
 

@@ -84,6 +84,7 @@ describe("migration plan", () => {
       "003_authz_foundation",
       "004_authz_hardening",
       "005_hrp_follow_up",
+      "006_hrp_helpdesk",
     ]);
   });
 });
