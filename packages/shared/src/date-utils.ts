@@ -100,36 +100,51 @@ export interface FollowUpScheduleResult {
 /**
  * Automatically schedule a follow-up for an HRP-identified patient.
  *
- * There is no manual toggle — the system calculates the earliest of three
- * tracks:
- *   1. IMMEDIATE_7_DAYS  → identifiedDate + 7 days
- *   2. PMSMA_SESSION     → next PMSMA at PHC (9th/15th/21st, next working day if holiday)
- *   3. VHSND_COMMUNITY   → next VHSND by ANM in the village
- *
- * The earliest date wins; that track is assigned.
+ * The three category tracks are automatically calculated:
+ *   1. IMMEDIATE_7_DAYS  → identifiedDate + 7 days (for referred patients or RED risk)
+ *   2. PMSMA_SESSION     → next PMSMA at PHC (9th/15th/21st, next working day if holiday, for AMBER risk)
+ *   3. VHSND_COMMUNITY   → next VHSND by ANM in the village (for routine/GREEN cases)
  */
 export function scheduleFollowUp(
-  patient: { village: string },
-  identifiedDate: Date
+  patient: {
+    village?: string;
+    referred?: boolean | null;
+    riskLevel?: "GREEN" | "AMBER" | "RED" | null;
+  },
+  identifiedDate: Date = new Date()
 ): FollowUpScheduleResult {
   const immediateDeadline = addDays(identifiedDate, 7);
   const pmsmaDate = getNextPmsmaDate(identifiedDate);
-  const vhsndDate = getNextVhsndDate(patient.village, identifiedDate);
+  const vhsndDate = getNextVhsndDate(patient.village ?? "", identifiedDate);
 
-  const candidates = [
-    { track: "IMMEDIATE_7_DAYS" as const, date: immediateDeadline },
-    { track: "PMSMA_SESSION" as const, date: pmsmaDate },
-    { track: "VHSND_COMMUNITY" as const, date: vhsndDate },
-  ];
+  let track: "IMMEDIATE_7_DAYS" | "PMSMA_SESSION" | "VHSND_COMMUNITY";
+  let scheduledDate: Date;
 
-  // Earliest date wins
-  candidates.sort((a, b) => a.date.getTime() - b.date.getTime());
-  const earliest = candidates[0];
-  if (!earliest) throw new Error("No scheduling candidates available");
+  if (patient.referred || patient.riskLevel === "RED") {
+    track = "IMMEDIATE_7_DAYS";
+    scheduledDate = immediateDeadline;
+  } else if (patient.riskLevel === "AMBER") {
+    track = "PMSMA_SESSION";
+    scheduledDate = pmsmaDate;
+  } else if (patient.riskLevel === "GREEN") {
+    track = "VHSND_COMMUNITY";
+    scheduledDate = vhsndDate;
+  } else {
+    const candidates = [
+      { track: "IMMEDIATE_7_DAYS" as const, date: immediateDeadline },
+      { track: "PMSMA_SESSION" as const, date: pmsmaDate },
+      { track: "VHSND_COMMUNITY" as const, date: vhsndDate },
+    ];
+    candidates.sort((a, b) => a.date.getTime() - b.date.getTime());
+    const earliest = candidates[0];
+    if (!earliest) throw new Error("No scheduling candidates available");
+    track = earliest.track;
+    scheduledDate = earliest.date;
+  }
 
   return {
-    track: earliest.track,
-    scheduledDate: earliest.date,
+    track,
+    scheduledDate,
     immediateDeadline,
     pmsmaDate,
     vhsndDate,

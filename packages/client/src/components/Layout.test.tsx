@@ -24,11 +24,11 @@ const baseUser = {
   updatedAt: new Date(),
 };
 
-function renderLayout() {
+function renderLayout(initialEntry = "/") {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
         <Layout />
       </MemoryRouter>
     </QueryClientProvider>
@@ -72,5 +72,22 @@ describe("Layout", () => {
     expect(nav.getByRole("link", { name: "Add case" })).toHaveAttribute("href", "/");
     expect(nav.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(nav.getByRole("link", { name: "Supervision" })).toHaveAttribute("href", "/supervision");
+  });
+
+  it("does not double-select Add HRP case and All people for oversight role on /patients/new", async () => {
+    vi.mocked(api.auth.me).mockResolvedValue({ ...baseUser, role: "BHM", employeeId: "BHM001" });
+
+    renderLayout("/patients/new");
+
+    await screen.findByText("Block nodal officer");
+
+    const nav = sidebar();
+    const addCaseLink = nav.getByRole("link", { name: "Add HRP case" });
+    const allPeopleLink = nav.getByRole("link", { name: "All people" });
+
+    expect(addCaseLink).toHaveAttribute("href", "/patients/new");
+    expect(addCaseLink).toHaveAttribute("aria-current", "page");
+    expect(allPeopleLink).toHaveAttribute("href", "/patients");
+    expect(allPeopleLink).not.toHaveAttribute("aria-current");
   });
 });

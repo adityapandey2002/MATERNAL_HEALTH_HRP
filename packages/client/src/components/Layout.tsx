@@ -217,7 +217,7 @@ export default function Layout() {
             <li key={`${item.path}-${item.label}`}>
               <NavLink
                 to={item.path}
-                end={item.path === "/"}
+                end={item.path === "/" || item.path === "/patients"}
                 className={({ isActive }) =>
                   `flex min-h-touch flex-col items-center justify-center gap-1 px-1 py-2 text-2xs font-semibold ${
                     isActive ? "text-primary" : "text-ink-subtle"
@@ -259,7 +259,7 @@ export default function Layout() {
             <li key={`${item.path}-${item.label}`}>
               <NavLink
                 to={item.path}
-                end={item.path === "/"}
+                end={item.path === "/" || item.path === "/patients"}
                 onClick={() => setMoreOpen(false)}
                 className="flex min-h-touch items-center gap-3 rounded px-3 text-sm font-medium text-ink-muted hover:bg-canvas"
               >

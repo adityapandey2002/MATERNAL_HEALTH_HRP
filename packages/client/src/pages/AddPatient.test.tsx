@@ -158,4 +158,25 @@ describe("AddPatientPage", () => {
     });
     expect(await screen.findByText("Follow-ups page")).toBeInTheDocument();
   });
+
+  it("shows Refer to Sadar hospital and Not needed for block level staff", async () => {
+    vi.mocked(api.auth.me).mockResolvedValue({
+      id: "bhm-1",
+      name: "Dr. Verma",
+      employeeId: "BHM001",
+      phone: "9988776655",
+      role: "BHM",
+      facilityId: "fac1",
+      language: "en",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+
+    render(<AddPatientPage />, { wrapper: createWrapper() });
+
+    expect(await screen.findByRole("heading", { name: "Add HRP case" })).toBeInTheDocument();
+    expect(screen.getByText("Refer to Sadar hospital")).toBeInTheDocument();
+    expect(screen.getByText("Not needed")).toBeInTheDocument();
+  });
 });

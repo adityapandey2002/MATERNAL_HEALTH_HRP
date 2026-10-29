@@ -142,8 +142,8 @@ export default function AddPatientPage() {
     });
   };
 
-  const title =
-    role === "HELPDESK" || role === "BHM" || role === "DHS" ? "Add HRP case" : "Add case";
+  const isBlockRole = role === "HELPDESK" || role === "BHM" || role === "DHS";
+  const title = isBlockRole ? "Add HRP case" : "Add case";
 
   return (
     <div className="space-y-5">
@@ -333,10 +333,12 @@ export default function AddPatientPage() {
                     />
                     <span>
                       <span className="block text-sm font-semibold text-ink">
-                        Yes — Refer to CHC/FRU
+                        {isBlockRole ? "Refer to Sadar hospital" : "Yes — Refer to CHC/FRU"}
                       </span>
                       <span className="block text-xs text-ink-subtle">
-                        Escalates to the Block Nodal HRP Helpdesk and the BHM panel
+                        {isBlockRole
+                          ? "Escalates to District Sadar Hospital for specialist care"
+                          : "Escalates to the Block Nodal HRP Helpdesk and the BHM panel"}
                       </span>
                     </span>
                   </label>
@@ -358,10 +360,12 @@ export default function AddPatientPage() {
                     />
                     <span>
                       <span className="block text-sm font-semibold text-ink">
-                        No — Routine Field Management
+                        {isBlockRole ? "Not needed" : "No — Routine Field Management"}
                       </span>
                       <span className="block text-xs text-ink-subtle">
-                        Managed at the village HSC cluster
+                        {isBlockRole
+                          ? "Managed at block CHC / routine follow-up"
+                          : "Managed at the village HSC cluster"}
                       </span>
                     </span>
                   </label>
@@ -408,7 +412,9 @@ export default function AddPatientPage() {
                     aria-hidden="true"
                     className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                   />
-                  Referred cases appear on the Block Nodal helpdesk and BHM panel.
+                  {isBlockRole
+                    ? "Referred cases escalate to the District Sadar Hospital panel."
+                    : "Referred cases appear on the Block Nodal helpdesk and BHM panel."}
                 </li>
               </ul>
             </PanelBody>

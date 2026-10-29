@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { scheduleFollowUp } from "./date-utils.js";
 import { ANC_TESTS_BY_VISIT, getFollowUpPlan } from "./follow-ups.js";
 
 const LMP = new Date(2026, 0, 1); // 1 Jan 2026
@@ -63,5 +64,42 @@ describe("getFollowUpPlan", () => {
   it("honours the limit and never returns more than the remaining schedule", () => {
     expect(getFollowUpPlan({ lmp: LMP }, 0, 3)).toHaveLength(3);
     expect(getFollowUpPlan({ lmp: LMP }, 8, 3)).toEqual([]);
+  });
+});
+
+describe("scheduleFollowUp", () => {
+  const baseDate = new Date("2026-10-01T00:00:00.000Z");
+
+  it("assigns IMMEDIATE_7_DAYS for referred patients", () => {
+    const result = scheduleFollowUp({ village: "Test Village", referred: true }, baseDate);
+    expect(result.track).toBe("IMMEDIATE_7_DAYS");
+    expect(result.scheduledDate).toEqual(result.immediateDeadline);
+  });
+
+  it("assigns IMMEDIATE_7_DAYS for RED risk level patients", () => {
+    const result = scheduleFollowUp(
+      { village: "Test Village", referred: false, riskLevel: "RED" },
+      baseDate
+    );
+    expect(result.track).toBe("IMMEDIATE_7_DAYS");
+    expect(result.scheduledDate).toEqual(result.immediateDeadline);
+  });
+
+  it("assigns PMSMA_SESSION for AMBER risk level patients", () => {
+    const result = scheduleFollowUp(
+      { village: "Test Village", referred: false, riskLevel: "AMBER" },
+      baseDate
+    );
+    expect(result.track).toBe("PMSMA_SESSION");
+    expect(result.scheduledDate).toEqual(result.pmsmaDate);
+  });
+
+  it("assigns VHSND_COMMUNITY for GREEN risk level patients", () => {
+    const result = scheduleFollowUp(
+      { village: "Test Village", referred: false, riskLevel: "GREEN" },
+      baseDate
+    );
+    expect(result.track).toBe("VHSND_COMMUNITY");
+    expect(result.scheduledDate).toEqual(result.vhsndDate);
   });
 });

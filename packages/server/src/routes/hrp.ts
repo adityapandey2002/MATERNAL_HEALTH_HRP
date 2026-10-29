@@ -142,7 +142,11 @@ export const hrpRoutes: FastifyPluginAsync = async (app) => {
     // worker owns the first contact; the block helpdesk can re-dispatch it.
     if (data.isHrp) {
       const { track, scheduledDate } = scheduleFollowUp(
-        { village: actor.homeFacilityPath },
+        {
+          village: actor.homeFacilityPath,
+          referred: data.referred,
+          riskLevel: level,
+        },
         new Date()
       );
 
@@ -273,7 +277,11 @@ export const hrpRoutes: FastifyPluginAsync = async (app) => {
     if (isHrp && !existing.is_hrp) {
       const identifiedDate = new Date();
       const { track, scheduledDate } = scheduleFollowUp(
-        { village: existing.facility_name },
+        {
+          village: existing.facility_name,
+          referred: existing.referred,
+          riskLevel: existing.risk_level as "GREEN" | "AMBER" | "RED",
+        },
         identifiedDate
       );
       followUpTrack = track;

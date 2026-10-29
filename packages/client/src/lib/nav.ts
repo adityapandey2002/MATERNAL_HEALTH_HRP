@@ -175,6 +175,12 @@ export function mobileOverflowFor(role: UserRole): NavItem[] {
 /** True when the nav item should be highlighted for the current path. */
 export function isNavActive(item: NavItem, pathname: string): boolean {
   if (item.path === "/") return pathname === "/";
+  if (
+    item.path === "/patients" &&
+    (pathname === "/patients/new" || pathname.startsWith("/patients/new/"))
+  ) {
+    return false;
+  }
   return pathname === item.path || pathname.startsWith(`${item.path}/`);
 }
 
