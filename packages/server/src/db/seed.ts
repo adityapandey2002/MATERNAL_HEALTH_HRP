@@ -114,6 +114,9 @@ const addDays = (value: Date, days: number): Date => new Date(value.getTime() + 
 export async function seedDatabase() {
   console.log("Seeding database...");
 
+  await db.deleteFrom("field_level_lists").execute();
+  await db.deleteFrom("follow_ups").execute();
+  await db.deleteFrom("user_nodal_designations").execute();
   await db.deleteFrom("responsibilities").execute();
   await db.deleteFrom("sync_queue").execute();
   await db.deleteFrom("supervision_alerts").execute();
@@ -202,6 +205,16 @@ export async function seedDatabase() {
         facility_id: districtId,
         language: "hi",
       },
+      {
+        employee_id: "HELP01",
+        email: "helpdesk.daskroi@araria.gov.in",
+        name: "Amit Kumar",
+        phone: "9876543214",
+        password_hash: passwordHash,
+        role: "HELPDESK",
+        facility_id: chcId,
+        language: "hi",
+      },
     ])
     .returning(["id", "employee_id"])
     .execute();
@@ -213,6 +226,10 @@ export async function seedDatabase() {
   };
 
   const anmId = getUserId("ANM001");
+  const choId = getUserId("CHO001");
+  const bhmId = getUserId("MO001");
+  const dhsId = getUserId("ADM001");
+  const helpdeskId = getUserId("HELP01");
 
   // Anchor the synthetic pregnancies to today so the demo never shows a
   // gestation that is months overdue.
@@ -232,6 +249,11 @@ export async function seedDatabase() {
         phone: "9988776655",
         address: "Pasunj Village, Daskroi",
         hrp_reason: "PREVIOUS_C_SECTION",
+        hrp_complication: "ANEMIA",
+        is_hrp: true,
+        follow_up_track: "IMMEDIATE_7_DAYS",
+        follow_up_scheduled_date: daysFromToday(-2),
+        follow_up_status: "PENDING",
         asha_name: "Sunita Devi",
         asha_phone: "9988776601",
         referred: true,
@@ -253,6 +275,11 @@ export async function seedDatabase() {
         phone: "9988776656",
         address: "Pasunj Village, Daskroi",
         hrp_reason: "RH_NEGATIVE",
+        hrp_complication: "PIH",
+        is_hrp: true,
+        follow_up_track: "PMSMA_SESSION",
+        follow_up_scheduled_date: daysFromToday(5),
+        follow_up_status: "PENDING",
         asha_name: "Kavita Patel",
         asha_phone: "9988776602",
         referred: false,
@@ -274,6 +301,11 @@ export async function seedDatabase() {
         phone: "9988776657",
         address: "Pasunj Village, Daskroi",
         hrp_reason: null,
+        hrp_complication: null,
+        is_hrp: false,
+        follow_up_track: "VHSND_COMMUNITY",
+        follow_up_scheduled_date: daysFromToday(10),
+        follow_up_status: "PENDING",
         asha_name: "Rekha Ben",
         asha_phone: "9988776603",
         referred: false,
@@ -365,6 +397,61 @@ export async function seedDatabase() {
     ])
     .execute();
 
+  // HRP follow-up records: one row per scheduled contact, across all tiers.
+  await db
+    .insertInto("follow_ups")
+    .values([
+      {
+        patient_id: patient1Id,
+        assigned_to_user_id: anmId,
+        assigned_by_user_id: bhmId,
+        level: "ANM",
+        status: "PENDING",
+        track: "IMMEDIATE_7_DAYS",
+        scheduled_date: daysFromToday(-2),
+      },
+      {
+        patient_id: patient2Id,
+        assigned_to_user_id: anmId,
+        assigned_by_user_id: bhmId,
+        level: "ANM",
+        status: "PENDING",
+        track: "PMSMA_SESSION",
+        scheduled_date: daysFromToday(5),
+      },
+      {
+        patient_id: patient3Id,
+        assigned_to_user_id: helpdeskId,
+        assigned_by_user_id: bhmId,
+        level: "BLOCK_NODAL",
+        status: "PENDING",
+        track: "VHSND_COMMUNITY",
+        scheduled_date: daysFromToday(10),
+      },
+      {
+        patient_id: patient1Id,
+        assigned_to_user_id: choId,
+        assigned_by_user_id: bhmId,
+        level: "CHO",
+        status: "COMPLETE",
+        track: "PMSMA_SESSION",
+        scheduled_date: daysFromToday(-6),
+        completed_at: daysFromToday(-5),
+        completed_by_user_id: choId,
+        notes: "Seen at PHC; Hb repeated and IFA doubled.",
+      },
+    ])
+    .execute();
+
+  // Nodal designations so the block and district dashboards authorise.
+  await db
+    .insertInto("user_nodal_designations")
+    .values([
+      { user_id: bhmId, nodal_level: "BLOCK", facility_id: chcId },
+      { user_id: dhsId, nodal_level: "DISTRICT", facility_id: districtId },
+    ])
+    .execute();
+
   // Insert referral
   await db
     .insertInto("referrals")
@@ -409,6 +496,7 @@ export async function seedDatabase() {
   console.log("  CHO: CHO001 / password123");
   console.log("  BHM: MO001 / password123");
   console.log("  DHS: ADM001 / password123");
+  console.log("  HRP Helpdesk: helpdesk.daskroi@araria.gov.in / password123");
 }
 
 export async function seed() {

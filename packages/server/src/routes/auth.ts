@@ -2,6 +2,7 @@ import { UserRole } from "@hrp/shared";
 import { LoginSchema } from "@hrp/shared/schemas";
 import bcrypt from "bcryptjs";
 import type { FastifyPluginAsync } from "fastify";
+import { sql } from "kysely";
 import { config } from "../config.js";
 import { db } from "../db/client.js";
 import { serializeUser } from "../lib/serializers.js";
@@ -16,10 +17,18 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       password: string;
     };
 
+    // Field staff sign in with the employee ID issued by their facility.
+    // Helpdesk accounts provisioned by a nodal officer sign in with email.
+    const identifier = employeeId.trim();
     const user = await db
       .selectFrom("users")
       .selectAll()
-      .where("employee_id", "=", employeeId)
+      .where((eb) =>
+        eb.or([
+          eb("employee_id", "=", identifier),
+          sql<boolean>`lower(users.email) = ${identifier.toLowerCase()}`,
+        ])
+      )
       .where("is_active", "=", true)
       .executeTakeFirst();
 

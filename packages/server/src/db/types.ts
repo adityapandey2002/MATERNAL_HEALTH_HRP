@@ -29,6 +29,7 @@ export interface Facility {
 export interface User {
   id: Generated<string>;
   employee_id: string;
+  email: string | null;
   name: string;
   phone: string;
   password_hash: string;

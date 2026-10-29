@@ -24,6 +24,8 @@ export const ACTIONS = [
   "dashboard:read",
   "audit:read",
   "admin:manage",
+  "staff:manage",
+  "followup:manage",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -68,13 +70,15 @@ const READ_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   "audit:read",
 ]);
 
-const CLINICAL_WRITE_ROLES: readonly UserRole[] = ["ANM", "CHO"];
+const CLINICAL_WRITE_ROLES: readonly UserRole[] = ["ANM", "CHO", "HELPDESK"];
 const SUPERVISION_ROLES: readonly UserRole[] = ["CHO", "BHM", "DHS"];
+const STAFF_ADMIN_ROLES: readonly UserRole[] = ["BHM", "DHS"];
 
 const REFERRAL_DESTINATION_LEVELS: Partial<Record<UserRole, readonly FacilityLevel[]>> = {
   CHO: ["HWC"],
   BHM: ["BLOCK", "CHC"],
   DHS: ["DISTRICT"],
+  HELPDESK: ["BLOCK", "CHC"],
 };
 
 function allow(): PolicyResult {
@@ -214,6 +218,28 @@ function canAdminister(actor: ActorScope, target: ResourceTarget): PolicyResult 
   return canReadFacilityScoped(actor, target);
 }
 
+/**
+ * Follow-up status updates and dispatch are shared across tiers: the ANM or
+ * CHO closes a field contact, the helpdesk works the block line list, and the
+ * nodal officer can correct a row from the block panel.
+ */
+function canManageFollowUp(actor: ActorScope, target: ResourceTarget): PolicyResult {
+  if (actor.role === "BHM" || actor.role === "DHS") {
+    return canReadFacilityScoped(actor, target);
+  }
+
+  return canWriteClinical(actor, target);
+}
+
+/** Block Nodal and District officers provision helpdesk staff in their scope. */
+function canManageStaff(actor: ActorScope, target: ResourceTarget): PolicyResult {
+  if (!STAFF_ADMIN_ROLES.includes(actor.role)) {
+    return deny("ROLE_NOT_PERMITTED");
+  }
+
+  return canReadFacilityScoped(actor, target);
+}
+
 function evaluate(actor: ActorScope, action: Action, target: ResourceTarget): PolicyResult {
   switch (action) {
     case "patient:read":
@@ -251,6 +277,12 @@ function evaluate(actor: ActorScope, action: Action, target: ResourceTarget): Po
 
     case "queue:retry":
       return canRetryQueue(actor, target);
+
+    case "followup:manage":
+      return canManageFollowUp(actor, target);
+
+    case "staff:manage":
+      return canManageStaff(actor, target);
 
     default:
       return deny("UNKNOWN_ACTION");

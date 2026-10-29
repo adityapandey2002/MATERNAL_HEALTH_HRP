@@ -127,6 +127,7 @@ export function serializeUser(row: UserRow): User {
   return {
     id: row.id,
     employeeId: row.employee_id,
+    email: row.email ?? null,
     name: row.name,
     phone: row.phone,
     role: UserRole.parse(row.role),

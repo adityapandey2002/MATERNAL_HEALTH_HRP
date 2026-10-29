@@ -21,6 +21,7 @@ import { nodalRoutes } from "./routes/nodal.js";
 import { patientRoutes } from "./routes/patients.js";
 import { queueRoutes } from "./routes/queue.js";
 import { referralRoutes } from "./routes/referrals.js";
+import { staffRoutes } from "./routes/staff.js";
 import { supervisionRoutes } from "./routes/supervision.js";
 import { syncRoutes } from "./routes/sync.js";
 import { visitRoutes } from "./routes/visits.js";
@@ -166,6 +167,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.register(authRoutes, { prefix: "/api/auth" });
+  app.register(staffRoutes, { prefix: "/api/staff" });
   app.register(patientRoutes, { prefix: "/api/patients" });
   app.register(hrpRoutes, { prefix: "/api/hrp/patients" });
   app.register(followUpRoutes, { prefix: "/api/hrp/follow-ups" });

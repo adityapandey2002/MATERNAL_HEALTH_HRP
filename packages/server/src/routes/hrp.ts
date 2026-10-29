@@ -1,4 +1,4 @@
-import { scheduleFollowUp } from "@hrp/shared";
+import { hrpReasonForComplication, scheduleFollowUp } from "@hrp/shared";
 import { calculateRiskScore } from "@hrp/shared/rules";
 import { CreatePatientSchema, HrpPatientFilterSchema } from "@hrp/shared/schemas";
 import type { CreatePatient, HrpPatientFilter } from "@hrp/shared/schemas";
@@ -108,17 +108,24 @@ export const hrpRoutes: FastifyPluginAsync = async (app) => {
       facilityPath: actor.homeFacilityPath,
     });
 
+    // The intake dropdown and the risk engine use different vocabularies.
+    // Bridge them so a recorded complication always scores AMBER or above.
+    const hrpReason = data.hrpReason ?? hrpReasonForComplication(data.hrpComplication);
+
     const { score, level } = scoreUnregisteredPatient({
       name: data.name,
       age: data.age,
       riskFactors: data.riskFactors ?? [],
-      hrpReason: data.hrpReason ?? null,
+      hrpReason,
     });
 
-    const row = mapPatientToRow(data, {
-      facilityId: actor.homeFacilityId,
-      registeredBy: actor.userId,
-    });
+    const row = mapPatientToRow(
+      { ...data, hrpReason },
+      {
+        facilityId: actor.homeFacilityId,
+        registeredBy: actor.userId,
+      }
+    );
 
     const result = await db
       .insertInto("patients")
@@ -130,6 +137,33 @@ export const hrpRoutes: FastifyPluginAsync = async (app) => {
       })
       .returningAll()
       .executeTakeFirstOrThrow();
+
+    // Automated follow-up scheduling: no manual toggle. The registering
+    // worker owns the first contact; the block helpdesk can re-dispatch it.
+    if (data.isHrp) {
+      const { track, scheduledDate } = scheduleFollowUp(
+        { village: actor.homeFacilityPath },
+        new Date()
+      );
+
+      await db
+        .updateTable("patients")
+        .set({ follow_up_track: track, follow_up_scheduled_date: scheduledDate })
+        .where("id", "=", result.id)
+        .execute();
+
+      await db
+        .insertInto("follow_ups")
+        .values({
+          patient_id: result.id,
+          assigned_to_user_id: actor.userId,
+          assigned_by_user_id: actor.userId,
+          level: actor.role === "ANM" ? "ANM" : actor.role === "CHO" ? "CHO" : "BLOCK_NODAL",
+          track,
+          scheduled_date: scheduledDate,
+        })
+        .execute();
+    }
 
     return reply.code(201).send(serializePatient(result));
   });

@@ -83,6 +83,7 @@ const ROLE_FACILITY_LEVELS: Record<UserRole, readonly FacilityLevel[]> = {
   CHO: ["HWC"],
   BHM: ["BLOCK", "CHC"],
   DHS: ["DISTRICT"],
+  HELPDESK: ["BLOCK", "CHC"],
 };
 
 export function isFacilityRoleCompatible(role: UserRole, level: FacilityLevel): boolean {
