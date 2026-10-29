@@ -1,0 +1,14 @@
+import FieldHome from "./FieldHome";
+import NodalDashboard from "./NodalDashboard";
+import { useIsFieldRole } from "../lib/session";
+
+/**
+ * Role-aware front page.
+ *
+ * ANM and CHO open on the single Add case action. Block, district and helpdesk
+ * accounts open on the block dashboard.
+ */
+export default function Home() {
+  const fieldRole = useIsFieldRole();
+  return fieldRole ? <FieldHome /> : <NodalDashboard />;
+}

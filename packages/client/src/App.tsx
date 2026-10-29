@@ -5,6 +5,7 @@ import { api } from "./lib/api";
 import AddPatient from "./pages/AddPatient";
 import Dashboard from "./pages/Dashboard";
 import FollowUps from "./pages/FollowUps";
+import Home from "./pages/Home";
 import Login from "./pages/Login";
 import NewVisit from "./pages/NewVisit";
 import Offline from "./pages/Offline";
@@ -13,6 +14,7 @@ import Patients from "./pages/Patients";
 import Referrals from "./pages/Referrals";
 import Settings from "./pages/Settings";
 import Supervision from "./pages/Supervision";
+import TeamAccess from "./pages/TeamAccess";
 import { isOnline, onOnlineChange } from "./utils/sw";
 
 function LoadingScreen() {

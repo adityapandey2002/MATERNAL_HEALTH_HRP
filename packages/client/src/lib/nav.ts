@@ -23,28 +23,38 @@ export interface NavItem {
   section: NavSection;
 }
 
-const today: NavItem = {
+/** ANM and CHO work the field app: register, triage, follow up. */
+export function isFieldRole(role: UserRole): boolean {
+  return role === "ANM" || role === "CHO";
+}
+
+/** Block and district staff work the oversight app. */
+export function isNodalRole(role: UserRole): boolean {
+  return role === "BHM" || role === "DHS";
+}
+
+const addCase: NavItem = {
   path: "/",
-  label: "Today",
-  shortLabel: "Today",
+  label: "Add case",
+  shortLabel: "Add",
+  icon: UserPlusIcon,
+  section: "Field work",
+};
+
+const dashboard: NavItem = {
+  path: "/dashboard",
+  label: "Dashboard",
+  shortLabel: "Home",
   icon: HomeIcon,
   section: "Field work",
 };
 
-const triage: NavItem = {
-  path: "/",
-  label: "Triage line list",
-  shortLabel: "Triage",
-  icon: ListChecksIcon,
-  section: "Oversight",
-};
-
-const overview: NavItem = {
-  path: "/",
-  label: "District overview",
-  shortLabel: "Overview",
-  icon: ActivityIcon,
-  section: "Oversight",
+const fieldFollowUps: NavItem = {
+  path: "/follow-ups",
+  label: "Follow-ups",
+  shortLabel: "Follow-ups",
+  icon: CalendarIcon,
+  section: "Field work",
 };
 
 const patients: NavItem = {
@@ -55,12 +65,36 @@ const patients: NavItem = {
   section: "Field work",
 };
 
-const followUps: NavItem = {
+const blockDashboard: NavItem = {
+  path: "/",
+  label: "Block dashboard",
+  shortLabel: "Dashboard",
+  icon: ActivityIcon,
+  section: "Oversight",
+};
+
+const blockFollowUps: NavItem = {
   path: "/follow-ups",
-  label: "Follow-ups",
+  label: "Follow-up to be done",
   shortLabel: "Follow-ups",
-  icon: CalendarIcon,
-  section: "Field work",
+  icon: ListChecksIcon,
+  section: "Oversight",
+};
+
+const hrpIntake: NavItem = {
+  path: "/patients/new",
+  label: "Add HRP case",
+  shortLabel: "Add",
+  icon: UserPlusIcon,
+  section: "Oversight",
+};
+
+const team: NavItem = {
+  path: "/team",
+  label: "Team & access",
+  shortLabel: "Team",
+  icon: UsersIcon,
+  section: "Account",
 };
 
 const referrals: NavItem = {
@@ -87,30 +121,41 @@ const settings: NavItem = {
   section: "Account",
 };
 
-const register: NavItem = {
-  path: "/patients/new",
-  label: "Register woman",
-  shortLabel: "Register",
-  icon: UserPlusIcon,
-  section: "Field work",
-};
-
 const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
-  // ANMs work a village list: today's visits first, then the full register.
-  ANM: [today, patients, followUps, register, referrals, settings],
-  // CHOs supervise the block line list and the ANMs who report into it, so the
-  // register reads as oversight rather than as field work.
-  CHO: [
-    triage,
-    { ...patients, section: "Oversight" },
-    { ...followUps, section: "Oversight" },
+  // Field app, in the order a field worker uses it: register first, then the
+  // triage dashboard, then the assigned follow-up list.
+  ANM: [addCase, dashboard, fieldFollowUps, patients, referrals, settings],
+  CHO: [addCase, dashboard, fieldFollowUps, patients, referrals, supervision, settings],
+
+  // Oversight app: block-wide surveillance, the shared line list, helpdesk
+  // intake, and the screen that provisions helpdesk credentials.
+  BHM: [
+    blockDashboard,
+    blockFollowUps,
+    hrpIntake,
+    team,
+    { ...patients, section: "Oversight", label: "All people" },
     referrals,
     supervision,
     settings,
   ],
-  // Block and district nodal officers read aggregate oversight, not field forms.
-  BHM: [overview, { ...patients, section: "Oversight" }, supervision, referrals, settings],
-  DHS: [overview, { ...patients, section: "Oversight" }, supervision, referrals, settings],
+  DHS: [
+    blockDashboard,
+    blockFollowUps,
+    hrpIntake,
+    team,
+    { ...patients, section: "Oversight", label: "All people" },
+    referrals,
+    supervision,
+    settings,
+  ],
+  HELPDESK: [
+    blockDashboard,
+    blockFollowUps,
+    hrpIntake,
+    { ...patients, section: "Oversight", label: "All people" },
+    settings,
+  ],
 };
 
 export function navFor(role: UserRole): NavItem[] {
@@ -137,7 +182,7 @@ export function isNavActive(item: NavItem, pathname: string): boolean {
 export function pageTitleFor(pathname: string, role: UserRole): string {
   const items = navFor(role);
 
-  if (pathname === "/patients/new") return "Register woman";
+  if (pathname === "/patients/new") return "Add HRP case";
   if (/^\/patients\/[^/]+\/visit$/.test(pathname)) return "Record ANC visit";
   if (/^\/patients\/[^/]+$/.test(pathname)) return "Patient record";
 

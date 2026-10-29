@@ -1,18 +1,24 @@
 import type {
   CreatePatient,
   CreateReferral,
+  CreateStaff,
   CreateVisit,
+  DispatchFollowUp,
   Facility,
+  FollowUpFilter,
+  FollowUpListItem,
   Login,
   Pagination,
   Patient,
   PatientFilter,
   Referral,
+  StaffMember,
   SupervisionAlert,
   SupervisionFilter,
   SyncPayload,
   SyncQueue,
   SyncResponse,
+  UpdateFollowUp,
   User,
   Visit,
   VisitFilter,
@@ -29,6 +35,15 @@ class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
+}
+
+function toSearch(params?: Record<string, unknown>): string {
+  const search = new URLSearchParams();
+  if (params)
+    for (const [k, v] of Object.entries(params)) {
+      if (v !== undefined) search.set(k, String(v));
+    }
+  return search.toString();
 }
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -123,6 +138,60 @@ export const api = {
     update: (id: string, data: Partial<CreatePatient>) =>
       request<Patient>(`/patients/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     delete: (id: string) => request<void>(`/patients/${id}`, { method: "DELETE" }),
+  },
+
+  /**
+   * HRP-specific endpoints. These carry the complication, follow-up track and
+   * the joined attribution the block line list shows.
+   */
+  hrp: {
+    patients: {
+      list: (params?: PatientFilter & Pagination & Record<string, unknown>) =>
+        request<{ data: Patient[]; total: number; page: number; limit: number }>(
+          `/hrp/patients?${toSearch(params)}`
+        ),
+      get: (id: string) => request<Patient>(`/hrp/patients/${id}`),
+      create: (data: CreatePatient) =>
+        request<Patient>("/hrp/patients", { method: "POST", body: JSON.stringify(data) }),
+      update: (id: string, data: Partial<CreatePatient>) =>
+        request<Patient>(`/hrp/patients/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+    },
+    followUps: {
+      list: (params?: FollowUpFilter & Pagination & { search?: string }) =>
+        request<{ data: FollowUpListItem[]; total: number; page: number; limit: number }>(
+          `/hrp/follow-ups?${toSearch(params)}`
+        ),
+      field: () =>
+        request<{
+          data: FollowUpListItem[];
+          total: number;
+          page: number;
+          limit: number;
+          active: boolean;
+        }>("/hrp/follow-ups/field"),
+      panel: () => request<{ data: FollowUpListItem[] }>("/hrp/follow-ups/panel"),
+      update: (id: string, data: UpdateFollowUp) =>
+        request<FollowUpListItem>(`/hrp/follow-ups/${id}`, {
+          method: "PATCH",
+          body: JSON.stringify(data),
+        }),
+      dispatch: (data: DispatchFollowUp) =>
+        request<{ data: FollowUpListItem[]; count: number }>("/hrp/follow-ups/dispatch", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+    },
+  },
+
+  staff: {
+    list: () => request<{ data: StaffMember[]; total: number }>("/staff"),
+    create: (data: CreateStaff) =>
+      request<StaffMember>("/staff", { method: "POST", body: JSON.stringify(data) }),
+    deactivate: (id: string) =>
+      request<{ id: string; isActive: boolean }>(`/staff/${id}/deactivate`, { method: "PATCH" }),
   },
 
   visits: {

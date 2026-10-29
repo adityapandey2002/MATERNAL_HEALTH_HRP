@@ -1,50 +1,84 @@
-import { type CreatePatient, HRP_REASONS, type HrpReason } from "@hrp/shared";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import {
+  type CreatePatient,
+  type HrpComplication,
+  HRP_COMPLICATIONS,
+  hrpReasonForComplication,
+} from "@hrp/shared";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FormField, Select } from "../components/ui";
-import { ArrowLeftIcon, ClipboardIcon, PhoneIcon, UserPlusIcon } from "../components/ui/Icons";
+import {
+  ArrowLeftIcon,
+  CalendarIcon,
+  ClipboardIcon,
+  MapPinIcon,
+  PhoneIcon,
+  UserPlusIcon,
+} from "../components/ui/Icons";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { api } from "../lib/api";
+import { eddFromLmp, gestationalAgeLabel } from "../lib/hrp";
+import { useUserRole } from "../lib/session";
 
 interface FormState {
   name: string;
+  phone: string;
   age: string;
-  hrpReason: HrpReason | "";
-  referred: boolean;
-  ashaName: string;
-  ashaPhone: string;
+  villageId: string;
   lmp: string;
+  complication: HrpComplication | "";
+  referred: boolean;
 }
 
 const INITIAL_FORM: FormState = {
   name: "",
+  phone: "",
   age: "",
-  hrpReason: "",
-  referred: false,
-  ashaName: "",
-  ashaPhone: "",
+  villageId: "",
   lmp: "",
+  complication: "",
+  referred: false,
 };
 
-const REASON_OPTIONS = HRP_REASONS.map((reason) => ({
-  value: reason.value,
-  label: reason.label,
+const COMPLICATION_OPTIONS = HRP_COMPLICATIONS.map((option) => ({
+  value: option.value,
+  label: option.label,
 }));
+
+const VILLAGE_LEVELS = new Set(["VILLAGE", "HSC", "HWC"]);
 
 export default function AddPatientPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const role = useUserRole();
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
 
+  const { data: facilities } = useQuery({
+    queryKey: ["facilities"],
+    queryFn: () => api.facilities.list(),
+    staleTime: 10 * 60 * 1000,
+    retry: false,
+  });
+
+  const villageOptions = useMemo(() => {
+    const list = Array.isArray(facilities) ? facilities : [];
+    return list
+      .filter((facility) => VILLAGE_LEVELS.has(facility.level))
+      .map((facility) => ({ value: facility.id, label: facility.name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [facilities]);
+
   const createMutation = useMutation({
-    mutationFn: (data: CreatePatient) => api.patients.create(data),
+    mutationFn: (data: CreatePatient) => api.hrp.patients.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
-      queryClient.invalidateQueries({ queryKey: ["visits", "dashboard"] });
-      navigate("/dashboard");
+      queryClient.invalidateQueries({ queryKey: ["hrp", "patients"] });
+      queryClient.invalidateQueries({ queryKey: ["hrp", "follow-ups"] });
+      navigate("/follow-ups");
     },
   });
 
@@ -53,34 +87,53 @@ export default function AddPatientPage() {
     setErrors((prev) => ({ ...prev, [field]: undefined }));
   };
 
+  const lmpDate = form.lmp ? new Date(`${form.lmp}T00:00:00`) : null;
+  const validLmp = lmpDate && !Number.isNaN(lmpDate.getTime()) ? lmpDate : null;
+  const edd = validLmp ? eddFromLmp(validLmp) : null;
+
   const validate = (): boolean => {
     const next: Partial<Record<keyof FormState, string>> = {};
-    if (!form.name.trim()) next.name = "Enter the woman's name";
+    if (!form.name.trim()) next.name = "Enter the mother's full name";
+
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    if (!phoneDigits) next.phone = "Enter her 10-digit mobile number";
+    else if (phoneDigits.length !== 10) next.phone = "Enter a 10-digit mobile number";
+
     const age = Number(form.age);
-    if (!form.age.trim() || Number.isNaN(age)) next.age = "Enter her age";
-    else if (age < 15 || age > 55) next.age = "Age must be between 15 and 55";
-    if (!form.hrpReason) next.hrpReason = "Select the reason this pregnancy is high-risk";
-    if (form.ashaPhone.trim() && form.ashaPhone.replace(/\D/g, "").length !== 10) {
-      next.ashaPhone = "Enter a 10-digit mobile number";
+    if (!form.age.trim() || Number.isNaN(age) || !Number.isInteger(age)) {
+      next.age = "Enter her age in completed years";
+    } else if (age < 15 || age > 55) {
+      next.age = "Age must be between 15 and 55";
     }
+
+    if (villageOptions.length > 0 && !form.villageId) next.villageId = "Select the village / HWC";
+    if (!validLmp) next.lmp = "Enter the last menstrual period date";
+    else if (validLmp.getTime() > Date.now()) next.lmp = "LMP cannot be in the future";
+    if (!form.complication) next.complication = "Select the HRP complication";
+
     setErrors(next);
     return Object.keys(next).length === 0;
   };
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!validate()) return;
+    if (!validate() || !validLmp || !form.complication) return;
+
+    const villageName = villageOptions.find((option) => option.value === form.villageId)?.label;
 
     createMutation.mutate({
       name: form.name.trim(),
       age: Number(form.age),
-      hrpReason: form.hrpReason || null,
+      phone: form.phone.replace(/\D/g, ""),
+      address: villageName ?? null,
+      hrpComplication: form.complication,
+      hrpReason: hrpReasonForComplication(form.complication),
+      isHrp: true,
       referred: form.referred,
-      isHrp: false,
-      followUpStatus: "PENDING",
-      ashaName: form.ashaName.trim() || null,
-      ashaPhone: form.ashaPhone.replace(/\D/g, "") || null,
-      lmp: form.lmp ? new Date(form.lmp) : null,
+      lmp: validLmp,
+      edd: eddFromLmp(validLmp),
+      ashaName: null,
+      ashaPhone: null,
       gravida: 0,
       para: 0,
       abortions: 0,
@@ -88,16 +141,18 @@ export default function AddPatientPage() {
     });
   };
 
+  const title = role === "HELPDESK" || role === "BHM" || role === "DHS" ? "Add HRP case" : "Add case";
+
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow="High-risk register"
-        title="Add HRP Woman"
-        description="Register a woman in the high-risk pregnancy cohort. Fields marked * are required."
+        eyebrow="HRP intake"
+        title={title}
+        description="Seven fields. The three-track follow-up schedule is calculated automatically."
         actions={
-          <Link to="/patients" className="btn btn-secondary">
+          <Link to="/" className="btn btn-secondary">
             <ArrowLeftIcon className="h-4 w-4" />
-            Back to register
+            Back
           </Link>
         }
       />
@@ -118,13 +173,19 @@ export default function AddPatientPage() {
         <div className="space-y-4 lg:col-span-2">
           <Panel>
             <PanelHeader
-              title="Identity"
-              description="The name and age recorded in the ANC register"
+              title="Woman and household"
+              description="As written on the MCP card / Aadhaar"
               action={<UserPlusIcon className="h-4 w-4 text-ink-subtle" />}
             />
             <PanelBody className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
-                <FormField label="Name" id="patient-name" required error={errors.name}>
+                <FormField
+                  label="Mother's full name"
+                  id="patient-name"
+                  required
+                  error={errors.name}
+                  hint="Match the name on the MCP card or Aadhaar"
+                >
                   <input
                     type="text"
                     autoComplete="name"
@@ -135,12 +196,47 @@ export default function AddPatientPage() {
                 </FormField>
               </div>
 
+              <div className="space-y-1.5">
+                <label htmlFor="patient-phone" className="label">
+                  Mobile number
+                  <span className="ml-0.5 text-triage-red-solid" aria-hidden="true">
+                    *
+                  </span>
+                </label>
+                <div className="flex">
+                  <span
+                    aria-hidden="true"
+                    className="inline-flex items-center rounded-l border border-r-0 border-line-strong bg-canvas px-3 text-sm text-ink-muted"
+                  >
+                    +91
+                  </span>
+                  <input
+                    id="patient-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    className={`input rounded-l-none ${errors.phone ? "input-error" : ""}`}
+                    aria-invalid={errors.phone ? "true" : "false"}
+                    aria-describedby={errors.phone ? "patient-phone-error" : undefined}
+                    value={form.phone}
+                    onChange={(e) => update("phone", e.target.value)}
+                    placeholder="10-digit mobile"
+                  />
+                </div>
+                {errors.phone ? (
+                  <p id="patient-phone-error" className="error-text" role="alert" aria-live="polite">
+                    {errors.phone}
+                  </p>
+                ) : (
+                  <p className="text-xs text-ink-subtle">Used by the ANM and helpdesk to call back</p>
+                )}
+              </div>
+
               <FormField
-                label="Age"
+                label="Age (completed years)"
                 id="patient-age"
                 required
                 error={errors.age}
-                hint="Years, between 15 and 55"
               >
                 <input
                   type="number"
@@ -153,103 +249,125 @@ export default function AddPatientPage() {
                 />
               </FormField>
 
-              <FormField
-                label="LMP (last menstrual period)"
-                id="patient-lmp"
-                hint="Optional — used for gestational age and follow-up dates"
-              >
-                <input
-                  type="date"
-                  max={new Date().toISOString().slice(0, 10)}
-                  value={form.lmp}
-                  onChange={(e) => update("lmp", e.target.value)}
-                />
-              </FormField>
+              <Select
+                label="Village / HWC"
+                id="patient-village"
+                required
+                placeholder={villageOptions.length === 0 ? "Your facility" : "Select a village"}
+                options={villageOptions}
+                value={form.villageId}
+                onChange={(e) => update("villageId", e.target.value)}
+                error={errors.villageId}
+                hint="Mapped to the local Health & Wellness Sub-Center"
+              />
             </PanelBody>
           </Panel>
 
           <Panel>
             <PanelHeader
-              title="Clinical reason"
-              description="Why this pregnancy needs high-risk follow-up"
-              action={<ClipboardIcon className="h-4 w-4 text-ink-subtle" />}
+              title="Pregnancy"
+              description="LMP drives the EDD badge and the follow-up schedule"
+              action={<CalendarIcon className="h-4 w-4 text-ink-subtle" />}
             />
             <PanelBody className="space-y-5">
+              <div>
+                <FormField
+                  label="LMP (last menstrual period)"
+                  id="patient-lmp"
+                  required
+                  error={errors.lmp}
+                  hint="The EDD and gestational age are calculated from this date"
+                >
+                  <input
+                    type="date"
+                    max={new Date().toISOString().slice(0, 10)}
+                    value={form.lmp}
+                    onChange={(e) => update("lmp", e.target.value)}
+                  />
+                </FormField>
+                {validLmp && edd ? (
+                  <div className="mt-2 flex flex-wrap gap-2" aria-live="polite">
+                    <span className="badge badge-info">
+                      <CalendarIcon className="h-3 w-3" />
+                      EDD {format(edd, "d MMM yyyy")}
+                    </span>
+                    <span className="badge badge-gray">
+                      Gestational age {gestationalAgeLabel(validLmp)}
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
               <Select
-                label="Reason for high-risk pregnancy"
-                id="patient-reason"
+                label="Complication"
+                id="patient-complication"
                 required
-                placeholder="Select a reason"
-                options={REASON_OPTIONS}
-                value={form.hrpReason}
-                onChange={(e) => update("hrpReason", e.target.value as HrpReason)}
-                error={errors.hrpReason}
+                placeholder="Select the HRP complication"
+                options={COMPLICATION_OPTIONS}
+                value={form.complication}
+                onChange={(e) => update("complication", e.target.value as HrpComplication)}
+                error={errors.complication}
               />
 
               <fieldset>
-                <legend className="label">Is she being referred to a higher facility?</legend>
-                <div className="mt-2 grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    aria-pressed={form.referred}
-                    onClick={() => update("referred", true)}
-                    className={`min-h-touch rounded border px-4 text-sm font-semibold transition-colors ${
+                <legend className="label">Referring or not?</legend>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  <label
+                    className={`flex cursor-pointer items-start gap-2.5 rounded border px-3 py-3 transition-colors ${
                       form.referred
-                        ? "border-triage-red-solid bg-triage-red-bg text-triage-red"
-                        : "border-line bg-surface text-ink-muted hover:bg-canvas"
+                        ? "border-triage-red-solid bg-triage-red-bg"
+                        : "border-line bg-surface hover:bg-canvas"
                     }`}
                   >
-                    Yes, referred
-                  </button>
-                  <button
-                    type="button"
-                    aria-pressed={!form.referred}
-                    onClick={() => update("referred", false)}
-                    className={`min-h-touch rounded border px-4 text-sm font-semibold transition-colors ${
+                    <input
+                      type="radio"
+                      name="referred"
+                      value="yes"
+                      checked={form.referred}
+                      onChange={() => update("referred", true)}
+                      className="mt-0.5 h-4 w-4 text-triage-red-solid focus:ring-triage-red-line"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-ink">
+                        Yes — Refer to CHC/FRU
+                      </span>
+                      <span className="block text-xs text-ink-subtle">
+                        Escalates to the Block Nodal HRP Helpdesk and the BHM panel
+                      </span>
+                    </span>
+                  </label>
+
+                  <label
+                    className={`flex cursor-pointer items-start gap-2.5 rounded border px-3 py-3 transition-colors ${
                       !form.referred
-                        ? "border-primary bg-primary-light text-primary-dark"
-                        : "border-line bg-surface text-ink-muted hover:bg-canvas"
+                        ? "border-primary bg-primary-light"
+                        : "border-line bg-surface hover:bg-canvas"
                     }`}
                   >
-                    No, not referred
-                  </button>
+                    <input
+                      type="radio"
+                      name="referred"
+                      value="no"
+                      checked={!form.referred}
+                      onChange={() => update("referred", false)}
+                      className="mt-0.5 h-4 w-4 text-primary focus:ring-primary-ring"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-ink">
+                        No — Routine Field Management
+                      </span>
+                      <span className="block text-xs text-ink-subtle">
+                        Managed at the village HSC cluster
+                      </span>
+                    </span>
+                  </label>
                 </div>
               </fieldset>
             </PanelBody>
           </Panel>
 
-          <Panel>
-            <PanelHeader
-              title="Village follow-up"
-              description="Who the ANM coordinates with for home visits"
-              action={<PhoneIcon className="h-4 w-4 text-ink-subtle" />}
-            />
-            <PanelBody className="grid gap-4 sm:grid-cols-2">
-              <FormField label="ASHA name" id="asha-name" hint="Who follows up in the village">
-                <input
-                  type="text"
-                  autoComplete="off"
-                  value={form.ashaName}
-                  onChange={(e) => update("ashaName", e.target.value)}
-                  placeholder="ASHA worker's name"
-                />
-              </FormField>
-
-              <FormField label="ASHA mobile number" id="asha-phone" error={errors.ashaPhone}>
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="off"
-                  value={form.ashaPhone}
-                  onChange={(e) => update("ashaPhone", e.target.value)}
-                  placeholder="10-digit mobile"
-                />
-              </FormField>
-            </PanelBody>
-          </Panel>
-
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            <Link to="/patients" className="btn btn-secondary">
+            <Link to="/" className="btn btn-secondary">
               Cancel
             </Link>
             <button
@@ -257,7 +375,7 @@ export default function AddPatientPage() {
               className="btn btn-primary btn-lg"
               disabled={createMutation.isPending}
             >
-              {createMutation.isPending ? "Adding…" : "Add"}
+              {createMutation.isPending ? "Saving…" : "Add to HRP register"}
             </button>
           </div>
         </div>
@@ -272,32 +390,62 @@ export default function AddPatientPage() {
                     aria-hidden="true"
                     className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                   />
-                  The woman appears in the high-risk register and your field dashboard.
+                  She joins the HRP register for your village cluster.
                 </li>
                 <li className="flex gap-2">
                   <span
                     aria-hidden="true"
                     className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                   />
-                  An LMP date generates the ANC follow-up schedule automatically.
+                  The earliest track — 7-day MO review, next PMSMA, or VHSND — is scheduled for
+                  her.
                 </li>
                 <li className="flex gap-2">
                   <span
                     aria-hidden="true"
                     className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                   />
-                  Record the first visit from her patient record to start vitals tracking.
+                  Referred cases appear on the Block Nodal helpdesk and BHM panel.
                 </li>
               </ul>
             </PanelBody>
           </Panel>
 
           <Panel>
-            <PanelBody>
-              <h2 className="text-sm font-semibold text-ink">Data quality</h2>
-              <p className="mt-1 text-xs leading-relaxed text-ink-subtle">
-                Register the name exactly as written in the ANC card so the ASHA and CHO can match
-                records during a referral.
+            <PanelBody className="space-y-2">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <MapPinIcon className="h-4 w-4 text-ink-subtle" />
+                Village mapping
+              </h2>
+              <p className="text-xs leading-relaxed text-ink-subtle">
+                The village you pick maps the woman to her Health & Wellness Sub-Center, so follow-up
+                lists reach the right ANM.
+              </p>
+            </PanelBody>
+          </Panel>
+
+          <Panel>
+            <PanelBody className="space-y-2">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <PhoneIcon className="h-4 w-4 text-ink-subtle" />
+                Call-back number
+              </h2>
+              <p className="text-xs leading-relaxed text-ink-subtle">
+                The mobile number is what the ANM and HRP Helpdesk dial when a contact is
+                not reachable.
+              </p>
+            </PanelBody>
+          </Panel>
+
+          <Panel>
+            <PanelBody className="space-y-2">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
+                <ClipboardIcon className="h-4 w-4 text-ink-subtle" />
+                Complication drives risk
+              </h2>
+              <p className="text-xs leading-relaxed text-ink-subtle">
+                Every complication scores her AMBER or above, so no HRP registration is silently
+                marked low risk.
               </p>
             </PanelBody>
           </Panel>

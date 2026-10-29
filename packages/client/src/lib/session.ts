@@ -1,6 +1,7 @@
 import type { UserRole } from "@hrp/shared";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
+import { isFieldRole, isNodalRole } from "./nav";
 
 /**
  * Role of the signed-in user.
@@ -28,5 +29,37 @@ export function useUserRole(): UserRole {
  */
 export function useCanWriteClinical(): boolean {
   const role = useUserRole();
-  return role === "ANM" || role === "CHO";
+  return role === "ANM" || role === "CHO" || role === "HELPDESK";
+}
+
+/** True when the current role uses the field (mobile-first) app. */
+export function useIsFieldRole(): boolean {
+  return isFieldRole(useUserRole());
+}
+
+/** True when the current role uses the block/district oversight app. */
+export function useIsNodalRole(): boolean {
+  return isNodalRole(useUserRole());
+}
+
+export const ROLE_LABEL: Record<UserRole, string> = {
+  ANM: "ANM · field worker",
+  CHO: "CHO · facility",
+  BHM: "Block nodal officer",
+  DHS: "District officer",
+  HELPDESK: "HRP Helpdesk",
+};
+
+/** Short tier label used in attribution text, e.g. "Done by ANM". */
+export const ROLE_TIER_LABEL: Record<UserRole, string> = {
+  ANM: "ANM",
+  CHO: "CHO",
+  BHM: "Block Nodal",
+  DHS: "District Nodal",
+  HELPDESK: "HRP_Helpdesk",
+};
+
+export function tierLabel(role: string | null | undefined): string {
+  if (!role) return "Field team";
+  return ROLE_TIER_LABEL[role as UserRole] ?? "Field team";
 }
