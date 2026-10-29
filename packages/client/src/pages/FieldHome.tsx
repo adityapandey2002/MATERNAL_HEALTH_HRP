@@ -101,7 +101,8 @@ export default function FieldHome() {
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-semibold text-triage-red">
-                  {urgent.length} {urgent.length === 1 ? "HRP needs" : "HRPs need"} follow-up urgently
+                  {urgent.length} {urgent.length === 1 ? "HRP needs" : "HRPs need"} follow-up
+                  urgently
                 </h2>
                 <p className="mt-0.5 text-xs text-ink-muted">
                   {urgent
@@ -131,7 +132,9 @@ export default function FieldHome() {
               </span>
               <div className="min-w-0 flex-1">
                 <h2 className="text-sm font-semibold text-ink">
-                  {online ? "All follow-ups on track" : "Offline — records are saved on this device"}
+                  {online
+                    ? "All follow-ups on track"
+                    : "Offline — records are saved on this device"}
                 </h2>
                 <p className="mt-0.5 text-xs text-ink-subtle">
                   {online

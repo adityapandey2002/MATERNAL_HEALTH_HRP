@@ -16,6 +16,7 @@ const ROLE_LABEL: Record<UserRole, string> = {
   CHO: "CHO · facility",
   BHM: "Block nodal officer",
   DHS: "District officer",
+  HELPDESK: "HRP Helpdesk",
 };
 
 const NOTIFICATION_PREFS = [

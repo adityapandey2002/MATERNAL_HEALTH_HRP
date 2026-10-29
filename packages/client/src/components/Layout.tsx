@@ -7,25 +7,20 @@ import {
   type NavItem,
   type NavSection,
   initialsFor,
+  isFieldRole,
   isNavActive,
   mobileOverflowFor,
   mobileTabsFor,
   navFor,
   pageTitleFor,
 } from "../lib/nav";
+import { ROLE_LABEL } from "../lib/session";
 import { isOnline, onOnlineChange } from "../utils/sw";
 import { BrandLockup, BrandMark } from "./ui/BrandMark";
 import { LogoutIcon, MoreHorizontalIcon } from "./ui/Icons";
 import { Sheet } from "./ui/Sheet";
 
 const SECTION_ORDER: NavSection[] = ["Field work", "Oversight", "Account"];
-
-const ROLE_LABEL: Record<UserRole, string> = {
-  ANM: "ANM · field worker",
-  CHO: "CHO · facility",
-  BHM: "Block nodal officer",
-  DHS: "District officer",
-};
 
 export default function Layout() {
   const location = useLocation();

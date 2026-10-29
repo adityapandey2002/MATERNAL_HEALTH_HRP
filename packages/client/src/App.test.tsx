@@ -41,6 +41,7 @@ describe("App", () => {
       else if (url.includes("/patients")) body = { data: [], total: 0, page: 1, limit: 20 };
       else if (url.includes("/visits")) body = { data: [], total: 0, page: 1, limit: 20 };
       else if (url.includes("/supervision/alerts")) body = { data: [], total: 0 };
+      else if (url.includes("/hrp/follow-ups")) body = { data: [], total: 0 };
 
       return new Response(JSON.stringify(body), {
         status: 200,
@@ -54,15 +55,17 @@ describe("App", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the field dashboard at the front page (/)", async () => {
+  it("renders the field front page (/) with Add HRP case hero for ANM", async () => {
     render(wrapper({ children: <App /> }));
 
-    expect(await screen.findByRole("heading", { name: "Today" })).toBeInTheDocument();
-    const registerLinks = screen.getAllByRole("link", { name: /register woman/i });
-    expect(registerLinks[0]).toHaveAttribute("href", "/patients/new");
+    expect(
+      await screen.findByRole("heading", { name: "Register a high-risk pregnancy" })
+    ).toBeInTheDocument();
+    const addLinks = screen.getAllByRole("link", { name: /Add HRP case/i });
+    expect(addLinks[0]).toHaveAttribute("href", "/patients/new");
   });
 
-  it("renders the field dashboard at /dashboard", async () => {
+  it("renders the field triage dashboard at /dashboard", async () => {
     render(wrapper({ children: <App />, initialEntries: ["/dashboard"] }));
 
     expect(await screen.findByRole("heading", { name: "Today" })).toBeInTheDocument();
@@ -71,6 +74,6 @@ describe("App", () => {
   it("renders the registration form at /patients/new", async () => {
     render(wrapper({ children: <App />, initialEntries: ["/patients/new"] }));
 
-    expect(await screen.findByRole("heading", { name: "Add HRP Woman" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Add case" })).toBeInTheDocument();
   });
 });

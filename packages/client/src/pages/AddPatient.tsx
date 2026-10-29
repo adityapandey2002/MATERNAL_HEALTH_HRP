@@ -1,7 +1,7 @@
 import {
   type CreatePatient,
-  type HrpComplication,
   HRP_COMPLICATIONS,
+  type HrpComplication,
   hrpReasonForComplication,
 } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -130,6 +130,7 @@ export default function AddPatientPage() {
       hrpReason: hrpReasonForComplication(form.complication),
       isHrp: true,
       referred: form.referred,
+      followUpStatus: "PENDING",
       lmp: validLmp,
       edd: eddFromLmp(validLmp),
       ashaName: null,
@@ -141,7 +142,8 @@ export default function AddPatientPage() {
     });
   };
 
-  const title = role === "HELPDESK" || role === "BHM" || role === "DHS" ? "Add HRP case" : "Add case";
+  const title =
+    role === "HELPDESK" || role === "BHM" || role === "DHS" ? "Add HRP case" : "Add case";
 
   return (
     <div className="space-y-5">
@@ -224,20 +226,22 @@ export default function AddPatientPage() {
                   />
                 </div>
                 {errors.phone ? (
-                  <p id="patient-phone-error" className="error-text" role="alert" aria-live="polite">
+                  <p
+                    id="patient-phone-error"
+                    className="error-text"
+                    role="alert"
+                    aria-live="polite"
+                  >
                     {errors.phone}
                   </p>
                 ) : (
-                  <p className="text-xs text-ink-subtle">Used by the ANM and helpdesk to call back</p>
+                  <p className="text-xs text-ink-subtle">
+                    Used by the ANM and helpdesk to call back
+                  </p>
                 )}
               </div>
 
-              <FormField
-                label="Age (completed years)"
-                id="patient-age"
-                required
-                error={errors.age}
-              >
+              <FormField label="Age (completed years)" id="patient-age" required error={errors.age}>
                 <input
                   type="number"
                   inputMode="numeric"
@@ -397,8 +401,7 @@ export default function AddPatientPage() {
                     aria-hidden="true"
                     className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                   />
-                  The earliest track — 7-day MO review, next PMSMA, or VHSND — is scheduled for
-                  her.
+                  The earliest track — 7-day MO review, next PMSMA, or VHSND — is scheduled for her.
                 </li>
                 <li className="flex gap-2">
                   <span
@@ -418,8 +421,8 @@ export default function AddPatientPage() {
                 Village mapping
               </h2>
               <p className="text-xs leading-relaxed text-ink-subtle">
-                The village you pick maps the woman to her Health & Wellness Sub-Center, so follow-up
-                lists reach the right ANM.
+                The village you pick maps the woman to her Health & Wellness Sub-Center, so
+                follow-up lists reach the right ANM.
               </p>
             </PanelBody>
           </Panel>
@@ -431,8 +434,8 @@ export default function AddPatientPage() {
                 Call-back number
               </h2>
               <p className="text-xs leading-relaxed text-ink-subtle">
-                The mobile number is what the ANM and HRP Helpdesk dial when a contact is
-                not reachable.
+                The mobile number is what the ANM and HRP Helpdesk dial when a contact is not
+                reachable.
               </p>
             </PanelBody>
           </Panel>

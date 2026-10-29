@@ -1,3 +1,4 @@
+import { addDays, getNextPmsmaDate, getNextVhsndDate } from "@hrp/shared";
 import {
   CreateFollowUpSchema,
   DispatchFollowUpSchema,
@@ -11,7 +12,6 @@ import type {
   FollowUpListItem,
   UpdateFollowUp,
 } from "@hrp/shared/schemas";
-import { addDays, getNextPmsmaDate, getNextVhsndDate } from "@hrp/shared";
 import type { FastifyPluginAsync } from "fastify";
 import { type Updateable, sql } from "kysely";
 import { z } from "zod";
@@ -282,7 +282,9 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
 
       const dispatchRole = assignee.role;
       if (dispatchRole !== "ANM" && dispatchRole !== "CHO" && dispatchRole !== "HELPDESK") {
-        return reply.code(400).send({ message: "Follow-ups can only be dispatched to field workers" });
+        return reply
+          .code(400)
+          .send({ message: "Follow-ups can only be dispatched to field workers" });
       }
 
       const patients = await db

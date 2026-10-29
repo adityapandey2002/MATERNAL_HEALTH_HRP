@@ -36,8 +36,6 @@ function renderLayout() {
 }
 
 function sidebar() {
-  // The sidebar is the first "Primary" navigation in the document; the fixed
-  // bottom tab bar is the second and is hidden from desktop layout.
   const [primary] = screen.getAllByRole("navigation", { name: "Primary" });
   if (!primary) throw new Error("Primary navigation not rendered");
   return within(primary);
@@ -53,22 +51,17 @@ describe("Layout", () => {
   it("gives an ANM the field-work navigation", async () => {
     renderLayout();
 
-    // Wait for the session query to resolve before reading the nav, otherwise
-    // the shell is still showing its least-privileged ANM default.
     await screen.findByText("Asha Ben");
 
     const nav = sidebar();
-    expect(nav.getByRole("link", { name: "Today" })).toHaveAttribute("href", "/");
+    expect(nav.getByRole("link", { name: "Add case" })).toHaveAttribute("href", "/");
+    expect(nav.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
+    expect(nav.getByRole("link", { name: "Follow-ups" })).toHaveAttribute("href", "/follow-ups");
     expect(nav.getByRole("link", { name: "Patients" })).toHaveAttribute("href", "/patients");
-    expect(nav.getByRole("link", { name: "Register woman" })).toHaveAttribute(
-      "href",
-      "/patients/new"
-    );
-    // Supervision is an oversight tool and must not be offered to a field worker.
     expect(nav.queryByRole("link", { name: "Supervision" })).not.toBeInTheDocument();
   });
 
-  it("gives a CHO the oversight navigation", async () => {
+  it("gives a CHO the oversight supervision navigation", async () => {
     vi.mocked(api.auth.me).mockResolvedValue({ ...baseUser, role: "CHO", employeeId: "CHO001" });
 
     renderLayout();
@@ -76,9 +69,8 @@ describe("Layout", () => {
     await screen.findByText("CHO · facility");
 
     const nav = sidebar();
-    expect(nav.getByRole("link", { name: "Triage line list" })).toHaveAttribute("href", "/");
+    expect(nav.getByRole("link", { name: "Add case" })).toHaveAttribute("href", "/");
+    expect(nav.getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/dashboard");
     expect(nav.getByRole("link", { name: "Supervision" })).toHaveAttribute("href", "/supervision");
-    // CHOs review the register; they do not use the field registration form.
-    expect(nav.queryByRole("link", { name: "Register woman" })).not.toBeInTheDocument();
   });
 });

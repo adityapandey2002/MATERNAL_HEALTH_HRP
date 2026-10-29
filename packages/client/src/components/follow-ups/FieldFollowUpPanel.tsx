@@ -1,6 +1,6 @@
 import {
-  type HrpFollowUpStatus,
   HRP_FOLLOW_UP_TRACKS,
+  type HrpFollowUpStatus,
   getHrpComplicationLabel,
   getHrpStatusBadge,
   getHrpStatusLabel,
@@ -8,17 +8,6 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Link } from "react-router-dom";
-import { EmptyState } from "../ui/EmptyState";
-import {
-  CalendarIcon,
-  CheckIcon,
-  ClipboardIcon,
-  PhoneIcon,
-  SyncIcon,
-} from "../ui/Icons";
-import { PageHeader } from "../ui/PageHeader";
-import { Panel, PanelBody, PanelHeader } from "../ui/Panel";
-import { StatTile } from "../ui/Stat";
 import { api } from "../../lib/api";
 import {
   type FollowUpRow,
@@ -27,6 +16,11 @@ import {
   formatShortDate,
   summariseFollowUps,
 } from "../../lib/hrp";
+import { EmptyState } from "../ui/EmptyState";
+import { CalendarIcon, CheckIcon, ClipboardIcon, PhoneIcon, SyncIcon } from "../ui/Icons";
+import { PageHeader } from "../ui/PageHeader";
+import { Panel, PanelBody, PanelHeader } from "../ui/Panel";
+import { StatTile } from "../ui/Stat";
 
 interface UpdateStatusVariables {
   followUpId: string;
@@ -51,7 +45,11 @@ export default function FieldFollowUpPanel() {
     retry: false,
   });
 
-  const { data: recordsData, isLoading: recordsLoading, isError } = useQuery({
+  const {
+    data: recordsData,
+    isLoading: recordsLoading,
+    isError,
+  } = useQuery({
     queryKey: ["hrp", "follow-ups", "field-panel"],
     queryFn: () => api.hrp.followUps.list({ page: 1, limit: 100 }),
   });

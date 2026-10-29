@@ -79,7 +79,7 @@ const STATUS_ORDER: Record<HrpFollowUpStatus, number> = {
 
 const ACTIVE_STATUSES: ReadonlySet<HrpFollowUpStatus> = new Set(["PENDING", "NOT_REACHABLE"]);
 
-function defaultScheduledDate(track: HrpFollowUpTrack, village: string | null, now: Date): Date {
+function defaultScheduledDate(track: HrpFollowUpTrack, now: Date): Date {
   if (track === "IMMEDIATE_7_DAYS") return new Date(now.getTime() + 7 * DAY_MS);
   if (track === "PMSMA_SESSION") return getNextPmsmaDate(now);
   return new Date(now.getTime() + 30 * DAY_MS);
@@ -132,7 +132,7 @@ export function buildFollowUpLineList(
       ? new Date(record.scheduledDate)
       : patient?.followUpScheduledDate
         ? new Date(patient.followUpScheduledDate)
-        : defaultScheduledDate(track, record?.village ?? null, now);
+        : defaultScheduledDate(track, now);
 
     rows.push({
       key: record ? `follow-up-${record.id}` : `patient-${patientId}`,
@@ -197,10 +197,7 @@ function emptyTrack(): TrackSummary {
  * Block dashboard counters. Everything is derived from the same line list the
  * panel renders, so the tiles and the table can never disagree.
  */
-export function summariseFollowUps(
-  rows: FollowUpRow[],
-  now: Date = new Date()
-): FollowUpSummary {
+export function summariseFollowUps(rows: FollowUpRow[], now: Date = new Date()): FollowUpSummary {
   const byTrack: Record<HrpFollowUpTrack, TrackSummary> = {
     IMMEDIATE_7_DAYS: emptyTrack(),
     PMSMA_SESSION: emptyTrack(),

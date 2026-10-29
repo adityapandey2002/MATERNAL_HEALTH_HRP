@@ -26,8 +26,7 @@ function validate(form: FormState): Partial<Record<keyof FormState, string>> {
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
     errors.email = "Enter a valid email address";
 
-  if (form.phone.replace(/\D/g, "").length !== 10)
-    errors.phone = "Enter a 10-digit mobile number";
+  if (form.phone.replace(/\D/g, "").length !== 10) errors.phone = "Enter a 10-digit mobile number";
   if (form.password.length < 8) errors.password = "Use at least 8 characters";
 
   return errors;
@@ -314,9 +313,7 @@ export default function TeamAccessPage() {
                           <p className="font-medium text-ink">{member.name}</p>
                           <p className="tnum text-2xs text-ink-subtle">{member.employeeId}</p>
                         </td>
-                        <td className="break-all text-xs text-ink-muted">
-                          {member.email ?? "—"}
-                        </td>
+                        <td className="break-all text-xs text-ink-muted">{member.email ?? "—"}</td>
                         <td>
                           <span className="badge badge-gray">{ROLE_LABEL[member.role]}</span>
                         </td>

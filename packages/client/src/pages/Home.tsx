@@ -1,6 +1,6 @@
+import { useIsFieldRole } from "../lib/session";
 import FieldHome from "./FieldHome";
 import NodalDashboard from "./NodalDashboard";
-import { useIsFieldRole } from "../lib/session";
 
 /**
  * Role-aware front page.

@@ -105,9 +105,10 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/follow-ups" element={<FollowUps />} />
+          <Route path="/team" element={<TeamAccess />} />
           <Route path="/patients" element={<Patients />} />
           <Route path="/patients/new" element={<AddPatient />} />
           <Route path="/patients/:id" element={<PatientDetail />} />

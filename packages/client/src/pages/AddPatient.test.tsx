@@ -8,8 +8,12 @@ import AddPatientPage from "./AddPatient";
 
 vi.mock("../lib/api", () => ({
   api: {
-    patients: {
-      create: vi.fn(),
+    auth: { me: vi.fn() },
+    facilities: { list: vi.fn() },
+    hrp: {
+      patients: {
+        create: vi.fn(),
+      },
     },
   },
 }));
@@ -22,16 +26,17 @@ const patient: Patient = {
   anmName: "Asha Ben",
   name: "Sita Devi",
   age: 24,
-  phone: null,
-  address: null,
+  phone: "9988776655",
+  address: "Shivrajpur HSC",
+  hrpComplication: "PIH",
   hrpReason: "HYPERTENSION",
   ashaName: null,
   ashaPhone: null,
   referred: false,
-  isHrp: false,
+  isHrp: true,
   followUpStatus: "PENDING",
-  lmp: null,
-  edd: null,
+  lmp: new Date("2026-08-01"),
+  edd: new Date("2027-05-08"),
   gravida: 0,
   para: 0,
   abortions: 0,
@@ -50,7 +55,7 @@ const createWrapper = () => {
       <MemoryRouter initialEntries={["/patients/new"]}>
         <Routes>
           <Route path="/patients/new" element={children} />
-          <Route path="/dashboard" element={<p>Dashboard page</p>} />
+          <Route path="/follow-ups" element={<p>Follow-ups page</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>
@@ -60,82 +65,97 @@ const createWrapper = () => {
 describe("AddPatientPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(api.patients.create).mockResolvedValue(patient);
-  });
-
-  it("shows only the registration fields on the add form", () => {
-    render(<AddPatientPage />, { wrapper: createWrapper() });
-
-    expect(screen.getByRole("heading", { name: "Add HRP Woman" })).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Name/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Age/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^Reason for high-risk pregnancy/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Yes, referred" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "No, not referred" })).toBeInTheDocument();
-    expect(screen.getByLabelText(/^ASHA name/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/^ASHA mobile number/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Add" })).toBeInTheDocument();
-  });
-
-  it("requires a name, age, and reason before saving", () => {
-    render(<AddPatientPage />, { wrapper: createWrapper() });
-
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
-
-    expect(screen.getByText("Enter the woman's name")).toBeInTheDocument();
-    expect(screen.getByText("Enter her age")).toBeInTheDocument();
-    expect(screen.getByText("Select the reason this pregnancy is high-risk")).toBeInTheDocument();
-    expect(api.patients.create).not.toHaveBeenCalled();
-  });
-
-  it("saves the registration and goes to the dashboard", async () => {
-    render(<AddPatientPage />, { wrapper: createWrapper() });
-
-    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "Sita Devi" } });
-    fireEvent.change(screen.getByLabelText(/^Age/), { target: { value: "24" } });
-    fireEvent.change(screen.getByLabelText(/^Reason for high-risk pregnancy/), {
-      target: { value: "HYPERTENSION" },
+    vi.mocked(api.auth.me).mockResolvedValue({
+      id: "111",
+      name: "Radha",
+      employeeId: "ANM001",
+      phone: "9988776655",
+      role: "ANM",
+      facilityId: "fac1",
+      language: "en",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
     });
-    fireEvent.change(screen.getByLabelText(/^ASHA name/), { target: { value: "Asha Kumari" } });
-    fireEvent.change(screen.getByLabelText(/^ASHA mobile number/), {
-      target: { value: "99887 76655" },
+    vi.mocked(api.facilities.list).mockResolvedValue([
+      {
+        id: "fac-1",
+        code: "HSC001",
+        name: "Shivrajpur HSC",
+        level: "HSC",
+        state: "Bihar",
+        district: "Araria",
+        block: "Araria",
+        parentId: null,
+        path: "fac-1",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ]);
+    vi.mocked(api.hrp.patients.create).mockResolvedValue(patient);
+  });
+
+  it("shows the simplified 7-field intake form", () => {
+    render(<AddPatientPage />, { wrapper: createWrapper() });
+
+    expect(screen.getByRole("heading", { name: "Add case" })).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Mother's full name/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Mobile number/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Age \(completed years\)/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Village \/ HWC/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^LMP/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^Complication/)).toBeInTheDocument();
+    expect(screen.getByText(/Referring or not\?/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add to HRP register" })).toBeInTheDocument();
+  });
+
+  it("requires mandatory fields before saving", () => {
+    render(<AddPatientPage />, { wrapper: createWrapper() });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add to HRP register" }));
+
+    expect(screen.getByText("Enter the mother's full name")).toBeInTheDocument();
+    expect(screen.getByText("Enter her 10-digit mobile number")).toBeInTheDocument();
+    expect(screen.getByText("Enter her age in completed years")).toBeInTheDocument();
+    expect(api.hrp.patients.create).not.toHaveBeenCalled();
+  });
+
+  it("saves the registration and navigates to follow-ups", async () => {
+    render(<AddPatientPage />, { wrapper: createWrapper() });
+
+    fireEvent.change(screen.getByLabelText(/^Mother's full name/), {
+      target: { value: "Sita Devi" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
+    fireEvent.change(screen.getByLabelText(/^Mobile number/), {
+      target: { value: "9988776655" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Age \(completed years\)/), {
+      target: { value: "24" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Village \/ HWC/), {
+      target: { value: "fac-1" },
+    });
+    fireEvent.change(screen.getByLabelText(/^LMP/), {
+      target: { value: "2026-08-01" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Complication/), {
+      target: { value: "PIH" },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add to HRP register" }));
 
     await vi.waitFor(() => {
-      expect(api.patients.create).toHaveBeenCalledWith({
-        name: "Sita Devi",
-        age: 24,
-        hrpReason: "HYPERTENSION",
-        referred: false,
-        isHrp: false,
-        followUpStatus: "PENDING",
-        ashaName: "Asha Kumari",
-        ashaPhone: "9988776655",
-        lmp: null,
-        gravida: 0,
-        para: 0,
-        abortions: 0,
-        riskFactors: [],
-      });
+      expect(api.hrp.patients.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "Sita Devi",
+          age: 24,
+          phone: "9988776655",
+          hrpComplication: "PIH",
+          referred: false,
+          isHrp: true,
+        })
+      );
     });
-    expect(await screen.findByText("Dashboard page")).toBeInTheDocument();
-  });
-
-  it("rejects an ASHA number that is not 10 digits", () => {
-    render(<AddPatientPage />, { wrapper: createWrapper() });
-
-    fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "Sita Devi" } });
-    fireEvent.change(screen.getByLabelText(/^Age/), { target: { value: "24" } });
-    fireEvent.change(screen.getByLabelText(/^Reason for high-risk pregnancy/), {
-      target: { value: "HYPERTENSION" },
-    });
-    fireEvent.change(screen.getByLabelText(/^ASHA mobile number/), {
-      target: { value: "12345" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
-
-    expect(screen.getByText("Enter a 10-digit mobile number")).toBeInTheDocument();
-    expect(api.patients.create).not.toHaveBeenCalled();
+    expect(await screen.findByText("Follow-ups page")).toBeInTheDocument();
   });
 });

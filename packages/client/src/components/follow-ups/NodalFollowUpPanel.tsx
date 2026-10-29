@@ -1,8 +1,8 @@
 import {
-  type HrpFollowUpStatus,
-  type HrpFollowUpTrack,
   HRP_FOLLOW_UP_STATUSES,
   HRP_FOLLOW_UP_TRACKS,
+  type HrpFollowUpStatus,
+  type HrpFollowUpTrack,
   getHrpComplicationLabel,
   getHrpStatusBadge,
   getHrpStatusLabel,
@@ -12,12 +12,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { EmptyState } from "../ui/EmptyState";
-import { SearchIcon } from "../ui/Icons";
-import { PageHeader } from "../ui/PageHeader";
-import { Panel, PanelHeader } from "../ui/Panel";
-import { SegmentedControl } from "../ui/SegmentedControl";
-import { StatTile } from "../ui/Stat";
 import { api } from "../../lib/api";
 import {
   type FollowUpRow,
@@ -26,6 +20,12 @@ import {
   formatShortDate,
   summariseFollowUps,
 } from "../../lib/hrp";
+import { EmptyState } from "../ui/EmptyState";
+import { SearchIcon } from "../ui/Icons";
+import { PageHeader } from "../ui/PageHeader";
+import { Panel, PanelHeader } from "../ui/Panel";
+import { SegmentedControl } from "../ui/SegmentedControl";
+import { StatTile } from "../ui/Stat";
 
 type StatusFilter = HrpFollowUpStatus | "ALL";
 type TrackFilter = HrpFollowUpTrack | "ALL";
@@ -50,7 +50,11 @@ export default function NodalFollowUpPanel() {
   const [villageFilter, setVillageFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
-  const { data: recordsData, isLoading: recordsLoading, isError } = useQuery({
+  const {
+    data: recordsData,
+    isLoading: recordsLoading,
+    isError,
+  } = useQuery({
     queryKey: ["hrp", "follow-ups", "nodal-panel"],
     queryFn: () => api.hrp.followUps.list({ page: 1, limit: 100 }),
   });
@@ -67,7 +71,11 @@ export default function NodalFollowUpPanel() {
 
   const villages = useMemo(
     () =>
-      [...new Set(rows.map((row) => row.village).filter((value): value is string => Boolean(value)))]
+      [
+        ...new Set(
+          rows.map((row) => row.village).filter((value): value is string => Boolean(value))
+        ),
+      ]
         .sort((a, b) => a.localeCompare(b))
         .map((village) => ({ value: village, label: village })),
     [rows]
@@ -125,7 +133,12 @@ export default function NodalFollowUpPanel() {
           hint={summary.breached > 0 ? `${summary.breached} past the window` : "Inside the window"}
           tone={summary.breached > 0 ? "red" : "amber"}
         />
-        <StatTile label="Complete" value={summary.complete} hint="Closed with attribution" tone="green" />
+        <StatTile
+          label="Complete"
+          value={summary.complete}
+          hint="Closed with attribution"
+          tone="green"
+        />
         <StatTile
           label="Compliance"
           value={`${summary.complianceRate}%`}
