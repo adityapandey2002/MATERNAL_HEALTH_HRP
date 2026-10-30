@@ -1,11 +1,11 @@
 import type { HrpFollowUpStatus, HrpFollowUpTrack } from "./types.js";
 
 /**
- * Copy for the three-track HRP follow-up engine.
+ * Copy for the 15-day HRP follow-up engine.
  *
- * Field panels, the block helpdesk and the dashboard all render the same
- * tracks and statuses, so the labels live here instead of being repeated (and
- * drifting) in each page.
+ * Every woman marked HRP repeats a 15-day cycle. The first cycle of a referred
+ * woman is owned by the Block HRP Helpdesk; every later cycle is worked by the
+ * field team and visible to the block at the same time.
  */
 export interface HrpTrackOption {
   value: HrpFollowUpTrack;
@@ -16,22 +16,18 @@ export interface HrpTrackOption {
 
 export const HRP_FOLLOW_UP_TRACKS: HrpTrackOption[] = [
   {
-    value: "IMMEDIATE_7_DAYS",
-    label: "Immediate 7-day window",
-    shortLabel: "7-day",
-    description: "Urgent doctor / MO clinical evaluation at CHC for critical warning signs",
+    value: "BLOCK_15_DAY",
+    label: "Block HRP Helpdesk · 15-day window",
+    shortLabel: "Block review",
+    description:
+      "Referred HRP case. The block helpdesk completes the first check-up before the 15-day window closes.",
   },
   {
-    value: "PMSMA_SESSION",
-    label: "Next PMSMA session at PHC",
-    shortLabel: "PMSMA",
-    description: "Specialist check-up on the 9th, 15th or 21st — whichever comes first",
-  },
-  {
-    value: "VHSND_COMMUNITY",
-    label: "Community VHSND session",
-    shortLabel: "VHSND",
-    description: "Village Health, Sanitation and Nutrition Day session by the local ANM",
+    value: "FIELD_15_DAY",
+    label: "Field follow-up · 15-day window",
+    shortLabel: "Field 15-day",
+    description:
+      "ANM / CHO contact every 15 days. The block helpdesk sees and can close the same row.",
   },
 ];
 
@@ -58,7 +54,7 @@ export function getHrpTrack(
 }
 
 export function getHrpTrackLabel(value: HrpFollowUpTrack | null | undefined): string {
-  return getHrpTrack(value)?.label ?? "No track";
+  return getHrpTrack(value)?.label ?? "No follow-up stage";
 }
 
 export function getHrpTrackShortLabel(value: HrpFollowUpTrack | null | undefined): string {
@@ -79,17 +75,20 @@ export function getHrpStatusBadge(value: HrpFollowUpStatus | null | undefined): 
   return getHrpStatus(value)?.badge ?? "badge-amber";
 }
 
+/** True when the row is the block-owned first cycle of a referred HRP. */
+export function isBlockStage(track: HrpFollowUpTrack | null | undefined): boolean {
+  return track === "BLOCK_15_DAY";
+}
+
 /**
- * Picks the track a woman enters when no follow-up record exists yet.
+ * Picks the stage a woman enters when no follow-up record exists yet.
  *
- * Referred and red-flagged pregnancies need an MO review inside seven days;
- * everything else joins the next PMSMA or VHSND session.
+ * A referred HRP starts with the block helpdesk; everyone else starts in the
+ * field 15-day cycle.
  */
 export function inferHrpTrack(patient: {
   referred?: boolean | null;
   riskLevel?: "GREEN" | "AMBER" | "RED" | null;
 }): HrpFollowUpTrack {
-  if (patient.referred || patient.riskLevel === "RED") return "IMMEDIATE_7_DAYS";
-  if (patient.riskLevel === "AMBER") return "PMSMA_SESSION";
-  return "VHSND_COMMUNITY";
+  return patient.referred ? "BLOCK_15_DAY" : "FIELD_15_DAY";
 }

@@ -70,36 +70,17 @@ describe("getFollowUpPlan", () => {
 describe("scheduleFollowUp", () => {
   const baseDate = new Date("2026-10-01T00:00:00.000Z");
 
-  it("assigns IMMEDIATE_7_DAYS for referred patients", () => {
-    const result = scheduleFollowUp({ village: "Test Village", referred: true }, baseDate);
-    expect(result.track).toBe("IMMEDIATE_7_DAYS");
-    expect(result.scheduledDate).toEqual(result.immediateDeadline);
+  it("opens the block 15-day window for referred patients", () => {
+    const result = scheduleFollowUp({ referred: true }, baseDate);
+    expect(result.track).toBe("BLOCK_15_DAY");
+    expect(result.windowDays).toBe(15);
+    expect(result.scheduledDate).toEqual(new Date("2026-10-16T00:00:00.000Z"));
   });
 
-  it("assigns IMMEDIATE_7_DAYS for RED risk level patients", () => {
-    const result = scheduleFollowUp(
-      { village: "Test Village", referred: false, riskLevel: "RED" },
-      baseDate
-    );
-    expect(result.track).toBe("IMMEDIATE_7_DAYS");
-    expect(result.scheduledDate).toEqual(result.immediateDeadline);
-  });
-
-  it("assigns PMSMA_SESSION for AMBER risk level patients", () => {
-    const result = scheduleFollowUp(
-      { village: "Test Village", referred: false, riskLevel: "AMBER" },
-      baseDate
-    );
-    expect(result.track).toBe("PMSMA_SESSION");
-    expect(result.scheduledDate).toEqual(result.pmsmaDate);
-  });
-
-  it("assigns VHSND_COMMUNITY for GREEN risk level patients", () => {
-    const result = scheduleFollowUp(
-      { village: "Test Village", referred: false, riskLevel: "GREEN" },
-      baseDate
-    );
-    expect(result.track).toBe("VHSND_COMMUNITY");
-    expect(result.scheduledDate).toEqual(result.vhsndDate);
+  it("opens the field 15-day window for non-referred patients", () => {
+    const result = scheduleFollowUp({ referred: false }, baseDate);
+    expect(result.track).toBe("FIELD_15_DAY");
+    expect(result.windowDays).toBe(15);
+    expect(result.scheduledDate).toEqual(new Date("2026-10-16T00:00:00.000Z"));
   });
 });

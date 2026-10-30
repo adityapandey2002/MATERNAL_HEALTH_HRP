@@ -11,7 +11,14 @@ export const FacilityLevel = z.enum([
   "DISTRICT",
   "STATE",
 ]);
-export const UserRole = z.enum(["ANM", "CHO", "BHM", "DHS", "HELPDESK"]);
+export const UserRole = z.enum([
+  "ANM",
+  "CHO",
+  "HRP_HELPDESK_BLOCK",
+  "BHM",
+  "HRP_HELPDESK_DISTRICT",
+  "DHS",
+]);
 
 export const NodalLevel = z.enum(["BLOCK", "DISTRICT"]);
 export type NodalLevel = "BLOCK" | "DISTRICT";
@@ -47,8 +54,18 @@ export const RiskLevel = z.enum(["GREEN", "AMBER", "RED"]);
 export const HrpFollowUpStatus = z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]);
 export type HrpFollowUpStatus = "COMPLETE" | "PENDING" | "NOT_REACHABLE";
 
-export const HrpFollowUpTrack = z.enum(["IMMEDIATE_7_DAYS", "PMSMA_SESSION", "VHSND_COMMUNITY"]);
-export type HrpFollowUpTrack = "IMMEDIATE_7_DAYS" | "PMSMA_SESSION" | "VHSND_COMMUNITY";
+/**
+ * Stage of the repeating 15-day follow-up cycle.
+ *
+ * BLOCK_15_DAY — first contact for a referred HRP, owned by the Block HRP
+ * Helpdesk. FIELD_15_DAY — every later cycle, worked by the ANM/CHO and
+ * visible to the block helpdesk at the same time.
+ */
+export const HrpFollowUpTrack = z.enum(["BLOCK_15_DAY", "FIELD_15_DAY"]);
+export type HrpFollowUpTrack = "BLOCK_15_DAY" | "FIELD_15_DAY";
+
+/** Length of one HRP follow-up cycle, in days. */
+export const HRP_FOLLOW_UP_WINDOW_DAYS = 15;
 
 /**
  * Date field that accepts a Date (in-process) or an ISO date string (JSON
@@ -127,7 +144,7 @@ export const PatientSchema = z.object({
   hrpComplication: HrpComplication.nullable().optional(), // HRP complication dropdown (8 values)
   ashaName: z.string().nullable().optional(),
   ashaPhone: z.string().nullable().optional(),
-  referred: z.boolean().default(false), // referred to a higher facility at registration
+  referred: z.boolean().default(false), // first cycle is block-owned when referred
   isHrp: z.boolean().default(false), // marked as high-risk pregnancy
   // Automated follow-up scheduling (no manual toggle — server-calculated)
   followUpTrack: HrpFollowUpTrack.nullable().optional(),

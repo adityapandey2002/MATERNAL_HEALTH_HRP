@@ -183,7 +183,7 @@ export const CreateFollowUpSchema = z.object({
   assignedToUserId: z.string().uuid(),
   assignedByUserId: z.string().uuid(),
   level: z.enum(["BLOCK_NODAL", "CHO", "ANM"]),
-  track: z.enum(["IMMEDIATE_7_DAYS", "PMSMA_SESSION", "VHSND_COMMUNITY"]),
+  track: z.enum(["BLOCK_15_DAY", "FIELD_15_DAY"]),
   scheduledDate: z.string().datetime(),
   notes: z.string().nullable().optional(),
 });
@@ -195,7 +195,7 @@ export const UpdateFollowUpSchema = z.object({
 
 export const FollowUpFilterSchema = z.object({
   status: z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]).optional(),
-  track: z.enum(["IMMEDIATE_7_DAYS", "PMSMA_SESSION", "VHSND_COMMUNITY"]).optional(),
+  track: z.enum(["BLOCK_15_DAY", "FIELD_15_DAY"]).optional(),
   assignedToUserId: z.string().uuid().optional(),
   patientId: z.string().uuid().optional(),
   facilityId: z.string().uuid().optional(),
@@ -251,6 +251,8 @@ export interface FollowUpListItem extends FollowUp {
   patientRiskLevel: RiskLevel;
   hrpComplication: HrpComplication | null;
   village: string | null;
+  /** Block the patient's facility belongs to, for district roll-ups. */
+  blockName: string | null;
   assignedToName: string | null;
   assignedToRole: string | null;
   completedByName: string | null;
@@ -260,7 +262,6 @@ export interface FollowUpListItem extends FollowUp {
 export const DispatchFollowUpSchema = z.object({
   patientIds: z.array(z.string().uuid()).min(1).max(100),
   assignedToUserId: z.string().uuid(),
-  track: z.enum(["IMMEDIATE_7_DAYS", "PMSMA_SESSION", "VHSND_COMMUNITY"]),
   scheduledDate: z.string().datetime().optional(),
   notes: z.string().nullable().optional(),
 });
@@ -268,18 +269,49 @@ export const DispatchFollowUpSchema = z.object({
 export type DispatchFollowUp = z.infer<typeof DispatchFollowUpSchema>;
 
 /* ============================================================================
- * Staff provisioning schemas (Block Nodal creates HRP Helpdesk accounts)
+ * Staff provisioning — delegated account creation down the hierarchy
  * ============================================================================ */
+
+/** Roles a BHM or DHS may provision, per the final hierarchy. */
+export const ProvisionableRole = z.enum([
+  "ANM",
+  "CHO",
+  "HRP_HELPDESK_BLOCK",
+  "BHM",
+  "HRP_HELPDESK_DISTRICT",
+]);
 
 export const CreateStaffSchema = z.object({
   name: z.string().min(2).max(120),
   email: z.string().email().max(120),
   phone: z.string().regex(/^\d{10}$/),
   password: z.string().min(8).max(72),
-  role: z.literal("HELPDESK").default("HELPDESK"),
+  role: ProvisionableRole,
+  facilityId: z.string().uuid(),
 });
 
 export type CreateStaff = z.infer<typeof CreateStaffSchema>;
+
+export const UpdateStaffSchema = z
+  .object({
+    name: z.string().min(2).max(120).optional(),
+    email: z.string().email().max(120).optional(),
+    phone: z.string().regex(/^\d{10}$/).optional(),
+    facilityId: z.string().uuid().optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
+    message: "Provide at least one field to update",
+  });
+
+export type UpdateStaff = z.infer<typeof UpdateStaffSchema>;
+
+export const STAFF_ROLE_LABEL: Record<z.infer<typeof ProvisionableRole>, string> = {
+  ANM: "ANM · village",
+  CHO: "CHO · facility",
+  HRP_HELPDESK_BLOCK: "HRP Helpdesk · block",
+  BHM: "BHM · block nodal officer",
+  HRP_HELPDESK_DISTRICT: "HRP Helpdesk · district",
+};
 
 export const StaffMemberSchema = z.object({
   id: z.string().uuid(),
@@ -330,7 +362,12 @@ export const apiSchemas = {
     activate: FieldLevelActivateSchema,
     deactivate: FieldLevelDeactivateSchema,
   },
-  auth: { login: LoginSchema, refresh: RefreshTokenSchema, staff: CreateStaffSchema },
+  auth: {
+    login: LoginSchema,
+    refresh: RefreshTokenSchema,
+    staff: CreateStaffSchema,
+    staffUpdate: UpdateStaffSchema,
+  },
   pagination: PaginationSchema,
   supervision: { filter: SupervisionFilterSchema },
   sync: { payload: SyncPayloadSchema, response: SyncResponseSchema, pull: SyncPullQuerySchema },
