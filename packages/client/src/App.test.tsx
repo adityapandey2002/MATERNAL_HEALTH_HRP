@@ -58,9 +58,7 @@ describe("App", () => {
   it("renders the field front page (/) with Add HRP case hero for ANM", async () => {
     render(wrapper({ children: <App /> }));
 
-    expect(
-      await screen.findByRole("heading", { name: "Register a high-risk pregnancy" })
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Field work" })).toBeInTheDocument();
     const addLinks = screen.getAllByRole("link", { name: /Add HRP case/i });
     expect(addLinks[0]).toHaveAttribute("href", "/patients/new");
   });

@@ -58,10 +58,10 @@ export default function FieldHome() {
     <div className="flex min-h-[calc(100vh-11rem)] flex-col gap-4">
       <header className="min-w-0">
         <p className="text-2xs font-semibold uppercase tracking-wider text-primary">
-          {format(new Date(), "EEEE d MMMM")} · Field work
+          {format(new Date(), "EEEE d MMMM")}
         </p>
         <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
-          Register a high-risk pregnancy
+          Field work
         </h1>
       </header>
 
@@ -78,10 +78,6 @@ export default function FieldHome() {
         </span>
         <span className="text-2xl font-semibold tracking-tight text-primary-dark sm:text-3xl">
           Add HRP case
-        </span>
-        <span className="max-w-sm text-sm leading-relaxed text-ink-muted">
-          Seven fields — name, mobile, age, village, LMP, complication and referral. Takes under a
-          minute.
         </span>
         <span className="btn btn-primary mt-2">
           <PlusIcon className="h-4 w-4" />

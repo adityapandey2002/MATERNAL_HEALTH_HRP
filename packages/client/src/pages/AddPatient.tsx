@@ -150,7 +150,6 @@ export default function AddPatientPage() {
       <PageHeader
         eyebrow="HRP intake"
         title={title}
-        description="Seven fields. The three-track follow-up schedule is calculated automatically."
         actions={
           <Link to="/" className="btn btn-secondary">
             <ArrowLeftIcon className="h-4 w-4" />
@@ -176,7 +175,6 @@ export default function AddPatientPage() {
           <Panel>
             <PanelHeader
               title="Woman and household"
-              description="As written on the MCP card / Aadhaar"
               action={<UserPlusIcon className="h-4 w-4 text-ink-subtle" />}
             />
             <PanelBody className="grid gap-4 sm:grid-cols-2">
@@ -186,7 +184,6 @@ export default function AddPatientPage() {
                   id="patient-name"
                   required
                   error={errors.name}
-                  hint="Match the name on the MCP card or Aadhaar"
                 >
                   <input
                     type="text"
@@ -262,7 +259,6 @@ export default function AddPatientPage() {
                 value={form.villageId}
                 onChange={(e) => update("villageId", e.target.value)}
                 error={errors.villageId}
-                hint="Mapped to the local Health & Wellness Sub-Center"
               />
             </PanelBody>
           </Panel>
@@ -270,7 +266,6 @@ export default function AddPatientPage() {
           <Panel>
             <PanelHeader
               title="Pregnancy"
-              description="LMP drives the EDD badge and the follow-up schedule"
               action={<CalendarIcon className="h-4 w-4 text-ink-subtle" />}
             />
             <PanelBody className="space-y-5">
@@ -280,7 +275,6 @@ export default function AddPatientPage() {
                   id="patient-lmp"
                   required
                   error={errors.lmp}
-                  hint="The EDD and gestational age are calculated from this date"
                 >
                   <input
                     type="date"
