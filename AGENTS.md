@@ -1,4 +1,4 @@
-# Agent Instructions — HRP Tracking Platform
+# Agent Instructions — Matru Suraksha
 
 ## Read First
 
@@ -6,11 +6,13 @@
 
 ## Project Context
 
-- **Product:** Multi-tier High-Risk Pregnancy tracking for India's public health system
+- **Product:** Matru Suraksha — multi-tier high-risk pregnancy care for India's public health system
+- **Roles:** `ANM → CHO → HRP_HELPDESK_BLOCK → BHM → HRP_HELPDESK_DISTRICT → DHS`
+- **Follow-up:** repeating 15-day cycle; a referred HRP starts with the block helpdesk
 - **MVP:** Offline-first PWA (ANM mobile) + CHO desktop dashboard + supervision layer
 - **Stack:** React + Vite + TypeScript, RxDB/WatermelonDB, Fastify/Node, PostgreSQL
 - **Timeline:** 6-8 months, 5-8 devs, 1 district pilot
-- **Key doc:** `docs/ideas/hrp-tracking-mvp.md`
+- **Key docs:** `docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md`, `docs/ideas/hrp-tracking-mvp.md`
 
 ## Quality Gates
 

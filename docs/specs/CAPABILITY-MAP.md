@@ -1,23 +1,38 @@
-# Capability Map: HRP Araria Production Launch
+# Capability Map: Matru Suraksha Araria Production Launch
 
 Status: Approved
 Owner: Architect / Tech Lead
-Last reviewed: 2026-10-23
+Last reviewed: 2026-10-30
 
 ## Product decision
 
-Four roles only: **ANM -> CHO -> BHM -> DHS**.
-- ANM: VILLAGE/HSC.
-- CHO: HWC.
+Six roles in the final hierarchy:
+
+```
+ANM -> CHO -> HRP_HELPDESK_BLOCK -> BHM -> HRP_HELPDESK_DISTRICT -> DHS
+```
+
+- ANM: VILLAGE/HSC/HWC.
+- CHO: HWC/PHC/CHC.
+- HRP_HELPDESK_BLOCK: BLOCK/CHC.
 - BHM: BLOCK/CHC.
+- HRP_HELPDESK_DISTRICT: DISTRICT.
 - DHS: DISTRICT.
 - ASHA remains patient contact data only; no login.
-- MO, STATE_ADMIN, and DISTRICT_ADMIN are removed from the pilot model.
-- BHM and DHS can read full patient records within scope, read-only; every view is audited.
-- DHS administers users, facilities, and responsibilities only inside the district.
-- Clinical referrals are acknowledged by CHO at HWC, BHM at CHC/block hospital, DHS at district hospital, or any user granted `REFERRAL_NODAL` through the admin panel.
-- Block nodal sees all block referrals; district nodal sees all district referrals.
-- Dashboards provide aggregate counts plus drill-down to facility, ANM, and patient.
+- MO and STATE_ADMIN/DISTRICT_ADMIN are removed from the pilot model.
+- BHM and DHS can read full patient records within scope; every view is audited.
+- Account creation is delegated: DHS creates BHM and district helpdesk accounts;
+  BHM creates ANM, CHO and block helpdesk accounts.
+- HRP follow-up is a repeating 15-day cycle. A referred HRP starts with the
+  block helpdesk; completion starts the next field cycle for ANM/CHO with block
+  visibility. An overdue cycle escalates to DHS.
+- The standalone referral workflow is superseded by the block-owned first
+  follow-up. Clinical referral notes stay on visits.
+- Dashboards provide aggregate counts plus drill-down to facility, block, and
+  patient.
+
+See `SPEC-matru-suraksha-roles-and-follow-up.md` for the binding rules; it
+supersedes the role, referral and dashboard rows below where they differ.
 
 ## Modules
 

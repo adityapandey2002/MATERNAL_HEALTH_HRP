@@ -1,6 +1,6 @@
-# HRP Tracking Platform
+# Matru Suraksha
 
-Multi-tier High-Risk Pregnancy tracking for India's public health system.
+Multi-tier high-risk pregnancy care for India's public health system.
 
 ## Stack
 
@@ -67,12 +67,25 @@ npm run test:smoke:proxy    # same, through the Vite proxy
 
 ## Test Users (after seed)
 
-| Role | Employee ID | Password |
-|------|-------------|----------|
+| Role | Login | Password |
+|------|-------|----------|
 | ANM | ANM001 | password123 |
 | CHO | CHO001 | password123 |
+| HRP Helpdesk (block) | helpdesk.daskroi@araria.gov.in | password123 |
 | BHM | MO001 | password123 |
+| HRP Helpdesk (district) | helpdesk.district@araria.gov.in | password123 |
 | DHS | ADM001 | password123 |
+
+## Role hierarchy
+
+```
+ANM -> CHO -> HRP_HELPDESK_BLOCK -> BHM -> HRP_HELPDESK_DISTRICT -> DHS
+```
+
+Account provisioning follows the same order: DHS creates BHM and district
+helpdesk accounts; BHM creates ANM, CHO and block helpdesk accounts. See
+[`docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md`](docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md)
+for the full matrix and the 15-day follow-up rule.
 
 ## Quality Gates
 
@@ -120,6 +133,7 @@ hrp/
 └── docs/
     ├── runbooks/deployment.md     # build, deploy, rollback
     ├── runbooks/free-demo-deploy.md # Render + Neon, synthetic data only
+    ├── specs/SPEC-matru-suraksha-roles-and-follow-up.md
     └── ideas/hrp-tracking-mvp.md
 ```
 
@@ -142,8 +156,11 @@ hrp/
 - [x] Patient registration with 8 danger signs
 - [x] ANC visit logging with vitals
 - [x] Auto HRP risk scoring (configurable rules)
-- [x] CHO dashboard with triage line list
-- [x] Referral workflow (ANM → CHO → BHM → DHS)
+- [x] CHO field dashboard with triage line list
+- [x] HRP 15-day follow-up cycle with block-owned first contact
+- [x] Automatic DHS escalation when a 15-day window closes incomplete
+- [x] Block, district and field dashboards
+- [x] Delegated account provisioning (DHS -> BHM -> ANM/CHO)
 - [x] Offline sync with conflict handling
 - [x] Supervision alerts (ANM offline, overdue visits)
 - [x] JWT auth with refresh tokens

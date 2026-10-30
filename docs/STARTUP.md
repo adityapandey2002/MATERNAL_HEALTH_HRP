@@ -1,4 +1,4 @@
-# HRP Tracking Platform — Startup & Operations Guide
+# Matru Suraksha — Startup & Operations Guide
 
 Run all commands from the repo root: `C:\Users\ADITYA\Downloads\HRP`
 
@@ -70,17 +70,21 @@ npm run dev:client   # Vite PWA      -> http://localhost:5173
 
 **Demo users** (after `db:seed`), all password `password123`:
 
-| Role | Employee ID | Name |
-|------|-------------|------|
+| Role | Login | Name |
+|------|-------|------|
 | ANM | ANM001 | Asha Ben |
 | CHO | CHO001 | Dr. Priya Patel |
-| MO | MO001 | — |
-| Admin | ADM001 | — |
+| HRP Helpdesk (block) | helpdesk.daskroi@araria.gov.in | Amit Kumar |
+| BHM | MO001 | Dr. Rajesh Kumar |
+| HRP Helpdesk (district) | helpdesk.district@araria.gov.in | District helpdesk |
+| DHS | ADM001 | District Admin |
 
 ### What lands on the front page
-- `/` → **Dashboard** (big circular `+` **Add HRP woman** button → add form at `/patients/new`, saving returns to Dashboard)
-- Patient list is now **inside Dashboard** (no separate `/patients` page)
-- `/follow-ups` → Follow Ups, ordered by need (overdue → due → upcoming)
+- ANM/CHO `/` → **Add HRP case** action, then `/dashboard` for field triage and `/follow-ups` for the 15-day cycle.
+- Block roles `/` → **Block dashboard** with dispatch box.
+- District roles `/` → **District dashboard** with escalated cases.
+- `/patients/new` → HRP intake form.
+- `/follow-ups` → field 15-day panel or the shared block/district line list.
 
 ## 5. Verify the stack
 

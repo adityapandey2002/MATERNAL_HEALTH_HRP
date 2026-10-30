@@ -1,5 +1,5 @@
 # osv-scanner.toml
-# Dependency vulnerability overrides and mitigations for HRP Tracking Platform
+# Dependency vulnerability overrides and mitigations for Matru Suraksha
 # Documented justifications for accepted risks as required by CONSTRAINTS.md
 
 # Development and testing tooling dependencies (not packaged into production artifacts)
