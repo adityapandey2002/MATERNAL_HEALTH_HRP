@@ -39,7 +39,7 @@ const basePatient: Patient = {
   referred: false,
   isHrp: true,
   followUpStatus: "PENDING",
-  followUpTrack: "IMMEDIATE_7_DAYS",
+  followUpTrack: "FIELD_15_DAY",
   followUpScheduledDate: new Date(),
   lmp: new Date("2026-08-01"),
   edd: new Date("2027-05-08"),
@@ -80,7 +80,7 @@ describe("FollowUpsPage", () => {
     });
   });
 
-  it("renders the assigned follow-up contacts with three tracks", async () => {
+  it("renders the assigned follow-up contacts for the 15-day stage", async () => {
     vi.mocked(api.hrp.followUps.list).mockResolvedValue({
       data: [
         {
@@ -89,7 +89,7 @@ describe("FollowUpsPage", () => {
           assignedToUserId: "33333333-3333-4333-8333-333333333333",
           assignedByUserId: "admin",
           level: "ANM",
-          track: "IMMEDIATE_7_DAYS",
+          track: "FIELD_15_DAY",
           scheduledDate: new Date().toISOString(),
           status: "PENDING",
           completedAt: null,
@@ -102,6 +102,7 @@ describe("FollowUpsPage", () => {
           patientRiskLevel: "RED",
           hrpComplication: "PIH",
           village: "Shivrajpur",
+          blockName: "Darbhanga Sadar",
           assignedToName: "Asha Ben",
           assignedToRole: "ANM",
           completedByName: null,
@@ -129,6 +130,62 @@ describe("FollowUpsPage", () => {
       screen.getByRole("button", { name: /Mark not reachable for Urgent Woman/i })
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Call mother/i })).toBeInTheDocument();
+  });
+
+  it("shows a referred woman's first cycle as awaiting block review", async () => {
+    vi.mocked(api.hrp.followUps.list).mockResolvedValue({
+      data: [
+        {
+          id: "fu-block",
+          patientId: basePatient.id,
+          assignedToUserId: "44444444-4444-4444-8444-444444444444",
+          assignedByUserId: "admin",
+          level: "BLOCK_NODAL",
+          track: "BLOCK_15_DAY",
+          scheduledDate: new Date().toISOString(),
+          status: "PENDING",
+          completedAt: null,
+          completedByUserId: null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          patientName: "Referred Woman",
+          patientAge: 28,
+          patientPhone: "9876543211",
+          patientRiskLevel: "RED",
+          hrpComplication: "ANEMIA",
+          village: "Shivrajpur",
+          blockName: "Darbhanga Sadar",
+          assignedToName: "Amit Kumar",
+          assignedToRole: "HRP_HELPDESK_BLOCK",
+          completedByName: null,
+          completedByRole: null,
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 100,
+    });
+    vi.mocked(api.hrp.patients.list).mockResolvedValue({
+      data: [
+        {
+          ...basePatient,
+          name: "Referred Woman",
+          referred: true,
+          followUpTrack: "BLOCK_15_DAY",
+        },
+      ],
+      total: 1,
+      page: 1,
+      limit: 100,
+    });
+
+    render(<FollowUpsPage />, { wrapper: createWrapper() });
+
+    expect(await screen.findByText("Referred Woman")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Awaiting block review/i })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Mark complete for Referred Woman/i })
+    ).not.toBeInTheDocument();
   });
 
   it("shows the empty state when no follow-ups are assigned", async () => {

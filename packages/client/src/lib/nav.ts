@@ -2,7 +2,6 @@ import type { UserRole } from "@hrp/shared";
 import type { ComponentType } from "react";
 import {
   ActivityIcon,
-  ArrowRightIcon,
   BellIcon,
   CalendarIcon,
   CogIcon,
@@ -30,6 +29,21 @@ export function isFieldRole(role: UserRole): boolean {
 
 /** Block and district staff work the oversight app. */
 export function isNodalRole(role: UserRole): boolean {
+  return isBlockRole(role) || isDistrictRole(role);
+}
+
+/** Block HRP Helpdesk and the Block Nodal Officer (BHM). */
+export function isBlockRole(role: UserRole): boolean {
+  return role === "HRP_HELPDESK_BLOCK" || role === "BHM";
+}
+
+/** District HRP Helpdesk and the District Officer (DHS). */
+export function isDistrictRole(role: UserRole): boolean {
+  return role === "HRP_HELPDESK_DISTRICT" || role === "DHS";
+}
+
+/** Roles allowed to provision accounts below them in the hierarchy. */
+export function canProvisionStaff(role: UserRole): boolean {
   return role === "BHM" || role === "DHS";
 }
 
@@ -73,6 +87,14 @@ const blockDashboard: NavItem = {
   section: "Oversight",
 };
 
+const districtDashboard: NavItem = {
+  path: "/",
+  label: "District dashboard",
+  shortLabel: "Dashboard",
+  icon: ActivityIcon,
+  section: "Oversight",
+};
+
 const blockFollowUps: NavItem = {
   path: "/follow-ups",
   label: "Follow-up to be done",
@@ -89,20 +111,18 @@ const hrpIntake: NavItem = {
   section: "Oversight",
 };
 
+const allPeople: NavItem = {
+  ...patients,
+  label: "All people",
+  section: "Oversight",
+};
+
 const team: NavItem = {
   path: "/team",
   label: "Team & access",
   shortLabel: "Team",
   icon: UsersIcon,
   section: "Account",
-};
-
-const referrals: NavItem = {
-  path: "/referrals",
-  label: "Referrals",
-  shortLabel: "Referrals",
-  icon: ArrowRightIcon,
-  section: "Oversight",
 };
 
 const supervision: NavItem = {
@@ -124,38 +144,22 @@ const settings: NavItem = {
 const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   // Field app, in the order a field worker uses it: register first, then the
   // triage dashboard, then the assigned follow-up list.
-  ANM: [addCase, dashboard, fieldFollowUps, patients, referrals, settings],
-  CHO: [addCase, dashboard, fieldFollowUps, patients, referrals, supervision, settings],
+  ANM: [addCase, dashboard, fieldFollowUps, patients, settings],
+  CHO: [addCase, dashboard, fieldFollowUps, patients, supervision, settings],
 
-  // Oversight app: block-wide surveillance, the shared line list, helpdesk
-  // intake, and the screen that provisions helpdesk credentials.
-  BHM: [
-    blockDashboard,
-    blockFollowUps,
-    hrpIntake,
-    team,
-    { ...patients, section: "Oversight", label: "All people" },
-    referrals,
-    supervision,
-    settings,
-  ],
-  DHS: [
-    blockDashboard,
-    blockFollowUps,
-    hrpIntake,
-    team,
-    { ...patients, section: "Oversight", label: "All people" },
-    referrals,
-    supervision,
-    settings,
-  ],
-  HELPDESK: [
-    blockDashboard,
-    blockFollowUps,
-    hrpIntake,
-    { ...patients, section: "Oversight", label: "All people" },
-    settings,
-  ],
+  // Block helpdesk: block-wide surveillance, the shared line list, intake and
+  // the read-only people register. Team provisioning belongs to the BHM.
+  HRP_HELPDESK_BLOCK: [blockDashboard, blockFollowUps, hrpIntake, allPeople, settings],
+
+  // Block Nodal Officer: the helpdesk screens plus account provisioning.
+  BHM: [blockDashboard, blockFollowUps, hrpIntake, team, allPeople, supervision, settings],
+
+  // District helpdesk: district roll-up, the shared line list, and the people
+  // register. No intake — district staff do not register women.
+  HRP_HELPDESK_DISTRICT: [districtDashboard, blockFollowUps, allPeople, settings],
+
+  // District officer: the district dashboard plus account provisioning.
+  DHS: [districtDashboard, blockFollowUps, team, allPeople, supervision, settings],
 };
 
 export function navFor(role: UserRole): NavItem[] {
@@ -193,7 +197,7 @@ export function pageTitleFor(pathname: string, role: UserRole): string {
   if (/^\/patients\/[^/]+$/.test(pathname)) return "Patient record";
 
   const match = items.find((item) => isNavActive(item, pathname));
-  return match?.label ?? "HRP Tracking";
+  return match?.label ?? "Matru Suraksha";
 }
 
 /** Initials for the avatar chip. Falls back to a neutral glyph. */

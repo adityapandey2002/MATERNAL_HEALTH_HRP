@@ -7,7 +7,7 @@ const OFFLINE_CAPABILITIES = [
   "Register new patients",
   "Record ANC visits and vitals",
   "Flag danger signs",
-  "Create referrals",
+  "Track 15-day HRP follow-ups",
   "View patient history",
 ];
 
@@ -35,7 +35,7 @@ export default function OfflinePage() {
         <div className="mb-6 flex items-center justify-center gap-3">
           <BrandMark size={40} variant="full" title={null} />
           <div>
-            <p className="text-sm font-semibold leading-tight text-ink">HRP Tracking</p>
+            <p className="text-sm font-semibold leading-tight text-ink">Matru Suraksha</p>
             <p className="text-2xs uppercase tracking-wider text-ink-subtle">Araria district</p>
           </div>
         </div>
@@ -51,8 +51,8 @@ export default function OfflinePage() {
           <div className="px-5 py-6 sm:px-6">
             <h1 className="text-xl font-semibold tracking-tight text-ink">You're Offline</h1>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
-              High-Risk Pregnancy Tracking of Araria works offline. Your data is saved locally and
-              will sync automatically when you're back online.
+              Matru Suraksha works offline. Your data is saved locally and will sync automatically
+              when you're back online.
             </p>
 
             <div className="mt-5 rounded border border-line-soft bg-canvas px-4 py-4">

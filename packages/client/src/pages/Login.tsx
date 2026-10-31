@@ -9,7 +9,7 @@ import { type ApiError, api } from "../lib/api";
 const CAPABILITIES = [
   "Register high-risk pregnancies at the village level",
   "Record ANC vitals and danger signs offline",
-  "Refer to the right facility with the right urgency",
+  "Follow every HRP on a repeating 15-day cycle",
 ];
 
 export default function LoginPage() {
@@ -50,7 +50,7 @@ export default function LoginPage() {
           <div className="flex items-center gap-3">
             <BrandMark size={44} variant="full" title={null} />
             <div>
-              <p className="text-sm font-semibold leading-tight">HRP Tracking</p>
+              <p className="text-sm font-semibold leading-tight">Matru Suraksha</p>
               <p className="text-2xs uppercase tracking-wider text-primary-ring">Araria district</p>
             </div>
           </div>
@@ -92,7 +92,7 @@ export default function LoginPage() {
           <div className="mb-6 flex items-center gap-3 lg:hidden">
             <BrandMark size={40} variant="full" title={null} />
             <div>
-              <p className="text-sm font-semibold leading-tight text-ink">HRP Tracking</p>
+              <p className="text-sm font-semibold leading-tight text-ink">Matru Suraksha</p>
               <p className="text-2xs uppercase tracking-wider text-ink-subtle">Araria district</p>
             </div>
           </div>

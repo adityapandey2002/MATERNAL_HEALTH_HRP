@@ -1,7 +1,7 @@
 import type { UserRole } from "@hrp/shared";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
-import { isFieldRole, isNodalRole } from "./nav";
+import { isBlockRole, isDistrictRole, isFieldRole, isNodalRole } from "./nav";
 
 /**
  * Role of the signed-in user.
@@ -29,7 +29,7 @@ export function useUserRole(): UserRole {
  */
 export function useCanWriteClinical(): boolean {
   const role = useUserRole();
-  return role === "ANM" || role === "CHO" || role === "HELPDESK";
+  return role === "ANM" || role === "CHO" || role === "HRP_HELPDESK_BLOCK" || role === "BHM";
 }
 
 /** True when the current role uses the field (mobile-first) app. */
@@ -42,21 +42,33 @@ export function useIsNodalRole(): boolean {
   return isNodalRole(useUserRole());
 }
 
+/** True when the current role is scoped to a block (helpdesk or BHM). */
+export function useIsBlockRole(): boolean {
+  return isBlockRole(useUserRole());
+}
+
+/** True when the current role is scoped to the district (helpdesk or DHS). */
+export function useIsDistrictRole(): boolean {
+  return isDistrictRole(useUserRole());
+}
+
 export const ROLE_LABEL: Record<UserRole, string> = {
   ANM: "ANM · field worker",
   CHO: "CHO · facility",
-  BHM: "Block nodal officer",
-  DHS: "District officer",
-  HELPDESK: "HRP Helpdesk",
+  HRP_HELPDESK_BLOCK: "HRP Helpdesk · block",
+  BHM: "BHM · block nodal officer",
+  HRP_HELPDESK_DISTRICT: "HRP Helpdesk · district",
+  DHS: "DHS · district officer",
 };
 
 /** Short tier label used in attribution text, e.g. "Done by ANM". */
 export const ROLE_TIER_LABEL: Record<UserRole, string> = {
   ANM: "ANM",
   CHO: "CHO",
-  BHM: "Block Nodal",
-  DHS: "District Nodal",
-  HELPDESK: "HRP_Helpdesk",
+  HRP_HELPDESK_BLOCK: "HRP Helpdesk (block)",
+  BHM: "BHM",
+  HRP_HELPDESK_DISTRICT: "HRP Helpdesk (district)",
+  DHS: "DHS",
 };
 
 export function tierLabel(role: string | null | undefined): string {

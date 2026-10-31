@@ -142,7 +142,11 @@ export default function AddPatientPage() {
     });
   };
 
-  const isBlockRole = role === "HELPDESK" || role === "BHM" || role === "DHS";
+  const isBlockRole =
+    role === "HRP_HELPDESK_BLOCK" ||
+    role === "BHM" ||
+    role === "HRP_HELPDESK_DISTRICT" ||
+    role === "DHS";
   const title = isBlockRole ? "Add HRP case" : "Add case";
 
   return (
@@ -332,7 +336,7 @@ export default function AddPatientPage() {
                       <span className="block text-xs text-ink-subtle">
                         {isBlockRole
                           ? "Escalates to District Sadar Hospital for specialist care"
-                          : "Escalates to the Block Nodal HRP Helpdesk and the BHM panel"}
+                          : "The Block HRP Helpdesk owns the first 15-day check-up"}
                       </span>
                     </span>
                   </label>
@@ -407,8 +411,8 @@ export default function AddPatientPage() {
                     className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
                   />
                   {isBlockRole
-                    ? "Referred cases escalate to the District Sadar Hospital panel."
-                    : "Referred cases appear on the Block Nodal helpdesk and BHM panel."}
+                    ? "Referred cases are recorded against the district hospital panel."
+                    : "Referred cases start with the Block HRP Helpdesk's 15-day window."}
                 </li>
               </ul>
             </PanelBody>

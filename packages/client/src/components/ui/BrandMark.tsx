@@ -15,7 +15,7 @@ interface BrandMarkProps {
 }
 
 /**
- * High-Risk Pregnancy Tracking of Araria brand mark.
+ * Matru Suraksha brand mark.
  *
  * A heart outline carrying a monitoring pulse. The pulse is the dominant
  * stroke so the mark reads as "maternal vitals under watch" rather than as a
@@ -24,7 +24,7 @@ interface BrandMarkProps {
 export function BrandMark({
   size = 40,
   variant = "full",
-  title = "High-Risk Pregnancy Tracking of Araria",
+  title = "Matru Suraksha",
   className,
 }: BrandMarkProps) {
   // useId keeps the gradient unique per instance. Two copies of the mark can
@@ -93,7 +93,7 @@ export function BrandLockup({
     <div className={`flex items-center gap-2.5 ${className ?? ""}`}>
       <BrandMark size={size} variant={variant} title={null} />
       <div className="min-w-0">
-        <p className="truncate text-sm font-semibold leading-tight text-ink">HRP Tracking</p>
+        <p className="truncate text-sm font-semibold leading-tight text-ink">Matru Suraksha</p>
         <p className="truncate text-2xs leading-tight text-ink-subtle">{caption}</p>
       </div>
     </div>

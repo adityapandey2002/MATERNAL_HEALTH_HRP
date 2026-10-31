@@ -1,6 +1,5 @@
 import {
   HRP_FOLLOW_UP_STATUSES,
-  HRP_FOLLOW_UP_TRACKS,
   type HrpFollowUpStatus,
   type HrpFollowUpTrack,
   getHrpComplicationLabel,
@@ -18,8 +17,10 @@ import {
   attributionLabel,
   buildFollowUpLineList,
   formatShortDate,
+  isEscalated,
   summariseFollowUps,
 } from "../../lib/hrp";
+import { useIsDistrictRole } from "../../lib/session";
 import { EmptyState } from "../ui/EmptyState";
 import { SearchIcon } from "../ui/Icons";
 import { PageHeader } from "../ui/PageHeader";
@@ -28,7 +29,7 @@ import { SegmentedControl } from "../ui/SegmentedControl";
 import { StatTile } from "../ui/Stat";
 
 type StatusFilter = HrpFollowUpStatus | "ALL";
-type TrackFilter = HrpFollowUpTrack | "ALL";
+type StageFilter = HrpFollowUpTrack | "ALL";
 
 interface UpdateStatusVariables {
   followUpId: string;
@@ -38,15 +39,16 @@ interface UpdateStatusVariables {
 /**
  * Block and district shared line list.
  *
- * Every woman is one row, regardless of who owns the contact, so the block can
- * see the whole cohort in one place. The status dropdown writes straight to the
- * follow-up record, which stamps the acting user as the completer and leaves an
- * audit trail on the row.
+ * Every woman is one row, regardless of which stage of the 15-day cycle she is
+ * in, so the block can see the whole cohort in one place. The status dropdown
+ * writes straight to the follow-up record, which stamps the acting user as the
+ * completer and leaves an audit trail on the row.
  */
 export default function NodalFollowUpPanel() {
   const queryClient = useQueryClient();
+  const districtRole = useIsDistrictRole();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
-  const [trackFilter, setTrackFilter] = useState<TrackFilter>("ALL");
+  const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
   const [villageFilter, setVillageFilter] = useState("ALL");
   const [search, setSearch] = useState("");
 
@@ -68,6 +70,8 @@ export default function NodalFollowUpPanel() {
   const patients = patientsData?.data ?? [];
   const rows = buildFollowUpLineList(patients, records);
   const summary = summariseFollowUps(rows);
+  const fieldPending = summary.byStage.FIELD_15_DAY.pending;
+  const showBlockColumn = districtRole && rows.some((row) => row.blockName);
 
   const villages = useMemo(
     () =>
@@ -83,13 +87,14 @@ export default function NodalFollowUpPanel() {
 
   const visible = rows.filter((row) => {
     if (statusFilter !== "ALL" && row.status !== statusFilter) return false;
-    if (trackFilter !== "ALL" && row.track !== trackFilter) return false;
+    if (stageFilter !== "ALL" && row.track !== stageFilter) return false;
     if (villageFilter !== "ALL" && row.village !== villageFilter) return false;
     if (search.trim()) {
       const term = search.trim().toLowerCase();
       const matches =
         row.patientName.toLowerCase().includes(term) ||
         (row.village ?? "").toLowerCase().includes(term) ||
+        (row.blockName ?? "").toLowerCase().includes(term) ||
         (row.phone ?? "").includes(term);
       if (!matches) return false;
     }
@@ -117,7 +122,11 @@ export default function NodalFollowUpPanel() {
       <PageHeader
         eyebrow="Oversight"
         title="Follow-up to be done"
-        description="The shared block line list, with attribution for every contact"
+        description={
+          districtRole
+            ? "Every block's shared line list, with the stage and attribution for each contact"
+            : "The shared block line list, with the stage and attribution for each contact"
+        }
         actions={
           <Link to="/" className="btn btn-secondary">
             Back to dashboard
@@ -128,23 +137,22 @@ export default function NodalFollowUpPanel() {
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         <StatTile label="In the line list" value={summary.total} hint="Women with a contact" />
         <StatTile
-          label="Pending"
-          value={summary.pending}
+          label="Block review pending"
+          value={summary.awaitingBlockReview}
+          hint="Owned by the block helpdesk"
+          tone="amber"
+        />
+        <StatTile
+          label="Field pending"
+          value={fieldPending}
           hint={summary.breached > 0 ? `${summary.breached} past the window` : "Inside the window"}
           tone={summary.breached > 0 ? "red" : "amber"}
         />
         <StatTile
-          label="Complete"
-          value={summary.complete}
-          hint="Closed with attribution"
-          tone="green"
-        />
-        <StatTile
-          label="Compliance"
-          value={`${summary.complianceRate}%`}
-          hint="Complete ÷ line list"
-          tone="primary"
-          compact
+          label="Escalated"
+          value={summary.escalated}
+          hint="Open and past the due date"
+          tone={summary.escalated > 0 ? "red" : "green"}
         />
       </div>
 
@@ -185,28 +193,25 @@ export default function NodalFollowUpPanel() {
 
         <div className="flex flex-col gap-2 border-b border-line-soft bg-canvas px-4 py-3 sm:flex-row sm:items-center sm:px-5">
           <label className="relative min-w-0 flex-1">
-            <span className="sr-only">Search women by name, village or phone</span>
+            <span className="sr-only">Search women by name, village, block or phone</span>
             <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-subtle" />
             <input
               type="search"
               className="input min-h-control pl-9"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search name, village or phone"
+              placeholder="Search name, village, block or phone"
             />
           </label>
           <select
             className="input min-h-control w-full py-1.5 sm:w-auto"
-            aria-label="Filter by track"
-            value={trackFilter}
-            onChange={(event) => setTrackFilter(event.target.value as TrackFilter)}
+            aria-label="Filter by follow-up stage"
+            value={stageFilter}
+            onChange={(event) => setStageFilter(event.target.value as StageFilter)}
           >
-            <option value="ALL">All tracks</option>
-            {HRP_FOLLOW_UP_TRACKS.map((track) => (
-              <option key={track.value} value={track.value}>
-                {track.shortLabel} — {track.label}
-              </option>
-            ))}
+            <option value="ALL">All stages</option>
+            <option value="BLOCK_15_DAY">Block review</option>
+            <option value="FIELD_15_DAY">Field 15-day</option>
           </select>
           <select
             className="input min-h-control w-full py-1.5 sm:w-auto"
@@ -232,12 +237,12 @@ export default function NodalFollowUpPanel() {
         ) : isError ? (
           <EmptyState
             title="Line list could not load"
-            description="The block register is unavailable. It will reappear when the server responds."
+            description="The register is unavailable. It will reappear when the server responds."
           />
         ) : visible.length === 0 ? (
           <EmptyState
             title="No follow-ups match these filters"
-            description="Clear the status, track or village filter to see the rest of the block."
+            description="Clear the status, stage or village filter to see the rest of the cohort."
           />
         ) : (
           <>
@@ -254,14 +259,18 @@ export default function NodalFollowUpPanel() {
                       </Link>
                       <p className="tnum mt-0.5 text-2xs text-ink-subtle">
                         {row.age} yrs · {row.village ?? "Village not recorded"}
+                        {showBlockColumn && row.blockName ? ` · ${row.blockName}` : ""}
                       </p>
                       <p className="mt-0.5 text-2xs text-ink-muted">
                         {getHrpTrackLabel(row.track)} · due {formatShortDate(row.scheduledDate)}
                       </p>
                     </div>
-                    <span className={`badge shrink-0 ${getHrpStatusBadge(row.status)}`}>
-                      {getHrpStatusLabel(row.status)}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className={`badge ${getHrpStatusBadge(row.status)}`}>
+                        {getHrpStatusLabel(row.status)}
+                      </span>
+                      {isEscalated(row) ? <span className="badge badge-red">Escalated</span> : null}
+                    </div>
                   </div>
                   {row.complication ? (
                     <p className="mt-1 text-2xs font-medium text-triage-red">
@@ -305,7 +314,8 @@ export default function NodalFollowUpPanel() {
                   <tr>
                     <th scope="col">Woman</th>
                     <th scope="col">Village / sub-center</th>
-                    <th scope="col">Track</th>
+                    {showBlockColumn ? <th scope="col">Block</th> : null}
+                    <th scope="col">Stage</th>
                     <th scope="col">Attribution</th>
                     <th scope="col">Due</th>
                     <th scope="col">Last update</th>
@@ -325,10 +335,16 @@ export default function NodalFollowUpPanel() {
                         <p className="tnum text-2xs text-ink-subtle">{row.age} yrs</p>
                       </td>
                       <td className="text-ink-muted">{row.village ?? "—"}</td>
+                      {showBlockColumn ? (
+                        <td className="text-ink-muted">{row.blockName ?? "—"}</td>
+                      ) : null}
                       <td className="text-ink-muted">{getHrpTrackLabel(row.track)}</td>
                       <td className="max-w-64 text-2xs text-ink-muted">{attributionLabel(row)}</td>
                       <td className="tnum whitespace-nowrap text-ink-muted">
                         {format(row.scheduledDate, "d MMM yyyy")}
+                        {isEscalated(row) ? (
+                          <span className="badge badge-red ml-2">Escalated</span>
+                        ) : null}
                       </td>
                       <td className="tnum whitespace-nowrap text-2xs text-ink-subtle">
                         {row.lastAttemptAt ? format(row.lastAttemptAt, "d MMM, HH:mm") : "—"}

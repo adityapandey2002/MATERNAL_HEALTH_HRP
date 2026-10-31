@@ -12,11 +12,7 @@ export async function registerSW(): Promise<void> {
           newWorker.addEventListener("statechange", () => {
             if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
               console.log("[SW] New version available");
-              if (
-                confirm(
-                  "A new version of High-Risk Pregnancy Tracking of Araria is available. Reload to update?"
-                )
-              ) {
+              if (confirm("A new version of Matru Suraksha is available. Reload to update?")) {
                 window.location.reload();
               }
             }

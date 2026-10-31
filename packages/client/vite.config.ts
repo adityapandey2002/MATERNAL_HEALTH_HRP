@@ -18,9 +18,9 @@ export default defineConfig(({ mode }) => {
         registerType: "autoUpdate",
         includeAssets: ["favicon.ico", "robots.txt"],
         manifest: {
-          name: "High-Risk Pregnancy Tracking of Araria",
-          short_name: "HRP",
-          description: "High-Risk Pregnancy Tracking of Araria for ANMs",
+          name: "Matru Suraksha",
+          short_name: "Matru Suraksha",
+          description: "Matru Suraksha — high-risk pregnancy care in Araria",
           theme_color: "#16a34a",
           background_color: "#ffffff",
           display: "standalone",

@@ -11,7 +11,6 @@ import NewVisit from "./pages/NewVisit";
 import Offline from "./pages/Offline";
 import PatientDetail from "./pages/PatientDetail";
 import Patients from "./pages/Patients";
-import Referrals from "./pages/Referrals";
 import Settings from "./pages/Settings";
 import Supervision from "./pages/Supervision";
 import TeamAccess from "./pages/TeamAccess";
@@ -21,11 +20,11 @@ function LoadingScreen() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
       <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-primary text-lg font-bold text-white">
-        HRP
+        MS
       </div>
       <div>
-        <h1 className="text-base font-semibold text-ink">High-Risk Pregnancy Tracking</h1>
-        <p className="text-sm text-ink-subtle">of Araria</p>
+        <h1 className="text-base font-semibold text-ink">Matru Suraksha</h1>
+        <p className="text-sm text-ink-subtle">High-risk pregnancy care · Araria</p>
       </div>
       <div className="flex items-center gap-2 text-sm text-ink-subtle">
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -113,7 +112,6 @@ export default function App() {
           <Route path="/patients/new" element={<AddPatient />} />
           <Route path="/patients/:id" element={<PatientDetail />} />
           <Route path="/patients/:id/visit" element={<NewVisit />} />
-          <Route path="/referrals" element={<Referrals />} />
           <Route path="/supervision" element={<Supervision />} />
           <Route path="/settings" element={<Settings />} />
         </Route>

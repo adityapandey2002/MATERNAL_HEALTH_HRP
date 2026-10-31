@@ -1,7 +1,7 @@
-import { HRP_FOLLOW_UP_TRACKS, type HrpFollowUpTrack, getHrpTrackShortLabel } from "@hrp/shared";
+import { HRP_FOLLOW_UP_TRACKS, getHrpTrackShortLabel } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { EmptyState } from "../components/ui/EmptyState";
 import {
@@ -25,7 +25,8 @@ import {
   formatShortDate,
   summariseFollowUps,
 } from "../lib/hrp";
-import { useIsNodalRole } from "../lib/session";
+import { canProvisionStaff, isBlockRole } from "../lib/nav";
+import { useUserRole } from "../lib/session";
 import { onOnlineChange } from "../utils/sw";
 
 function lastSyncLabel(): string | null {
@@ -36,19 +37,26 @@ function lastSyncLabel(): string | null {
   return format(new Date(value), "d MMM, HH:mm");
 }
 
-function TriangulationSection({ summary }: { summary: FollowUpSummary }) {
+/**
+ * Stage breakdown for the repeating 15-day cycle.
+ *
+ * A referred woman's first window belongs to the block helpdesk; every later
+ * window belongs to the field team but stays visible here. Showing both stages
+ * side by side is what makes "whose turn is it" obvious at a glance.
+ */
+function StageBreakdown({ summary }: { summary: FollowUpSummary }) {
   return (
-    <section aria-labelledby="triangulation-heading">
+    <section aria-labelledby="stage-breakdown-heading">
       <div className="mb-2 flex items-end justify-between gap-3">
         <div>
           <h2
-            id="triangulation-heading"
+            id="stage-breakdown-heading"
             className="text-base font-semibold tracking-tight text-ink"
           >
-            Three-track triangulation
+            The 15-day cycle
           </h2>
           <p className="text-xs text-ink-subtle">
-            Where the block's contacts sit across the 7-day, PMSMA and VHSND tracks
+            Where the block's contacts sit across the block review and field stages
           </p>
         </div>
         <Link
@@ -59,9 +67,9 @@ function TriangulationSection({ summary }: { summary: FollowUpSummary }) {
         </Link>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="grid gap-3 lg:grid-cols-2">
         {HRP_FOLLOW_UP_TRACKS.map((option) => {
-          const counters = summary.byTrack[option.value];
+          const counters = summary.byStage[option.value];
           const completion =
             counters.total === 0 ? 0 : Math.round((counters.complete / counters.total) * 100);
 
@@ -82,7 +90,7 @@ function TriangulationSection({ summary }: { summary: FollowUpSummary }) {
                 <div
                   className="h-1.5 overflow-hidden rounded-full bg-line-soft"
                   role="img"
-                  aria-label={`${completion}% of the ${option.shortLabel} track complete`}
+                  aria-label={`${completion}% of the ${option.shortLabel} stage complete`}
                 >
                   <span
                     className="block h-full rounded-full bg-triage-green-solid"
@@ -120,16 +128,15 @@ function TriangulationSection({ summary }: { summary: FollowUpSummary }) {
 }
 
 interface DispatchBoxProps {
-  nodalRole: boolean;
+  canDispatch: boolean;
   pendingRows: FollowUpRow[];
   assignable: Array<{ id: string; name: string; role: string; facilityName?: string | null }>;
 }
 
-function DispatchBox({ nodalRole, pendingRows, assignable }: DispatchBoxProps) {
+function DispatchBox({ canDispatch, pendingRows, assignable }: DispatchBoxProps) {
   const queryClient = useQueryClient();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [assigneeId, setAssigneeId] = useState("");
-  const [track, setTrack] = useState<HrpFollowUpTrack>("IMMEDIATE_7_DAYS");
 
   const allPendingSelected =
     pendingRows.length > 0 && pendingRows.every((row) => selected.has(row.patientId));
@@ -152,7 +159,6 @@ function DispatchBox({ nodalRole, pendingRows, assignable }: DispatchBoxProps) {
       api.hrp.followUps.dispatch({
         patientIds: [...selected],
         assignedToUserId: assigneeId,
-        track,
       }),
     onSuccess: () => {
       setSelected(new Set());
@@ -162,22 +168,22 @@ function DispatchBox({ nodalRole, pendingRows, assignable }: DispatchBoxProps) {
   });
 
   const dispatchDisabled =
-    !nodalRole || selected.size === 0 || !assigneeId || dispatchMutation.isPending;
+    !canDispatch || selected.size === 0 || !assigneeId || dispatchMutation.isPending;
 
   return (
     <Panel aria-labelledby="dispatch-heading">
       <PanelHeader
         id="dispatch-heading"
         title="Push AWC / ANM dispatch box"
-        description="Select pending women, choose a field worker and push the list to her panel"
+        description="Select pending women, choose a field worker and start their next 15-day window"
         action={<span className="badge badge-info">{selected.size} selected</span>}
       />
 
-      {!nodalRole ? (
+      {!canDispatch ? (
         <PanelBody>
           <p className="text-sm text-ink-muted">
-            Only block and district nodal officers can push lists to field workers. Helpdesk
-            accounts use the shared line list to close contacts.
+            Only the block dashboard can push lists to field workers. Open the shared line list to
+            close contacts.
           </p>
         </PanelBody>
       ) : dispatchMutation.isSuccess ? (
@@ -185,7 +191,8 @@ function DispatchBox({ nodalRole, pendingRows, assignable }: DispatchBoxProps) {
           <div className="flex items-start gap-2.5 rounded border border-triage-green-line bg-triage-green-bg px-3 py-2.5">
             <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-triage-green" />
             <p className="text-sm text-ink">
-              List pushed. The selected women now appear in the field worker's follow-up panel.
+              List pushed. The selected women now have a 15-day field follow-up in the worker's
+              panel.
             </p>
           </div>
           <button
@@ -203,38 +210,27 @@ function DispatchBox({ nodalRole, pendingRows, assignable }: DispatchBoxProps) {
         />
       ) : (
         <PanelBody className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="space-y-1.5">
-              <span className="label">Assign to ANM / CHO</span>
-              <select
-                className="input"
-                value={assigneeId}
-                onChange={(event) => setAssigneeId(event.target.value)}
-              >
-                <option value="">Select a field worker</option>
-                {assignable.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.name} · {member.role}
-                    {member.facilityName ? ` · ${member.facilityName}` : ""}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="space-y-1.5">
-              <span className="label">Follow-up track</span>
-              <select
-                className="input"
-                value={track}
-                onChange={(event) => setTrack(event.target.value as HrpFollowUpTrack)}
-              >
-                {HRP_FOLLOW_UP_TRACKS.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
+          <label className="block space-y-1.5">
+            <span className="label">Assign to ANM / CHO</span>
+            <select
+              className="input"
+              value={assigneeId}
+              onChange={(event) => setAssigneeId(event.target.value)}
+            >
+              <option value="">Select a field worker</option>
+              {assignable.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.name} · {member.role}
+                  {member.facilityName ? ` · ${member.facilityName}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <p className="rounded border border-line-soft bg-canvas px-3 py-2 text-xs text-ink-muted">
+            Every dispatch starts a 15-day field window. The block helpdesk keeps seeing the same
+            row and can close it too.
+          </p>
 
           {assignable.length === 0 ? (
             <p className="rounded border border-triage-amber-line bg-triage-amber-bg px-3 py-2 text-xs text-ink-muted">
@@ -293,7 +289,7 @@ function DispatchBox({ nodalRole, pendingRows, assignable }: DispatchBoxProps) {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="flex items-center gap-1.5 text-2xs text-ink-subtle">
               <AlertTriangleIcon className="h-3.5 w-3.5" />
-              Dispatch creates a new scheduled contact for each selected woman.
+              Dispatch moves each selected woman to a new 15-day field cycle.
             </p>
             <button
               type="button"
@@ -311,8 +307,17 @@ function DispatchBox({ nodalRole, pendingRows, assignable }: DispatchBoxProps) {
   );
 }
 
+/**
+ * Block dashboard for the BHM and the Block HRP Helpdesk.
+ *
+ * Counters, the stage breakdown and the dispatch box all read from the same
+ * line list, so the tiles and the table can never disagree. District roles get
+ * `DistrictDashboard` instead.
+ */
 export default function NodalDashboard() {
-  const nodalRole = useIsNodalRole();
+  const role = useUserRole();
+  const canDispatch = isBlockRole(role);
+  const canManageTeam = canProvisionStaff(role);
   const [online, setOnline] = useState(true);
   const [syncedAt, setSyncedAt] = useState<string | null>(null);
 
@@ -339,7 +344,7 @@ export default function NodalDashboard() {
   const { data: staffData } = useQuery({
     queryKey: ["staff", "assignable"],
     queryFn: () => api.staff.list(),
-    enabled: nodalRole,
+    enabled: canDispatch,
     retry: false,
   });
 
@@ -355,14 +360,14 @@ export default function NodalDashboard() {
   );
 
   const loading = recordsLoading || patientsLoading;
-  const nextPmsma = useMemo(() => formatShortDate(summary.nextPmsmaDate), [summary.nextPmsmaDate]);
+  const fieldPending = summary.byStage.FIELD_15_DAY.pending;
 
   return (
     <div className="space-y-5">
       <PageHeader
         eyebrow={`${format(new Date(), "EEEE d MMMM")} · Araria block`}
         title="Block dashboard"
-        description="High-risk pregnancies, follow-up compliance and dispatch in one view"
+        description="High-risk pregnancies, the 15-day cycle and dispatch in one view"
         actions={
           <Link to="/follow-ups" className="btn btn-primary">
             <ListChecksIcon className="h-4 w-4" />
@@ -407,7 +412,7 @@ export default function NodalDashboard() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-5">
         <StatTile
           label="Total HRPs"
           value={loading ? "…" : totalHrps}
@@ -416,21 +421,28 @@ export default function NodalDashboard() {
           tone="primary"
         />
         <StatTile
-          label="Pending follow-ups"
-          value={loading ? "…" : summary.pending}
+          label="Block review"
+          value={loading ? "…" : summary.awaitingBlockReview}
+          hint="First cycle with the helpdesk"
+          icon={<ListChecksIcon className="h-4 w-4" />}
+          tone="amber"
+        />
+        <StatTile
+          label="Field pending"
+          value={loading ? "…" : fieldPending}
           hint={summary.breached > 0 ? `${summary.breached} past the window` : "Inside the window"}
           icon={<CalendarIcon className="h-4 w-4" />}
           tone={summary.breached > 0 ? "red" : "amber"}
         />
         <StatTile
-          label="Next PMSMA cohort"
-          value={nextPmsma}
-          hint={`${summary.pmsmaCohort} women on the PMSMA track`}
-          icon={<CalendarIcon className="h-4 w-4" />}
-          compact
+          label="Escalated"
+          value={loading ? "…" : summary.escalated}
+          hint="Open past the due date"
+          icon={<AlertTriangleIcon className="h-4 w-4" />}
+          tone={summary.escalated > 0 ? "red" : "green"}
         />
         <StatTile
-          label="Compliance rate"
+          label="Compliance"
           value={`${summary.complianceRate}%`}
           hint="Complete ÷ line list"
           icon={<CheckIcon className="h-4 w-4" />}
@@ -439,28 +451,30 @@ export default function NodalDashboard() {
         />
       </div>
 
-      <TriangulationSection summary={summary} />
+      <StageBreakdown summary={summary} />
 
-      <DispatchBox nodalRole={nodalRole} pendingRows={pendingRows} assignable={assignable} />
+      <DispatchBox canDispatch={canDispatch} pendingRows={pendingRows} assignable={assignable} />
 
-      <Link
-        to="/team"
-        className="panel flex items-center gap-3 p-3 transition-colors hover:bg-canvas sm:p-4"
-      >
-        <span
-          aria-hidden="true"
-          className="flex h-9 w-9 items-center justify-center rounded bg-primary-light text-primary-dark"
+      {canManageTeam ? (
+        <Link
+          to="/team"
+          className="panel flex items-center gap-3 p-3 transition-colors hover:bg-canvas sm:p-4"
         >
-          <ActivityIcon className="h-4 w-4" />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-ink">Team &amp; access</span>
-          <span className="block text-2xs text-ink-subtle">
-            Create the HRP Helpdesk login with email and password
+          <span
+            aria-hidden="true"
+            className="flex h-9 w-9 items-center justify-center rounded bg-primary-light text-primary-dark"
+          >
+            <ActivityIcon className="h-4 w-4" />
           </span>
-        </span>
-        <ArrowRightIcon className="h-4 w-4 text-ink-subtle" />
-      </Link>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">Team &amp; access</span>
+            <span className="block text-2xs text-ink-subtle">
+              Create ANM, CHO and block HRP Helpdesk accounts
+            </span>
+          </span>
+          <ArrowRightIcon className="h-4 w-4 text-ink-subtle" />
+        </Link>
+      ) : null}
     </div>
   );
 }

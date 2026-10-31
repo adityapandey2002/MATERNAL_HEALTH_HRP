@@ -55,12 +55,12 @@ describe("App", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders the field front page (/) with Add HRP case hero for ANM", async () => {
+  it("renders the field front page (/) with the Add HRP case hero for ANM", async () => {
     render(wrapper({ children: <App /> }));
 
-    expect(await screen.findByRole("heading", { name: "Field work" })).toBeInTheDocument();
-    const addLinks = screen.getAllByRole("link", { name: /Add HRP case/i });
+    const addLinks = await screen.findAllByRole("link", { name: /Add HRP case/i });
     expect(addLinks[0]).toHaveAttribute("href", "/patients/new");
+    expect(screen.queryByRole("heading", { name: "Field work" })).not.toBeInTheDocument();
   });
 
   it("renders the field triage dashboard at /dashboard", async () => {

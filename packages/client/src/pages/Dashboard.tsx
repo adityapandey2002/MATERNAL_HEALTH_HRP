@@ -39,6 +39,7 @@ import {
   latestVisitByPatient,
   toneTextClass,
 } from "../lib/clinical";
+import { buildFollowUpLineList, summariseFollowUps } from "../lib/hrp";
 import { useUserRole } from "../lib/session";
 import { isOnline, onOnlineChange } from "../utils/sw";
 
@@ -370,6 +371,68 @@ function UrgentPatientCard({ patient, visit }: { patient: Patient; visit: Visit 
   );
 }
 
+/**
+ * Compact HRP cycle view for the CHO.
+ *
+ * The full line list lives on `/follow-ups`; this is the "is anything slipping"
+ * summary: field pending, women still waiting on the block helpdesk's first
+ * check-up, open cycles past their due date and overall compliance.
+ */
+function HrpCycleSection() {
+  const { data: recordsData } = useQuery({
+    queryKey: ["hrp", "follow-ups", "cho-dashboard"],
+    queryFn: () => api.hrp.followUps.list({ page: 1, limit: 100 }),
+  });
+
+  const { data: patientsData } = useQuery({
+    queryKey: ["hrp", "patients", "cho-dashboard"],
+    queryFn: () => api.hrp.patients.list({ page: 1, limit: 100 }),
+  });
+
+  const rows = buildFollowUpLineList(patientsData?.data ?? [], recordsData?.data ?? []);
+  const summary = summariseFollowUps(rows);
+  const fieldPending = summary.byStage.FIELD_15_DAY.pending;
+
+  return (
+    <Panel aria-labelledby="cho-hrp-heading">
+      <PanelHeader
+        id="cho-hrp-heading"
+        title="HRP 15-day follow-ups"
+        description="Your field cycle plus the first check-up owned by the block helpdesk"
+        action={
+          <Link to="/follow-ups" className="btn btn-secondary btn-sm">
+            Open follow-ups
+          </Link>
+        }
+      />
+      <dl className="grid grid-cols-2 gap-2.5 p-3 sm:grid-cols-4 sm:p-4">
+        <div className="rounded border border-line-soft bg-canvas px-3 py-2">
+          <dt className="text-2xs font-medium text-ink-subtle">Field pending</dt>
+          <dd className="tnum text-lg font-semibold text-ink">{fieldPending}</dd>
+        </div>
+        <div className="rounded border border-line-soft bg-canvas px-3 py-2">
+          <dt className="text-2xs font-medium text-ink-subtle">Awaiting block review</dt>
+          <dd className="tnum text-lg font-semibold text-ink">{summary.awaitingBlockReview}</dd>
+        </div>
+        <div className="rounded border border-line-soft bg-canvas px-3 py-2">
+          <dt className="text-2xs font-medium text-ink-subtle">Escalated</dt>
+          <dd
+            className={`tnum text-lg font-semibold ${
+              summary.escalated > 0 ? "text-triage-red" : "text-triage-green"
+            }`}
+          >
+            {summary.escalated}
+          </dd>
+        </div>
+        <div className="rounded border border-line-soft bg-canvas px-3 py-2">
+          <dt className="text-2xs font-medium text-ink-subtle">Compliance</dt>
+          <dd className="tnum text-lg font-semibold text-ink">{summary.complianceRate}%</dd>
+        </div>
+      </dl>
+    </Panel>
+  );
+}
+
 function OversightDashboard({
   role,
   patients,
@@ -428,6 +491,8 @@ function OversightDashboard({
           icon={<CalendarIcon className="h-4 w-4" />}
         />
       </div>
+
+      {role === "CHO" ? <HrpCycleSection /> : null}
 
       <Panel aria-labelledby="cohort-heading">
         <PanelHeader

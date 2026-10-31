@@ -1,4 +1,3 @@
-import type { UserRole } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { BrandMark } from "../components/ui/BrandMark";
@@ -8,16 +7,9 @@ import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { api } from "../lib/api";
 import { initialsFor } from "../lib/nav";
+import { ROLE_LABEL } from "../lib/session";
 
 type SettingsTab = "profile" | "sync" | "notifications" | "about";
-
-const ROLE_LABEL: Record<UserRole, string> = {
-  ANM: "ANM · field worker",
-  CHO: "CHO · facility",
-  BHM: "Block nodal officer",
-  DHS: "District officer",
-  HELPDESK: "HRP Helpdesk",
-};
 
 const NOTIFICATION_PREFS = [
   {
@@ -303,10 +295,10 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-4 rounded border border-line-soft bg-canvas p-4">
                   <BrandMark size={44} variant="full" title={null} />
                   <div>
-                    <h2 className="text-sm font-semibold text-ink">
-                      High-Risk Pregnancy Tracking of Araria
-                    </h2>
-                    <p className="text-xs text-ink-subtle">Version 0.1.0 (MVP)</p>
+                    <h2 className="text-sm font-semibold text-ink">Matru Suraksha</h2>
+                    <p className="text-xs text-ink-subtle">
+                      High-risk pregnancy care · Araria · Version 0.1.0 (MVP)
+                    </p>
                   </div>
                 </div>
 

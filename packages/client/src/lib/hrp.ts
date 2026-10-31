@@ -1,10 +1,10 @@
 import {
+  HRP_FOLLOW_UP_WINDOW_DAYS,
   type HrpComplication,
   type HrpFollowUpStatus,
   type HrpFollowUpTrack,
   type Patient,
   type RiskLevel,
-  getNextPmsmaDate,
   inferHrpTrack,
 } from "@hrp/shared";
 import type { FollowUpListItem } from "@hrp/shared/schemas";
@@ -45,7 +45,7 @@ export function gestationalAgeLabel(lmp: Date, at: Date = new Date()): string {
  * A single woman on the follow-up line list.
  *
  * The row is assembled from a server follow-up record when one exists, and
- * otherwise from the patient's own track/schedule so a newly registered woman
+ * otherwise from the patient's own stage/schedule so a newly registered woman
  * never disappears from the panel.
  */
 export interface FollowUpRow {
@@ -57,11 +57,19 @@ export interface FollowUpRow {
   phone: string | null;
   ashaPhone: string | null;
   village: string | null;
+  /** Block the woman's facility belongs to; null on block-scoped responses. */
+  blockName: string | null;
   complication: HrpComplication | null;
   riskLevel: RiskLevel;
+  /** Stage of the 15-day cycle: block-owned first contact or field cycle. */
   track: HrpFollowUpTrack;
   status: HrpFollowUpStatus;
   scheduledDate: Date;
+  /**
+   * True when the row is the block helpdesk's first 15-day contact and is still
+   * open. The field worker sees it but cannot close it.
+   */
+  isBlockStage: boolean;
   /** Last time the row changed — used as the "last attempt" stamp. */
   lastAttemptAt: Date | null;
   assignedToName: string | null;
@@ -79,10 +87,13 @@ const STATUS_ORDER: Record<HrpFollowUpStatus, number> = {
 
 const ACTIVE_STATUSES: ReadonlySet<HrpFollowUpStatus> = new Set(["PENDING", "NOT_REACHABLE"]);
 
-function defaultScheduledDate(track: HrpFollowUpTrack, now: Date): Date {
-  if (track === "IMMEDIATE_7_DAYS") return new Date(now.getTime() + 7 * DAY_MS);
-  if (track === "PMSMA_SESSION") return getNextPmsmaDate(now);
-  return new Date(now.getTime() + 30 * DAY_MS);
+/**
+ * Both stages use the same 15-day window. The stage only decides who owns the
+ * contact: the block helpdesk for a referred woman's first cycle, the field
+ * worker for every cycle after that.
+ */
+function defaultScheduledDate(_track: HrpFollowUpTrack, now: Date): Date {
+  return new Date(now.getTime() + HRP_FOLLOW_UP_WINDOW_DAYS * DAY_MS);
 }
 
 /** Picks the row that represents a woman's current contact. */
@@ -92,6 +103,7 @@ function pickRecord(records: FollowUpListItem[]): FollowUpListItem | undefined {
     (a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
   );
   const active = sorted.find((record) => ACTIVE_STATUSES.has(record.status));
+  // With no open cycle left, the latest completed one is the last contact.
   return active ?? sorted[sorted.length - 1];
 }
 
@@ -99,7 +111,8 @@ function pickRecord(records: FollowUpListItem[]): FollowUpListItem | undefined {
  * Merge the server line list with the patient register.
  *
  * One row per woman: the active follow-up record wins, then her own scheduled
- * track, then the track inferred from referral and risk level.
+ * stage, then the stage inferred from referral status. A referred HRP starts
+ * with the block helpdesk; everyone else starts in the field cycle.
  */
 export function buildFollowUpLineList(
   patients: Patient[],
@@ -133,6 +146,7 @@ export function buildFollowUpLineList(
       : patient?.followUpScheduledDate
         ? new Date(patient.followUpScheduledDate)
         : defaultScheduledDate(track, now);
+    const status = record?.status ?? patient?.followUpStatus ?? "PENDING";
 
     rows.push({
       key: record ? `follow-up-${record.id}` : `patient-${patientId}`,
@@ -143,11 +157,13 @@ export function buildFollowUpLineList(
       phone: record?.patientPhone ?? patient?.phone ?? null,
       ashaPhone: patient?.ashaPhone ?? null,
       village: record?.village ?? patient?.address ?? null,
+      blockName: record?.blockName ?? null,
       complication: record?.hrpComplication ?? patient?.hrpComplication ?? null,
       riskLevel: record?.patientRiskLevel ?? patient?.riskLevel ?? "GREEN",
       track,
-      status: record?.status ?? patient?.followUpStatus ?? "PENDING",
+      status,
       scheduledDate,
+      isBlockStage: track === "BLOCK_15_DAY" && status !== "COMPLETE",
       lastAttemptAt: record ? new Date(record.updatedAt) : null,
       assignedToName: record?.assignedToName ?? null,
       assignedToRole: record?.assignedToRole ?? null,
@@ -165,8 +181,18 @@ export function buildFollowUpLineList(
   );
 }
 
+/** A pending contact whose due date has already passed. */
 export function isBreached(row: FollowUpRow, now: Date = new Date()): boolean {
   return row.status === "PENDING" && row.scheduledDate.getTime() < startOfToday(now).getTime();
+}
+
+/**
+ * An open cycle past its due date. Escalation is derived from the dates, not
+ * stored, so it can never go stale. `NOT_REACHABLE` stays open and escalates
+ * too.
+ */
+export function isEscalated(row: FollowUpRow, now: Date = new Date()): boolean {
+  return row.status !== "COMPLETE" && row.scheduledDate.getTime() < startOfToday(now).getTime();
 }
 
 export interface TrackSummary {
@@ -183,10 +209,12 @@ export interface FollowUpSummary {
   complete: number;
   notReachable: number;
   breached: number;
+  /** Open rows past their due date — the district escalation queue. */
+  escalated: number;
+  /** Open block-owned first contacts the field team is waiting on. */
+  awaitingBlockReview: number;
   complianceRate: number;
-  nextPmsmaDate: Date;
-  pmsmaCohort: number;
-  byTrack: Record<HrpFollowUpTrack, TrackSummary>;
+  byStage: Record<HrpFollowUpTrack, TrackSummary>;
 }
 
 function emptyTrack(): TrackSummary {
@@ -194,38 +222,42 @@ function emptyTrack(): TrackSummary {
 }
 
 /**
- * Block dashboard counters. Everything is derived from the same line list the
- * panel renders, so the tiles and the table can never disagree.
+ * Dashboard counters. Everything is derived from the same line list the panel
+ * renders, so the tiles and the table can never disagree.
  */
 export function summariseFollowUps(rows: FollowUpRow[], now: Date = new Date()): FollowUpSummary {
-  const byTrack: Record<HrpFollowUpTrack, TrackSummary> = {
-    IMMEDIATE_7_DAYS: emptyTrack(),
-    PMSMA_SESSION: emptyTrack(),
-    VHSND_COMMUNITY: emptyTrack(),
+  const byStage: Record<HrpFollowUpTrack, TrackSummary> = {
+    BLOCK_15_DAY: emptyTrack(),
+    FIELD_15_DAY: emptyTrack(),
   };
 
   let pending = 0;
   let complete = 0;
   let notReachable = 0;
   let breached = 0;
+  let escalated = 0;
+  let awaitingBlockReview = 0;
 
   for (const row of rows) {
-    const track = byTrack[row.track];
-    track.total += 1;
+    const stage = byStage[row.track];
+    stage.total += 1;
+
+    if (row.isBlockStage) awaitingBlockReview += 1;
+    if (isEscalated(row, now)) escalated += 1;
 
     if (row.status === "PENDING") {
       pending += 1;
-      track.pending += 1;
+      stage.pending += 1;
       if (isBreached(row, now)) {
         breached += 1;
-        track.breached += 1;
+        stage.breached += 1;
       }
     } else if (row.status === "COMPLETE") {
       complete += 1;
-      track.complete += 1;
+      stage.complete += 1;
     } else {
       notReachable += 1;
-      track.notReachable += 1;
+      stage.notReachable += 1;
     }
   }
 
@@ -236,10 +268,10 @@ export function summariseFollowUps(rows: FollowUpRow[], now: Date = new Date()):
     complete,
     notReachable,
     breached,
+    escalated,
+    awaitingBlockReview,
     complianceRate: total === 0 ? 0 : Math.round((complete / total) * 100),
-    nextPmsmaDate: getNextPmsmaDate(now),
-    pmsmaCohort: byTrack.PMSMA_SESSION.total,
-    byTrack,
+    byStage,
   };
 }
 
@@ -257,13 +289,14 @@ export function attributionLabel(row: FollowUpRow): string {
 }
 
 function humanTier(role: string): string {
-  if (role === "HELPDESK") return "HRP_Helpdesk";
-  if (role === "BHM") return "Block Nodal";
-  if (role === "DHS") return "District Nodal";
+  if (role === "HRP_HELPDESK_BLOCK") return "HRP Helpdesk (block)";
+  if (role === "HRP_HELPDESK_DISTRICT") return "HRP Helpdesk (district)";
+  if (role === "BHM") return "BHM";
+  if (role === "DHS") return "DHS";
   return role;
 }
 
-/** "15 Oct" style label for the next PMSMA cohort tile. */
+/** "15 Oct" style label for a due date. */
 export function formatShortDate(date: Date): string {
   return date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }

@@ -79,7 +79,7 @@ describe("Layout", () => {
 
     renderLayout("/patients/new");
 
-    await screen.findByText("Block nodal officer");
+    await screen.findByText("BHM · block nodal officer");
 
     const nav = sidebar();
     const addCaseLink = nav.getByRole("link", { name: "Add HRP case" });

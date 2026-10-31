@@ -56,15 +56,6 @@ export default function FieldHome() {
 
   return (
     <div className="flex min-h-[calc(100vh-11rem)] flex-col gap-4">
-      <header className="min-w-0">
-        <p className="text-2xs font-semibold uppercase tracking-wider text-primary">
-          {format(new Date(), "EEEE d MMMM")}
-        </p>
-        <h1 className="mt-1 text-xl font-semibold tracking-tight text-ink sm:text-2xl">
-          Field work
-        </h1>
-      </header>
-
       <Link
         to="/patients/new"
         className="group flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border-2 border-primary bg-primary-light px-6 py-14 text-center transition-colors hover:bg-primary/10 focus-visible:bg-primary/10"
@@ -106,7 +97,7 @@ export default function FieldHome() {
                     .map((row) => row.patientName)
                     .join(", ")}
                   {urgent.length > 2 ? ` and ${urgent.length - 2} more` : ""} — red triage or past
-                  the 7-day window.
+                  the 15-day due date.
                 </p>
               </div>
               <Link to="/follow-ups" className="btn btn-danger btn-sm">

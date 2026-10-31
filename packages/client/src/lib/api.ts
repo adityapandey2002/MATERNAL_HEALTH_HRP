@@ -1,6 +1,5 @@
 import type {
   CreatePatient,
-  CreateReferral,
   CreateStaff,
   CreateVisit,
   DispatchFollowUp,
@@ -11,7 +10,6 @@ import type {
   Pagination,
   Patient,
   PatientFilter,
-  Referral,
   StaffMember,
   SupervisionAlert,
   SupervisionFilter,
@@ -19,6 +17,7 @@ import type {
   SyncQueue,
   SyncResponse,
   UpdateFollowUp,
+  UpdateStaff,
   User,
   Visit,
   VisitFilter,
@@ -141,8 +140,8 @@ export const api = {
   },
 
   /**
-   * HRP-specific endpoints. These carry the complication, follow-up track and
-   * the joined attribution the block line list shows.
+   * HRP-specific endpoints. These carry the complication, the 15-day
+   * follow-up stage and the joined attribution the block line list shows.
    */
   hrp: {
     patients: {
@@ -190,6 +189,8 @@ export const api = {
     list: () => request<{ data: StaffMember[]; total: number }>("/staff"),
     create: (data: CreateStaff) =>
       request<StaffMember>("/staff", { method: "POST", body: JSON.stringify(data) }),
+    update: (id: string, data: UpdateStaff) =>
+      request<StaffMember>(`/staff/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     deactivate: (id: string) =>
       request<{ id: string; isActive: boolean }>(`/staff/${id}/deactivate`, { method: "PATCH" }),
   },
@@ -211,21 +212,6 @@ export const api = {
     update: (id: string, data: Partial<CreateVisit>) =>
       request<Visit>(`/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     byPatient: (patientId: string) => request<Visit[]>(`/visits/by-patient/${patientId}`),
-  },
-
-  referrals: {
-    list: (params?: Pagination) => {
-      const search = new URLSearchParams();
-      if (params)
-        for (const [k, v] of Object.entries(params)) {
-          if (v !== undefined) search.set(k, String(v));
-        }
-      return request<{ data: Referral[]; total: number }>(`/referrals?${search}`);
-    },
-    create: (data: CreateReferral) =>
-      request<Referral>("/referrals", { method: "POST", body: JSON.stringify(data) }),
-    update: (id: string, data: Partial<Referral>) =>
-      request<Referral>(`/referrals/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   },
 
   facilities: {
