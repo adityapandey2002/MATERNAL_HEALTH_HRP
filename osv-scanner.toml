@@ -10,6 +10,25 @@ ecosystem = "npm"
 ignore = true
 reason = "Development and test tooling dependencies not included in production runtime"
 
+# Transitive dev-tooling dependencies pulled in by axe/chromedriver and build tooling
+[[PackageOverrides]]
+name = "follow-redirects"
+ecosystem = "npm"
+ignore = true
+reason = "Development-only dependency of axe/chromedriver; not shipped in the production runtime"
+
+[[PackageOverrides]]
+name = "glob"
+ecosystem = "npm"
+ignore = true
+reason = "Development and build tooling dependency; not shipped in the production runtime"
+
+[[PackageOverrides]]
+name = "minimatch"
+ecosystem = "npm"
+ignore = true
+reason = "Development and build tooling dependency; not shipped in the production runtime"
+
 # Runtime dependencies with architecture-level mitigations
 [[PackageOverrides]]
 name = "fast-jwt"
