@@ -1,8 +1,16 @@
 # SPEC-referral-workflow
 
-Status: Approved
+Status: Superseded (Oct 30 2026)
+Superseded by: `SPEC-matru-suraksha-roles-and-follow-up.md`
 Owner: Clinical Lead + Backend
 Depends on: authz-facility-scope, district-administration, phi-audit
+
+> **Superseded.** The standalone Referrals page, navigation entry and state
+> machine are retired. A referred HRP now starts with the Block HRP Helpdesk's
+> first 15-day cycle, and clinical referral notes stay on the visit record. The
+> referral API remains available for authorization and data compatibility, but
+> no app screen calls it. The rest of this document is kept as historical
+> context; do not implement new workflow against it.
 
 ## Objective
 

@@ -78,7 +78,7 @@ Invoke-WebRequest -UseBasicParsing "https://<app>.onrender.com/ready"
 Expected:
 
 - `/health` → `200 {"status":"ok",...}`
-- `/ready` → `200 {"status":"ready","database":"ok","migration":"004_authz_hardening",...}`
+- `/ready` → `200 {"status":"ready","database":"ok","migration":"007_matru_suraksha_roles",...}`
 - `/` → the Add landing page (not a JSON 404)
 - a hard refresh on `/dashboard` → still the app, not a 404
 
@@ -90,9 +90,12 @@ Sign in with the seeded synthetic users:
 | CHO | `CHO001` | `password123` |
 | BHM | `MO001` | `password123` |
 | DHS | `ADM001` | `password123` |
+| HRP Helpdesk (block) | `HELP01` | `password123` |
+| HRP Helpdesk (district) | `HELP02` | `password123` |
 
-Then exercise the critical flow: Add → register a woman → lands on Dashboard →
-open the patient → visit history loads.
+Then exercise the critical flow: Add → register a referred woman → her first
+15-day cycle appears for the block helpdesk → close it → the next field cycle
+appears for the ANM/CHO.
 
 ## How the seed stays safe
 

@@ -63,7 +63,7 @@ tasks/               Implementation plan and task list
 
 - Unit: pure functions, schemas, policy, scope, risk rules.
 - Integration: Fastify routes against PostgreSQL; authz matrix and audit assertions.
-- E2E: offline capture, sync, referral, supervision, dashboards.
+- E2E: offline capture, sync, the 15-day block/field cycle, supervision, dashboards.
 - Changed-line coverage must stay >= 80%.
 
 ## Common boundaries

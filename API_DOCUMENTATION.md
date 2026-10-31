@@ -1,21 +1,34 @@
-# HRP Tracking Platform — API & Interface Documentation
+# Matru Suraksha — API & Interface Documentation
 
-**Product:** Multi-tier High-Risk Pregnancy tracking for India's public health system  
+**Product:** Matru Suraksha — multi-tier high-risk pregnancy care for India's public health system  
 **Stack:** React + Vite + TypeScript, Vitest, Playwright, Fastify/Node, PostgreSQL  
 **Documentation Status:** Complete  
-**Last Updated:** Wed Oct 28 2026
+**Last Updated:** Fri Oct 30 2026  
+**Binding rules:** [`docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md`](docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md)
 
 ---
 
 ## 1. Overview
 
-The HRP Tracking Platform serves three tiers of users in India's public health system:
+Matru Suraksha serves six roles across India's public health system:
 
 | Tier | Role | Primary Interface | Responsibility |
 |------|------|-------------------|----------------|
-| Field | ANM (Auxiliary Nurse Midwife) | Mobile PWA (offline-first) | Patient capture, HRP identification, vitals, follow-up execution |
-| Triage | CHO (Community Health Officer) | Desktop Dashboard | Patient line list, risk triage, follow-up execution |
-| Supervision | BHM / DHS + Block Nodal / District Nodal | Desktop Dashboard | Block/district oversight, field-level activation, adherence monitoring |
+| Field | ANM (Auxiliary Nurse Midwife) | Mobile PWA (offline-first) | Patient capture, HRP identification, vitals, 15-day follow-up execution |
+| Field triage | CHO (Community Health Officer) | Desktop Dashboard | Patient line list, risk triage, 15-day follow-up execution |
+| Block helpdesk | `HRP_HELPDESK_BLOCK` | Desktop Dashboard | Block-owned first follow-up for referred HRPs, shared line list |
+| Block supervision | BHM (Block Health Manager) | Desktop Dashboard | Block dashboard, dispatch box, Team & access |
+| District helpdesk | `HRP_HELPDESK_DISTRICT` | Desktop Dashboard | District line list and escalation queue |
+| District supervision | DHS (District Health Officer) | Desktop Dashboard | District KPIs, escalation queue, Team & access |
+
+Two rules drive the operational model:
+
+- **Follow-up is a repeating 15-day cycle.** A referred HRP starts with the Block HRP
+  Helpdesk (`BLOCK_15_DAY`); every later cycle is a field cycle (`FIELD_15_DAY`)
+  worked by the registering ANM/CHO and visible to the block at the same time.
+- **The standalone referral workflow is retired.** Referral notes stay on the visit
+  record. The referral endpoints remain available for authorization and data
+  compatibility, but no app screen calls them.
 
 ---
 
@@ -23,14 +36,30 @@ The HRP Tracking Platform serves three tiers of users in India's public health s
 
 ### 2.1 User Roles
 
+Six roles, lowest to highest responsibility:
+
 ```typescript
-export const UserRole = z.enum(["ANM", "CHO", "BHM", "DHS"]);
+export const UserRole = z.enum([
+  "ANM",
+  "CHO",
+  "HRP_HELPDESK_BLOCK",
+  "BHM",
+  "HRP_HELPDESK_DISTRICT",
+  "DHS",
+]);
 export type UserRole = z.infer<typeof UserRole>;
 ```
 
+`HELPDESK` is retired; migration `007_matru_suraksha_roles` rewrites existing
+rows to `HRP_HELPDESK_BLOCK`. `ASHA` and `STATE_ADMIN` remain database-only
+legacy values for inactive rows and are not part of the app enum.
+
 ### 2.2 Nodal Designation (Block / District)
 
-Block Nodal and District Nodal are **scoped designations** assigned to existing `DHS` or `BHM` users at the facility level. They are not separate roles.
+"Block Nodal" is the BHM; "District Nodal" is the DHS. The
+`user_nodal_designations` grant is retained for referral routing and for the
+legacy nodal dashboard/field-level endpoints. It does not create a seventh
+role and it is not the account-creation hierarchy — see §5.3.
 
 ```typescript
 export const NodalLevel = z.enum(["BLOCK", "DISTRICT"]);
@@ -80,25 +109,32 @@ Three statuses only:
 
 | Value | Meaning |
 |-------|---------|
-| `PENDING` | Follow-up not yet completed |
-| `COMPLETE` | Follow-up completed by ANM, CHO, or Block Nodal |
-| `NOT_REACHABLE` | Patient could not be reached for follow-up |
+| `PENDING` | Follow-up not yet completed; escalates when `scheduledDate` passes |
+| `COMPLETE` | Follow-up completed by the owning tier; starts the next 15-day cycle |
+| `NOT_REACHABLE` | Patient could not be reached; stays open and escalates when overdue |
 
 ```typescript
-export const FollowUpStatus = z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]);
-export type FollowUpStatus = z.infer<typeof FollowUpStatus>;
+export const HrpFollowUpStatus = z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]);
+export type HrpFollowUpStatus = z.infer<typeof HrpFollowUpStatus>;
 ```
 
-### 2.5 Follow-Up Track (Automated Scheduling)
+### 2.5 Follow-Up Stage (15-Day Cycle)
 
 ```typescript
-export const FollowUpTrack = z.enum([
-  "IMMEDIATE_7_DAYS",      // Within 7 days of HRP identification
-  "PMSMA_SESSION",         // Next PMSMA at PHC (9th/15th/21st, next working day if holiday)
-  "VHSND_COMMUNITY",       // Next VHSND by ANM in village
+export const HrpFollowUpTrack = z.enum([
+  "BLOCK_15_DAY",   // First cycle of a referred HRP, owned by the Block HRP Helpdesk
+  "FIELD_15_DAY",   // Every later cycle, worked by ANM/CHO and visible to the block
 ]);
-export type FollowUpTrack = z.infer<typeof FollowUpTrack>;
+export type HrpFollowUpTrack = z.infer<typeof HrpFollowUpTrack>;
+
+/** Length of one HRP follow-up cycle, in days. */
+export const HRP_FOLLOW_UP_WINDOW_DAYS = 15;
 ```
+
+The three old tracks (`IMMEDIATE_7_DAYS`, `PMSMA_SESSION`, `VHSND_COMMUNITY`)
+are removed. `follow_ups.track` stores the stage above; `patients.follow_up_track`
+mirrors it for the patient summary.
+
 
 ### 2.6 Facility Level
 
@@ -120,32 +156,30 @@ The Add Patient form collects exactly these fields:
 | `name` | string | Yes | Patient name |
 | `phone` | string | Yes | Mobile number (min 10 digits) |
 | `age` | number | Yes | Age (15–55) |
-| `village` | string | Yes | Village name (mapped to HWC on server) |
+| `address` | string | Yes | Village label picked from the HWC list; the owning facility comes from the access token |
 | `lmp` | string \| null | No | Last Menstrual Period (ISO datetime) |
-| `hrpComplication` | HrpComplication \| null | No | Dropdown — exactly 8 values above |
-| `isReferred` | boolean | Yes | "Referring or not" toggle — when true, patient goes to Block Nodal section |
+| `hrpComplication` | HrpComplication \| null | No | Dropdown - exactly 8 values above |
+| `referred` | boolean | Yes | "Referring or not" toggle — when true, the first 15-day cycle is owned by the Block HRP Helpdesk (`BLOCK_15_DAY`) |
 
 ```typescript
 export const PatientSchema = z.object({
   id: z.string().uuid(),
-  facilityId: z.string().uuid(),        // HWC facility (village resolved to HWC)
-  registeredBy: z.string().uuid(),       // ANM user ID who registered
+  facilityId: z.string().uuid(),          // owning HWC/facility (from the token)
+  registeredBy: z.string().uuid(),        // ANM/CHO user ID who registered
   name: z.string().min(1),
   age: z.number().int().min(15).max(55),
-  phone: z.string().min(10),
-  village: z.string().min(1),
-  hwcId: z.string().uuid().nullable(),   // resolved HWC facility
-  lmp: z.string().datetime().nullable(),
-  hrpComplication: HrpComplication.nullable(),
-  isReferred: z.boolean().default(false),
-  referredToFacilityId: z.string().uuid().nullable(),
-  isHrp: z.boolean().default(false),     // marked HRP by ANM/CHO
+  phone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(), // village label captured by intake
+  hrpReason: HrpReason.nullable().optional(),
+  hrpComplication: HrpComplication.nullable().optional(),
+  referred: z.boolean().default(false),
+  isHrp: z.boolean().default(false),      // marked HRP by ANM/CHO
   // Follow-up is AUTOMATED — no manual toggle
-  followUpTrack: FollowUpTrack.nullable(),
-  followUpScheduledDate: z.string().datetime().nullable(),
-  followUpStatus: FollowUpStatus.default("PENDING"),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
+  followUpTrack: HrpFollowUpTrack.nullable().optional(),
+  followUpScheduledDate: DateInput.nullable().optional(),
+  followUpStatus: HrpFollowUpStatus.default("PENDING"),
+  createdAt: DateInput,
+  updatedAt: DateInput,
 });
 ```
 
@@ -156,12 +190,16 @@ interface CreatePatientInput {
   name: string;
   phone: string;
   age: number;
-  village: string;           // mapped to HWC on server
+  address: string;           // village label from the HWC list
   lmp: string | null;        // ISO datetime
   hrpComplication: HrpComplication | null;
-  isReferred: boolean;
+  referred: boolean;
+  isHrp: boolean;            // the Add HRP case flow always sets true
 }
 ```
+
+`facilityId` and `registeredBy` are derived from the access token and are not
+accepted from the client.
 
 ---
 
@@ -171,12 +209,12 @@ interface CreatePatientInput {
 export const FollowUpSchema = z.object({
   id: z.string().uuid(),
   patientId: z.string().uuid(),
-  assignedToUserId: z.string().uuid(),   // ANM or CHO executing follow-up
-  assignedByUserId: z.string().uuid(),   // who created assignment (system for automated)
+  assignedToUserId: z.string().uuid(),   // current owner: field worker or block helpdesk
+  assignedByUserId: z.string().uuid(),   // who created the cycle (registration or completion)
   level: z.enum(["BLOCK_NODAL", "CHO", "ANM"]),
-  status: FollowUpStatus.default("PENDING"),
-  track: FollowUpTrack.nullable(),
-  scheduledDate: z.string().datetime(),
+  status: HrpFollowUpStatus.default("PENDING"),
+  track: HrpFollowUpTrack,               // BLOCK_15_DAY | FIELD_15_DAY
+  scheduledDate: z.string().datetime(),  // due date: start + 15 days
   completedAt: z.string().datetime().nullable(),
   completedByUserId: z.string().uuid().nullable(),
   notes: z.string().nullable(),
@@ -184,6 +222,42 @@ export const FollowUpSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 ```
+
+### Follow-Up List Item (shared line list)
+
+```typescript
+interface FollowUpListItem extends FollowUp {
+  patientName: string;
+  patientAge: number;
+  patientPhone: string | null;
+  patientRiskLevel: "GREEN" | "AMBER" | "RED";
+  hrpComplication: HrpComplication | null;
+  village: string | null;
+  blockName: string | null;              // block roll-up for district views
+  assignedToName: string | null;
+  assignedToRole: string | null;
+  completedByName: string | null;
+  completedByRole: string | null;
+}
+```
+
+The server joins the patient and attribution fields; the client never re-fetches
+users just to label a row. `blockName` is required for the district line list and
+escalation table.
+
+### Dispatch Input
+
+```typescript
+export const DispatchFollowUpSchema = z.object({
+  patientIds: z.array(z.string().uuid()).min(1).max(100),
+  assignedToUserId: z.string().uuid(),
+  scheduledDate: z.string().datetime().optional(),
+  notes: z.string().nullable().optional(),
+});
+```
+
+There is no `track` field. The server always writes `FIELD_15_DAY`; when
+`scheduledDate` is omitted the due date is today + 15 days.
 
 ### Follow-Up with Patient (for Panel View)
 
@@ -193,6 +267,7 @@ interface FollowUpWithPatient extends FollowUp {
   referredByAnmName?: string;  // ANM name shown in bottom right corner on panel
 }
 ```
+
 
 ---
 
@@ -204,36 +279,124 @@ All endpoints follow REST conventions: plural nouns, no verbs in URLs. Query par
 
 | Method | Endpoint | Description | Roles |
 |--------|----------|-------------|-------|
-| `POST` | `/api/hrp/patients` | Create new patient (Add Form) | ANM, CHO |
-| `GET` | `/api/hrp/patients` | List patients with filters | All authenticated |
-| `GET` | `/api/hrp/patients/:id` | Get single patient | All authenticated |
-| `PATCH` | `/api/hrp/patients/:id` | Partial update patient | ANM, CHO, Block Nodal |
-| `PATCH` | `/api/hrp/patients/:id/hrp` | Mark/unmark patient as HRP | ANM, CHO |
+| `POST` | `/api/hrp/patients` | Create new patient (Add Form) | ANM, CHO, HRP_HELPDESK_BLOCK, BHM |
+| `GET` | `/api/hrp/patients` | List patients with filters | All six roles (facility-scoped) |
+| `GET` | `/api/hrp/patients/:id` | Get single patient | All six roles (facility-scoped) |
+| `PATCH` | `/api/hrp/patients/:id` | Partial update patient | ANM, CHO, HRP_HELPDESK_BLOCK, BHM |
+| `PATCH` | `/api/hrp/patients/:id/hrp` | Mark/unmark patient as HRP; marking schedules the first 15-day cycle | ANM, CHO, HRP_HELPDESK_BLOCK, BHM |
+
+`facilityId` and `registeredBy` are always taken from the access token. ANM is
+restricted to its own facility; the other writer roles act inside their facility
+subtree.
 
 ### 5.2 Follow-Up Management
 
 | Method | Endpoint | Description | Roles |
 |--------|----------|-------------|-------|
-| `GET` | `/api/hrp/follow-ups` | List follow-ups with filters | All authenticated |
-| `GET` | `/api/hrp/follow-ups/panel` | Panel view: HRP-referred patients | ANM, CHO, Block Nodal, District Nodal |
-| `GET` | `/api/hrp/follow-ups/field` | Field-level follow-ups (if active) | ANM, CHO |
-| `PATCH` | `/api/hrp/follow-ups/:id` | Update follow-up status | ANM, CHO, Block Nodal |
-| `POST` | `/api/hrp/follow-ups/schedule` | Automated follow-up schedule calculation | System (triggered on HRP mark) |
+| `GET` | `/api/hrp/follow-ups` | List follow-ups with filters; returns `FollowUpListItem[]` including `blockName` | All six roles (facility-scoped) |
+| `GET` | `/api/hrp/follow-ups/panel` | Panel view: HRP-referred patients | ANM, CHO, HRP_HELPDESK_BLOCK, BHM, HRP_HELPDESK_DISTRICT, DHS |
+| `GET` | `/api/hrp/follow-ups/field` | Field-level follow-ups assigned to the caller (only when the district list is active) | ANM, CHO |
+| `POST` | `/api/hrp/follow-ups/dispatch` | Push selected women to an ANM/CHO with a 15-day due date; server writes `FIELD_15_DAY` | BHM, HRP_HELPDESK_BLOCK |
+| `GET` | `/api/hrp/follow-ups/:id` | Get one follow-up | All six roles (facility-scoped) |
+| `PATCH` | `/api/hrp/follow-ups/:id` | Update status to `COMPLETE` / `PENDING` / `NOT_REACHABLE`; `COMPLETE` starts the next cycle | All six roles (ANM own facility) |
 
-### 5.3 Nodal Dashboard (Block & District)
+There is no `POST /api/hrp/follow-ups/schedule`: the first cycle is created when
+the patient is registered with `isHrp = true` or marked HRP, and every later
+cycle is created by completion.
+
+`GET /api/hrp/follow-ups` filters: `status`, `track`, `assignedToUserId`,
+`patientId`, `facilityId`, `dueBefore`, `dueAfter`, `search`, plus pagination.
+
+### 5.3 Staff and Access
+
+Only BHM and DHS reach this surface. The role, not the JWT claim, decides what
+the account can do afterwards; role is fixed after creation.
 
 | Method | Endpoint | Description | Roles |
 |--------|----------|-------------|-------|
-| `GET` | `/api/hrp/nodal/dashboard` | Block/District nodal dashboard stats | Block Nodal, District Nodal |
-| `GET` | `/api/hrp/nodal/anms-offline` | ANMs offline > 48h | Block Nodal, District Nodal |
+| `GET` | `/api/staff` | List accounts in the caller's facility subtree | BHM, DHS |
+| `POST` | `/api/staff` | Create an account; `role` and `facilityId` are required | BHM, DHS (per matrix below) |
+| `PATCH` | `/api/staff/:id` | Edit `name`, `phone`, `email` or `facilityId` | BHM, DHS (per matrix below) |
+| `PATCH` | `/api/staff/:id/deactivate` | Deactivate an account; cannot deactivate self | BHM, DHS |
 
-### 5.4 Field-Level Activation (District-Controlled)
+Provisioning matrix:
+
+| Creator | May create / edit |
+|---------|-------------------|
+| DHS | BHM (one per block), `HRP_HELPDESK_DISTRICT` (district) |
+| BHM | CHO (facility), ANM (HWC / village), `HRP_HELPDESK_BLOCK` (block) |
+| Others | none |
+
+`POST /api/staff` body:
+
+```typescript
+export const CreateStaffSchema = z.object({
+  name: z.string().min(2).max(120),
+  email: z.string().email().max(120),
+  phone: z.string().regex(/^\d{10}$/),
+  password: z.string().min(8).max(72),
+  role: z.enum(["ANM", "CHO", "HRP_HELPDESK_BLOCK", "BHM", "HRP_HELPDESK_DISTRICT"]),
+  facilityId: z.string().uuid(),
+});
+```
+
+`PATCH /api/staff/:id` body (at least one field):
+
+```typescript
+export const UpdateStaffSchema = z
+  .object({
+    name: z.string().min(2).max(120).optional(),
+    email: z.string().email().max(120).optional(),
+    phone: z.string().regex(/^\d{10}$/).optional(),
+    facilityId: z.string().uuid().optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined));
+```
+
+Helpdesk accounts sign in with email + password; field/clinician accounts may
+sign in with employee ID or email. Every account gets an auto-generated employee
+ID when one is not supplied.
+
+### 5.4 Nodal Dashboard (Block & District)
 
 | Method | Endpoint | Description | Roles |
 |--------|----------|-------------|-------|
-| `GET` | `/api/hrp/field-level/active` | Check if field-level follow-up is active | All authenticated |
-| `POST` | `/api/hrp/field-level/activate` | Activate field-level from district list | District Nodal |
-| `POST` | `/api/hrp/field-level/deactivate` | Deactivate field-level | District Nodal |
+| `GET` | `/api/hrp/nodal/dashboard` | Block/district dashboard stats | BHM (block), DHS (district), with an active nodal designation |
+| `GET` | `/api/hrp/nodal/anms-offline` | ANMs offline > 48h | BHM, DHS, with an active nodal designation |
+
+These endpoints predate the role hierarchy and still check
+`user_nodal_designations` for the requested facility.
+
+### 5.5 Field-Level Activation (Retained API — Superseded)
+
+Field-level visibility is now automatic: every HRP has an open 15-day cycle,
+and the block's shared line list already includes the field stage. The old
+district activation gate is no longer part of the workflow. The endpoints below
+are kept for data compatibility; no app screen calls them.
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/api/hrp/field-level/active` | Check if a legacy field-level list is active | All six roles |
+| `POST` | `/api/hrp/field-level/activate` | Activate a legacy field-level list | District nodal designation (legacy) |
+| `POST` | `/api/hrp/field-level/deactivate` | Deactivate a legacy field-level list | District nodal designation (legacy) |
+
+### 5.6 Referrals (Retained API — Superseded Workflow)
+
+The standalone Referrals page and its navigation entry are removed. Referral
+notes recorded during a visit stay on the visit record. The endpoints below are
+kept for authorization and data compatibility; no app screen calls them.
+
+| Method | Endpoint | Description | Roles |
+|--------|----------|-------------|-------|
+| `GET` | `/api/referrals` | List referrals visible to the actor | All six roles (scope + `REFERRAL_NODAL` grant) |
+| `POST` | `/api/referrals` | Create a referral record | ANM, CHO, HRP_HELPDESK_BLOCK, BHM |
+| `PATCH` | `/api/referrals/:id` | Update referral status | Destination role or `REFERRAL_NODAL` holder |
+
+See [`docs/specs/SPEC-referral-workflow.md`](docs/specs/SPEC-referral-workflow.md)
+for the superseded workflow and
+[`docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md`](docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md)
+for the replacement follow-up rule.
+
 
 ---
 
@@ -265,93 +428,118 @@ interface APIError {
 
 ## 7. Role-Based Authorization Matrix
 
-| Action | ANM | CHO | BHM | DHS | Block Nodal | District Nodal |
-|--------|-----|-----|-----|-----|-------------|----------------|
-| Create patient | ✓ | ✓ | — | — | — | — |
-| View own facility patients | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| Mark patient as HRP | ✓ | ✓ | — | — | — | — |
-| Toggle isReferred | ✓ | ✓ | — | — | — | — |
-| View panel follow-ups | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
-| View field-level follow-ups | ✓\* | ✓\* | — | — | — | — |
-| Update follow-up status | ✓ (own) | ✓ (own) | ✓ | ✓ | ✓ | ✓ |
-| View nodal dashboard | — | — | ✓ | ✓ | ✓ (block) | ✓ (district) |
-| Activate field-level | — | — | — | ✓ | — | ✓ |
+| Action | ANM | CHO | HRP_HELPDESK_BLOCK | BHM | HRP_HELPDESK_DISTRICT | DHS |
+|--------|-----|-----|--------------------|-----|-----------------------|-----|
+| Create patient / visit | ✓ (own) | ✓ (subtree) | ✓ (block) | ✓ (subtree) | — | — |
+| View patients | ✓ (own) | ✓ (subtree) | ✓ (block) | ✓ (block) | ✓ (district) | ✓ (district) |
+| Mark patient as HRP | ✓ (own) | ✓ (subtree) | ✓ (block) | ✓ (subtree) | — | — |
+| Toggle `referred` | ✓ (own) | ✓ (subtree) | ✓ (block) | ✓ (subtree) | — | — |
+| View follow-up line list | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Close `BLOCK_15_DAY` | — | — | ✓ | ✓ | ✓ | ✓ |
+| Close `FIELD_15_DAY` | ✓ (own) | ✓ (subtree) | ✓ | ✓ | ✓ | ✓ |
+| Dispatch follow-ups | — | — | ✓ | ✓ | — | — |
+| Team & access (`staff:manage`) | — | — | — | ✓ (own subtree) | — | ✓ (district) |
+| View block dashboard | — | — | ✓ | ✓ | — | — |
+| View district dashboard / escalations | — | — | — | — | ✓ | ✓ |
+| Activate field-level | — | — | — | — | — | ✓ (district designation) |
+| Referral endpoints (retained) | create/read own | create/read HWC | read block | create/read block | read district | read district |
 
-*\*Only when district-level field-level list is active.*
+`followup:manage` is granted to all six roles, scoped to the facility subtree;
+ANM is limited to its own facility. `staff:manage` is granted to BHM and DHS only.
 
 ---
 
-## 8. Follow-Up Scheduling Logic (Automated — No Manual Toggle)
+## 8. Follow-Up Cycle (15 Days, Repeating — No Manual Toggle)
 
-### 8.1 Business Rules
+### 8.1 At registration
 
-When a patient is identified as HRP (`isHrp = true`) and/or referred (`isReferred = true`), the follow-up is **automatically scheduled**. There is **no manual toggle** for follow-up activation — the system calculates it.
+When a woman is marked HRP (`isHrp = true`), the first cycle is created
+automatically:
 
-Three tracks are computed, and the **earliest date wins**:
+| Condition | Stage | Owner | Due |
+|-----------|-------|-------|-----|
+| `referred = true` | `BLOCK_15_DAY` | Block HRP Helpdesk; falls back to the block BHM, then the registering worker | registration + 15 days |
+| `referred = false` | `FIELD_15_DAY` | Registering ANM/CHO | registration + 15 days |
 
-| Track | Logic | Rule |
-|-------|-------|------|
-| **IMMEDIATE_7_DAYS** | `identifiedDate + 7 days` | Within 7 days of HRP identification |
-| **PMSMA_SESSION** | Next PMSMA at PHC | Fixed dates: 9th, 15th, 21st of each month. If that date falls on Sunday or a government holiday → **next working day** |
-| **VHSND_COMMUNITY** | Next VHSND by ANM in village | Monthly village-level health, sanitation, and nutrition day |
+A `BLOCK_15_DAY` row is visible to the ANM/CHO in an **Awaiting block review**
+section but is not actionable there: only the block helpdesk, BHM or DHS can
+close it.
 
-**Scheduled date = min(Track 1, Track 2, Track 3)**  
-**Assigned track = whichever track produced the earliest date**
+### 8.2 On completion
 
-### 8.2 PMSMA Working-Day Logic
+When a cycle is marked `COMPLETE`:
 
-```typescript
-const PMSMA_DATES = [9, 15, 21]; // Fixed monthly dates
+1. the current row is closed with `completedAt` and `completedByUserId`;
+2. a new `FIELD_15_DAY` row is created, due **completion date + 15 days**,
+   assigned to the woman's registering ANM/CHO;
+3. the new row is immediately visible to the block helpdesk and district in the
+   shared line list, and both may close it.
 
-function getNextPmsmaDate(fromDate: Date): Date {
-  // Check current month's PMSMA dates first
-  // Then next month's dates
-  // For each candidate, if Sunday or government holiday → next working day
-}
+Completing any later cycle repeats step 2, so the 15-day cadence never stops
+while the woman remains an active HRP.
 
-function getNextWorkingDayIfHoliday(date: Date): Date {
-  let d = new Date(date);
-  while (isSunday(d) || isHoliday(d)) {
-    d = addDays(d, 1);
-  }
-  return d;
-}
-```
+### 8.3 Overdue escalation
 
-### 8.3 Follow-Up Completion Propagation
+A cycle is escalated when `status = PENDING AND scheduledDate < today`. No
+separate escalation record is written; the escalation queue and district
+compliance counts derive the condition, so an overdue row can never go stale.
+`NOT_REACHABLE` keeps the row open and escalates in the same way once its due
+date passes.
 
-When **any one** of (ANM, CHO, Block Nodal) marks a patient's follow-up as `COMPLETE`:
-- The follow-up record status = `COMPLETE`
-- All other viewers see it as completed for that patient
-- No duplicate follow-up is created for the same patient
+### 8.4 Dispatch
+
+The block dispatch box writes one `FIELD_15_DAY` row per selected woman,
+assigned to the chosen ANM/CHO. The request has no track field. Omitting
+`scheduledDate` sets the due date to today + 15 days; supplying it overrides the
+date but never the stage.
+
+### 8.5 Follow-up completion propagation
+
+When **any authorised role** marks a cycle `COMPLETE`:
+
+- the row status becomes `COMPLETE` and attribution is recorded;
+- all viewers of the shared line list see it as completed;
+- the next cycle is created exactly once, for the registering ANM/CHO.
 
 When marked `NOT_REACHABLE`:
-- Status recorded with attempt timestamp
-- No automatic retry schedule (manual review by nodal authority)
+
+- the status and attempt timestamp are recorded;
+- the row stays open and escalates if it becomes overdue;
+- no automatic retry schedule is created; the block helpdesk can re-dispatch.
+
 
 ---
 
 ## 9. Panel View — Follow-Up Section
 
-The follow-up section is **not a separate panel**. HRP-referred patients appear within the follow-up section of each user's view.
+The follow-up section is **not a separate panel**. HRP cases appear within the
+follow-up section of each user's view: field workers see their own cycles and
+the block-owned rows awaiting review; block and district roles see the shared
+line list.
 
 ### Visibility Rules
 
 A patient appears in the follow-up section when:
-- `isHrp = true` AND `isReferred = true`
+- `isHrp = true`
+
+The stage (`BLOCK_15_DAY` or `FIELD_15_DAY`) decides who owns the row, not
+whether it appears.
 
 ### Row Display
 
 | Column | Content | Location |
 |--------|---------|----------|
-| Patient Name | `patient.name` | Left |
-| Age | `patient.age` | Left |
-| Village | `patient.village` | Left |
-| Complication | `patient.hrpComplication` | Left (from 8-value dropdown) |
+| Patient Name | `patientName` | Left |
+| Age | `patientAge` | Left |
+| Village | `village` | Left |
+| Block | `blockName` (district roll-up) | Left |
+| Complication | `hrpComplication` | Left (from 9-value dropdown) |
 | Referred By | `referredByAnmName` | **Bottom right corner** |
 | Follow-Up Status | `PENDING` / `COMPLETE` / `NOT_REACHABLE` | Right |
 | Scheduled Date | `followUp.scheduledDate` | Right |
-| Track | `IMMEDIATE_7_DAYS` / `PMSMA_SESSION` / `VHSND_COMMUNITY` | Right |
+| Stage | `BLOCK_15_DAY` / `FIELD_15_DAY` | Right |
+| Done by | `completedByName` (`completedByRole`) | Right |
+
 
 ### Referral Attribution
 
@@ -359,22 +547,29 @@ A patient appears in the follow-up section when:
 
 ---
 
-## 10. Field-Level Follow-Up (District-Activated Only)
+## 10. Field-Level Follow-Up (Automatic 15-Day Cycle)
 
 ### Activation Rule
 
-Field-level follow-ups are visible **only** when a district-level follow-up list exists for that facility's block/district.
+There is no manual activation and no district-owned list gate. A woman marked
+`isHrp` automatically has one open 15-day cycle, so her row appears for the
+responsible worker as soon as the cycle is created.
 
 | State | Visibility |
 |-------|------------|
-| Inactive (no district list) | No field-level section on any ANM/CHO dashboard or app |
-| Active (district list exists) | ANM/CHO see field-level follow-ups assigned to them by area/AWC code |
+| Referred HRP, `BLOCK_15_DAY` open | Visible to ANM/CHO in the read-only **Awaiting block review** section; actionable for the Block HRP Helpdesk, BHM and DHS |
+| `FIELD_15_DAY` open | Actionable for the assigned ANM/CHO; also visible to the block helpdesk, BHM, district helpdesk and DHS |
+| Cycle complete | Closed with attribution; completing it creates the next 15-day cycle |
+| Cycle overdue and still open | Escalated to the district escalation queue |
 
 ### Assignment
 
-Pushed from Block/District level with:
+Pushed from block level with:
 - `assignedToUserId` (specific ANM or CHO)
-- Area/AWC code for geographic scoping
+- `scheduledDate` = push date + 15 days, stored as `FIELD_15_DAY`
+
+The server also creates the first cycle automatically at registration, so a
+block dispatch is only needed when the work is being reassigned or restarted.
 
 ---
 
@@ -514,32 +709,25 @@ export function followUpLabel(record: FollowUpRecord): string {
 
 ---
 
-## 15. Date Utilities (PMSMA Working-Day Logic)
+## 15. Date Utilities (Repeating 15-Day Cycle)
 
 ```typescript
 export function addDays(date: Date, days: number): Date {
   const result = new Date(date);
-  result.setDate(result.getDate() + days);
+  result.setUTCDate(result.getUTCDate() + days);
   return result;
 }
 
-export function isSunday(date: Date): boolean {
-  return date.getDay() === 0;
-}
+export const HRP_FOLLOW_UP_WINDOW_DAYS = 15;
 
-export function isHoliday(date: Date): boolean {
-  // TODO: Query government holiday calendar for state/district
-  return false;
-}
-
-export function getNextWorkingDay(date: Date): Date {
-  let d = new Date(date);
-  while (isSunday(d) || isHoliday(d)) {
-    d = addDays(d, 1);
-  }
-  return d;
+export function nextHrpFollowUpDate(fromDate: Date = new Date()): Date {
+  return addDays(fromDate, HRP_FOLLOW_UP_WINDOW_DAYS);
 }
 ```
+
+PMSMA (9th/15th/21st) and VHSND scheduling are retired. The block's first
+check-up and every later field contact both use the same 15-day window,
+measured from registration or from the previous completion.
 
 ---
 
@@ -548,12 +736,13 @@ export function getNextWorkingDay(date: Date): Date {
 Before marking any implementation complete:
 
 - [ ] **Complication dropdown** — Exactly 8 values in exact sequence: ANEMIA, PIH, GDM, SHORT_STATURE, PRE_LSCS, MULTI_GRAVIDA, TWINS_MULTIPLE_PREGNANCY, TEENAGE_PREGNANCY (no RH_FACTOR, no extras)
-- [ ] **Referring toggle** — `isReferred` boolean; when true, patient shows on Block Nodal section and visible for follow-up
-- [ ] **PMSMA dates** — 9th, 15th, 21st; if Sunday/government holiday → next working day
-- [ ] **Follow-up automation** — No manual toggle; scheduled automatically as min(Immediate 7 days, PMSMA, VHSND)
+- [ ] **Referring toggle** — `referred` boolean; when true, cycle 1 is `BLOCK_15_DAY` owned by the Block HRP Helpdesk, falling back to the block BHM, then the registering worker
+- [ ] **15-day schedule** — No manual activation; due date is `registration + 15` for cycle 1 and `completion + 15` for every later cycle
+- [ ] **Block review visibility** — A referred woman's first cycle appears in the ANM/CHO screen as read-only "Awaiting block review" until the block closes it
+- [ ] **Escalation** — `status = PENDING AND scheduled_date < today` appears in the DHS / district-helpdesk escalation queue, with no stored flag
 - [ ] **Panel view** — Follow-up section shows HRP-referred patients with ANM name in bottom right corner
-- [ ] **Field-level** — Only visible when district-level list is active; otherwise absent from all dashboards
-- [ ] **Roles** — ANM, CHO, BHM, DHS + Block Nodal / District Nodal designations (scoped permissions on existing roles)
+- [ ] **Roles** — Exactly `ANM`, `CHO`, `HRP_HELPDESK_BLOCK`, `BHM`, `HRP_HELPDESK_DISTRICT`, `DHS`
+- [ ] **Provisioning** — DHS creates BHM/district helpdesk; BHM creates ANM/CHO/block helpdesk; nobody else creates accounts
 - [ ] **Follow-up status** — Complete, Pending, Not Reachable only
 - [ ] **API errors** — Consistent `APIError` shape across all endpoints
 - [ ] **Idempotency** — Atomic claim, unique constraint, 422 on payload mismatch, 409 on in-flight duplicate
@@ -570,12 +759,13 @@ Before marking any implementation complete:
 | Document | Path |
 |----------|------|
 | Domain Types | `packages/shared/src/types.ts` |
-| Validation Schemas | `packages/server/src/lib/validate.ts` |
-| Follow-Up Scheduling Rules | `packages/shared/src/rules.ts` |
+| Validation Schemas | `packages/shared/src/schemas.ts` |
+| Follow-Up Scheduling Rules | `packages/shared/src/hrp-follow-up.ts` |
 | Date Utilities | `packages/shared/src/date-utils.ts` |
-| API Route Handlers | `packages/server/src/routes/hrp.ts` |
+| API Route Handlers | `packages/server/src/routes/hrp.ts`, `follow-ups.ts`, `staff.ts` |
 | Client API Layer | `packages/client/src/lib/api.ts` |
-| React Components | `packages/client/src/components/hrp/` |
+| React Components | `packages/client/src/components/follow-ups/` |
+| Binding Spec | `docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md` |
 | This Documentation | `API_DOCUMENTATION.md` |
 
 ---

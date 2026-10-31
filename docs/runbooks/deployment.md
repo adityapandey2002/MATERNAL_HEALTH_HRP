@@ -146,7 +146,7 @@ starting. Never edit an applied migration; add a new one.
 | Endpoint | Expected | Meaning |
 |---|---|---|
 | `GET /health` | 200 | Process is alive; database is not checked |
-| `GET /ready` | 200 | Database reachable and `schema_migrations` has an applied row |
+| `GET /ready` | 200 | Database reachable and the latest applied migration is `007_matru_suraksha_roles` |
 | `GET /ready` | 503 | Database unavailable or no migration applied |
 
 Check from the host through the client edge:

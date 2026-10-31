@@ -76,7 +76,7 @@ npm run dev:client   # Vite PWA      -> http://localhost:5173
 | CHO | CHO001 | Dr. Priya Patel |
 | HRP Helpdesk (block) | helpdesk.daskroi@araria.gov.in | Amit Kumar |
 | BHM | MO001 | Dr. Rajesh Kumar |
-| HRP Helpdesk (district) | helpdesk.district@araria.gov.in | District helpdesk |
+| HRP Helpdesk (district) | helpdesk.district@araria.gov.in | Neha Singh |
 | DHS | ADM001 | District Admin |
 
 ### What lands on the front page

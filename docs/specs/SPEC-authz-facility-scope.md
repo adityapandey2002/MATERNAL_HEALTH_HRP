@@ -21,7 +21,10 @@ Stop cross-facility PHI access. Every request is authorized by role, responsibil
 
 ## Roles
 
-ANM, CHO, BHM, DHS. ASHA is not a login role. MO, STATE_ADMIN, and DISTRICT_ADMIN are removed.
+ANM, CHO, HRP_HELPDESK_BLOCK, BHM, HRP_HELPDESK_DISTRICT, DHS. ASHA is not a
+login role. MO, STATE_ADMIN, and DISTRICT_ADMIN are removed. See
+`SPEC-matru-suraksha-roles-and-follow-up.md` for the binding hierarchy and
+provisioning matrix.
 
 ## Functional requirements
 
@@ -30,9 +33,9 @@ ANM, CHO, BHM, DHS. ASHA is not a login role. MO, STATE_ADMIN, and DISTRICT_ADMI
 - `FR-AUTHZ-003`: query/body `facilityId` can only narrow the actor scope, never widen it.
 - `FR-AUTHZ-004`: list queries apply scope before pagination and counts.
 - `FR-AUTHZ-005`: by-id reads outside scope return 404; writes return 403.
-- `FR-AUTHZ-006`: ANM writes only at own facility; CHO within HWC subtree; BHM/DHS clinical reads are read-only.
-- `FR-AUTHZ-007`: BHM and DHS can read full patient records within scope; every read is audited.
-- `FR-AUTHZ-008`: referrals are visible to the actor's scope and to assigned `REFERRAL_NODAL` holders.
+- `FR-AUTHZ-006`: ANM writes only at own facility; CHO within HWC subtree; block helpdesk and BHM within the block subtree; district helpdesk and DHS are read-only on clinical records.
+- `FR-AUTHZ-007`: BHM, block helpdesk, district helpdesk and DHS can read full patient records within scope; every read is audited.
+- `FR-AUTHZ-008`: the retained referral API is visible to the actor's scope and to assigned `REFERRAL_NODAL` holders; the standalone referral workflow is superseded.
 - `FR-AUTHZ-009`: `sync_queue` is scoped by `facility_id`; clients cannot push entities outside their scope.
 - `FR-AUTHZ-010`: DHS admin actions are restricted to the district subtree.
 
