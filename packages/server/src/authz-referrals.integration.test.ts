@@ -199,21 +199,29 @@ describe("referral creation scope", () => {
     );
     expect(anmSibling.statusCode).toBe(403);
 
-    for (const user of [seed.users.bhmA, seed.users.dhsA]) {
-      const response = await inject(
-        user,
-        "POST",
-        "/api/referrals",
-        createPayload(seed.patients.patientA.id, seed.facilities.chcA.id)
-      );
-      expect(response.statusCode).toBe(403);
-    }
+    // BHM is a clinical write role and can create referrals now.
+    const bhmResponse = await inject(
+      seed.users.bhmA,
+      "POST",
+      "/api/referrals",
+      createPayload(seed.patients.patientA.id, seed.facilities.chcA.id)
+    );
+    expect(bhmResponse.statusCode).toBe(201);
+
+    // DHS remains read-only for clinical records.
+    const dhsResponse = await inject(
+      seed.users.dhsA,
+      "POST",
+      "/api/referrals",
+      createPayload(seed.patients.patientA.id, seed.facilities.chcA.id)
+    );
+    expect(dhsResponse.statusCode).toBe(403);
 
     const count = await db
       .selectFrom("referrals")
       .select((eb) => eb.fn.count("id").as("count"))
       .executeTakeFirstOrThrow();
-    expect(Number(count.count)).toBe(4);
+    expect(Number(count.count)).toBe(5);
   });
 
   it("denies an ANM another district's patient", async () => {

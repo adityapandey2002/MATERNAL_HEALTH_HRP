@@ -1,6 +1,6 @@
 import type { FacilityLevel, UserRole } from "@hrp/shared";
 import { describe, expect, it } from "vitest";
-import { ACTIONS, assertCan, can } from "./policy.js";
+import { ACTIONS, assertCan, can, canProvisionRole, provisionableRoles } from "./policy.js";
 import type { Action, ResourceTarget } from "./policy.js";
 import { AuthzError, assertRequestedScope } from "./scope.js";
 import type { ActorScope, ResponsibilityGrant } from "./scope.js";
@@ -47,9 +47,10 @@ const DENIED_ACTIONS: ReadonlySet<Action> = new Set<Action>(["patient:delete", "
 const ACTOR_FACILITIES: Record<UserRole, { path: string; level: FacilityLevel }> = {
   ANM: { path: VILLAGE_PATH, level: "VILLAGE" },
   CHO: { path: HWC_PATH, level: "HWC" },
+  HRP_HELPDESK_BLOCK: { path: BLOCK_PATH, level: "BLOCK" },
   BHM: { path: BLOCK_PATH, level: "BLOCK" },
+  HRP_HELPDESK_DISTRICT: { path: DISTRICT_PATH, level: "DISTRICT" },
   DHS: { path: DISTRICT_PATH, level: "DISTRICT" },
-  HELPDESK: { path: BLOCK_PATH, level: "BLOCK" },
 };
 
 const EXPECTED_ALLOWED: Record<UserRole, ReadonlySet<Action>> = {
@@ -60,7 +61,22 @@ const EXPECTED_ALLOWED: Record<UserRole, ReadonlySet<Action>> = {
     ...SUPERVISION_ACTIONS,
     "followup:manage",
   ]),
-  BHM: new Set([...BASE_READS, ...SUPERVISION_ACTIONS, "staff:manage", "followup:manage"]),
+  HRP_HELPDESK_BLOCK: new Set([
+    ...BASE_READS,
+    ...CLINICAL_WRITE_ACTIONS,
+    "referral:respond",
+    "staff:read",
+    "followup:manage",
+  ]),
+  BHM: new Set([
+    ...BASE_READS,
+    ...CLINICAL_WRITE_ACTIONS,
+    ...SUPERVISION_ACTIONS,
+    "staff:manage",
+    "staff:read",
+    "followup:manage",
+  ]),
+  HRP_HELPDESK_DISTRICT: new Set([...BASE_READS, "referral:respond", "followup:manage"]),
   DHS: new Set([
     ...BASE_READS,
     ...SUPERVISION_ACTIONS,
@@ -68,12 +84,7 @@ const EXPECTED_ALLOWED: Record<UserRole, ReadonlySet<Action>> = {
     "audit:read",
     "admin:manage",
     "staff:manage",
-    "followup:manage",
-  ]),
-  HELPDESK: new Set([
-    ...BASE_READS,
-    ...CLINICAL_WRITE_ACTIONS,
-    "referral:respond",
+    "staff:read",
     "followup:manage",
   ]),
 };
@@ -250,8 +261,21 @@ describe("clinical writes", () => {
     }
   });
 
-  it("denies BHM and DHS clinical writes", () => {
-    for (const role of ["BHM", "DHS"] as UserRole[]) {
+  it("allows the block helpdesk and BHM clinical writes in their subtree", () => {
+    for (const role of ["HRP_HELPDESK_BLOCK", "BHM"] as UserRole[]) {
+      const actor = makeActor(role);
+
+      for (const action of CLINICAL_WRITE_ACTIONS) {
+        expect(can(actor, action, facilityTarget(actor.facilityPath))).toEqual({
+          allowed: true,
+          reason: "ALLOWED",
+        });
+      }
+    }
+  });
+
+  it("denies DHS and district helpdesk clinical writes", () => {
+    for (const role of ["DHS", "HRP_HELPDESK_DISTRICT"] as UserRole[]) {
       const actor = makeActor(role);
 
       for (const action of CLINICAL_WRITE_ACTIONS) {
@@ -265,7 +289,7 @@ describe("clinical writes", () => {
   });
 
   it("rejects a clinical write without a target facility", () => {
-    for (const role of ["ANM", "CHO"] as UserRole[]) {
+    for (const role of ["ANM", "CHO", "HRP_HELPDESK_BLOCK", "BHM"] as UserRole[]) {
       for (const action of CLINICAL_WRITE_ACTIONS) {
         expect(can(makeActor(role), action, facilityTarget(null))).toEqual({
           allowed: false,
@@ -402,6 +426,20 @@ describe("referral responses", () => {
     expect(
       can(
         makeActor("DHS"),
+        "referral:respond",
+        referralTarget(null, DISTRICT_HOSPITAL_PATH, "DISTRICT")
+      )
+    ).toEqual({ allowed: true, reason: "ALLOWED" });
+    expect(
+      can(
+        makeActor("HRP_HELPDESK_BLOCK"),
+        "referral:respond",
+        referralTarget(null, CHC_PATH, "CHC")
+      )
+    ).toEqual({ allowed: true, reason: "ALLOWED" });
+    expect(
+      can(
+        makeActor("HRP_HELPDESK_DISTRICT"),
         "referral:respond",
         referralTarget(null, DISTRICT_HOSPITAL_PATH, "DISTRICT")
       )

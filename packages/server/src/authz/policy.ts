@@ -25,6 +25,7 @@ export const ACTIONS = [
   "audit:read",
   "admin:manage",
   "staff:manage",
+  "staff:read",
   "followup:manage",
 ] as const;
 
@@ -70,16 +71,40 @@ const READ_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   "audit:read",
 ]);
 
-const CLINICAL_WRITE_ROLES: readonly UserRole[] = ["ANM", "CHO", "HELPDESK"];
+const CLINICAL_WRITE_ROLES: readonly UserRole[] = ["ANM", "CHO", "HRP_HELPDESK_BLOCK", "BHM"];
 const SUPERVISION_ROLES: readonly UserRole[] = ["CHO", "BHM", "DHS"];
 const STAFF_ADMIN_ROLES: readonly UserRole[] = ["BHM", "DHS"];
+const STAFF_READ_ROLES: readonly UserRole[] = ["HRP_HELPDESK_BLOCK", "BHM", "DHS"];
 
 const REFERRAL_DESTINATION_LEVELS: Partial<Record<UserRole, readonly FacilityLevel[]>> = {
   CHO: ["HWC"],
   BHM: ["BLOCK", "CHC"],
   DHS: ["DISTRICT"],
-  HELPDESK: ["BLOCK", "CHC"],
+  HRP_HELPDESK_BLOCK: ["BLOCK", "CHC"],
+  HRP_HELPDESK_DISTRICT: ["DISTRICT"],
 };
+
+/**
+ * Account provisioning matrix.
+ *
+ * DHS appoints the block nodal officers and the district helpdesk; BHM
+ * appoints field clinicians and the block helpdesk. Nobody else may create or
+ * edit accounts.
+ */
+const PROVISIONABLE_ROLES: Partial<Record<UserRole, readonly UserRole[]>> = {
+  DHS: ["BHM", "HRP_HELPDESK_DISTRICT"],
+  BHM: ["ANM", "CHO", "HRP_HELPDESK_BLOCK"],
+};
+
+/** Roles the actor may create or edit; empty for every other tier. */
+export function provisionableRoles(actorRole: UserRole): readonly UserRole[] {
+  return PROVISIONABLE_ROLES[actorRole] ?? [];
+}
+
+/** True when the actor may create or edit an account with the target role. */
+export function canProvisionRole(actorRole: UserRole, targetRole: UserRole): boolean {
+  return provisionableRoles(actorRole).includes(targetRole);
+}
 
 function allow(): PolicyResult {
   return { allowed: true, reason: "ALLOWED" };
@@ -219,21 +244,30 @@ function canAdminister(actor: ActorScope, target: ResourceTarget): PolicyResult 
 }
 
 /**
- * Follow-up status updates and dispatch are shared across tiers: the ANM or
- * CHO closes a field contact, the helpdesk works the block line list, and the
- * nodal officer can correct a row from the block panel.
+ * Follow-up status updates and dispatch are shared across all six tiers. Scope
+ * is what limits the action: an ANM only reaches its own facility path, while
+ * the helpdesk and nodal officers work the line list for their subtree.
  */
 function canManageFollowUp(actor: ActorScope, target: ResourceTarget): PolicyResult {
-  if (actor.role === "BHM" || actor.role === "DHS") {
-    return canReadFacilityScoped(actor, target);
-  }
-
-  return canWriteClinical(actor, target);
+  return canReadFacilityScoped(actor, target);
 }
 
-/** Block Nodal and District officers provision helpdesk staff in their scope. */
+/** BHM and DHS provision the tiers below them inside their own subtree. */
 function canManageStaff(actor: ActorScope, target: ResourceTarget): PolicyResult {
   if (!STAFF_ADMIN_ROLES.includes(actor.role)) {
+    return deny("ROLE_NOT_PERMITTED");
+  }
+
+  return canReadFacilityScoped(actor, target);
+}
+
+/**
+ * The block helpdesk needs the ANM/CHO directory to fill the dispatch box, but
+ * it cannot create or edit accounts. This read is separate from staff:manage so
+ * the write path stays restricted to BHM and DHS.
+ */
+function canReadStaff(actor: ActorScope, target: ResourceTarget): PolicyResult {
+  if (!STAFF_READ_ROLES.includes(actor.role)) {
     return deny("ROLE_NOT_PERMITTED");
   }
 
@@ -283,6 +317,9 @@ function evaluate(actor: ActorScope, action: Action, target: ResourceTarget): Po
 
     case "staff:manage":
       return canManageStaff(actor, target);
+
+    case "staff:read":
+      return canReadStaff(actor, target);
 
     default:
       return deny("UNKNOWN_ACTION");

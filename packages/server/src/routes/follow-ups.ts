@@ -1,4 +1,4 @@
-import { addDays, getNextPmsmaDate, getNextVhsndDate } from "@hrp/shared";
+import { nextHrpFollowUpDate } from "@hrp/shared";
 import {
   CreateFollowUpSchema,
   DispatchFollowUpSchema,
@@ -22,10 +22,11 @@ import {
   facilityScopePredicate,
 } from "../authz/scope.js";
 import { db } from "../db/client.js";
-import type { FollowUpRow } from "../db/types.js";
+import type { DB, FollowUpRow } from "../db/types.js";
 import { parsePagination } from "../lib/pagination.js";
 import { serializeFollowUp } from "../lib/serializers.js";
 import { validateBody, validateQuery } from "../lib/validate.js";
+import { followUpLevelForRole, nextFieldFollowUpValues } from "../services/hrp-follow-up.js";
 
 const SORTABLE_COLUMNS = ["scheduled_date", "created_at", "status"] as const;
 const _UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -45,6 +46,7 @@ type FollowUpJoinedRow = FollowUpRow & {
   completed_by_name: string | null;
   completed_by_role: string | null;
   village: string | null;
+  block_name: string | null;
 };
 
 /**
@@ -60,22 +62,12 @@ function toFollowUpListItem(row: FollowUpJoinedRow): FollowUpListItem {
     patientRiskLevel: row.patient_risk_level,
     hrpComplication: (row.hrp_complication ?? null) as FollowUpListItem["hrpComplication"],
     village: row.village,
+    blockName: row.block_name,
     assignedToName: row.assigned_to_name,
     assignedToRole: row.assigned_to_role,
     completedByName: row.completed_by_name,
     completedByRole: row.completed_by_role,
   };
-}
-
-/** Default date for a dispatched track when the caller does not set one. */
-function defaultScheduledDate(
-  track: DispatchFollowUp["track"],
-  village: string | null | undefined,
-  from: Date
-): Date {
-  if (track === "IMMEDIATE_7_DAYS") return addDays(from, 7);
-  if (track === "PMSMA_SESSION") return getNextPmsmaDate(from);
-  return getNextVhsndDate(village ?? "", from);
 }
 
 export const followUpRoutes: FastifyPluginAsync = async (app) => {
@@ -143,6 +135,7 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
         "completed_user.name as completed_by_name",
         "completed_user.role as completed_by_role",
         "facilities.name as village",
+        "facilities.block as block_name",
         "facilities.path as facility_path",
       ])
       .orderBy(
@@ -187,7 +180,7 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
 
     return {
       data: data.map((row) => ({
-        ...serializeFollowUp(row as unknown as import("../db/types.js").FollowUpRow),
+        ...serializeFollowUp(row),
         patient: {
           name: row.patient_name,
           age: row.patient_age,
@@ -231,9 +224,7 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
       .execute();
 
     return {
-      data: data.map((row) =>
-        serializeFollowUp(row as unknown as import("../db/types.js").FollowUpRow)
-      ),
+      data: data.map((row) => serializeFollowUp(row)),
       total: data.length,
       page: 1,
       limit: 20,
@@ -243,8 +234,8 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
 
   /* ------------------------------------------------------------------ *
    *  POST /api/hrp/follow-ups/dispatch — push a list to an ANM/CHO      *
-   *  Block Nodal dispatch box: assigns the selected cases to a field    *
-   *  worker and schedules them on the chosen track.                     *
+   *  Block dispatch box: assigns the selected women to a field worker   *
+   *  and starts (or moves) their next 15-day field cycle.               *
    * ------------------------------------------------------------------ */
   app.post(
     "/dispatch",
@@ -266,7 +257,6 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
           "users.role as role",
           "users.is_active as is_active",
           "facilities.path as facility_path",
-          "facilities.name as facility_name",
         ])
         .where("users.id", "=", data.assignedToUserId)
         .executeTakeFirst();
@@ -281,7 +271,11 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
       });
 
       const dispatchRole = assignee.role;
-      if (dispatchRole !== "ANM" && dispatchRole !== "CHO" && dispatchRole !== "HELPDESK") {
+      if (
+        dispatchRole !== "ANM" &&
+        dispatchRole !== "CHO" &&
+        dispatchRole !== "HRP_HELPDESK_BLOCK"
+      ) {
         return reply
           .code(400)
           .send({ message: "Follow-ups can only be dispatched to field workers" });
@@ -290,7 +284,7 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
       const patients = await db
         .selectFrom("patients")
         .innerJoin("facilities", "facilities.id", "patients.facility_id")
-        .select(["patients.id as id", "facilities.name as village"])
+        .select("patients.id as id")
         .where("patients.id", "in", data.patientIds)
         .where(facilityScopePredicate(actor, "facilities.path"))
         .execute();
@@ -302,30 +296,77 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
       const now = new Date();
       const scheduledDate = data.scheduledDate
         ? new Date(data.scheduledDate)
-        : defaultScheduledDate(data.track, patients[0]?.village ?? assignee.facility_name, now);
+        : nextHrpFollowUpDate(now);
+      const level = followUpLevelForRole(dispatchRole);
 
-      const level: "BLOCK_NODAL" | "CHO" | "ANM" =
-        dispatchRole === "ANM" ? "ANM" : dispatchRole === "CHO" ? "CHO" : "BLOCK_NODAL";
+      const rows = await db.transaction().execute(async (trx) => {
+        const pending = await trx
+          .selectFrom("follow_ups")
+          .select(["id", "patient_id"])
+          .where(
+            "patient_id",
+            "in",
+            patients.map((patient) => patient.id)
+          )
+          .where("status", "=", "PENDING")
+          .orderBy("scheduled_date", "asc")
+          .execute();
 
-      const inserted = await db
-        .insertInto("follow_ups")
-        .values(
-          patients.map((patient) => ({
-            patient_id: patient.id,
-            assigned_to_user_id: data.assignedToUserId,
-            assigned_by_user_id: actor.userId,
-            level,
-            track: data.track,
-            scheduled_date: scheduledDate,
-            notes: data.notes ?? null,
-          }))
-        )
-        .returningAll()
-        .execute();
+        const pendingByPatient = new Map<string, string>();
+        for (const row of pending) {
+          if (!pendingByPatient.has(row.patient_id)) {
+            pendingByPatient.set(row.patient_id, row.id);
+          }
+        }
+
+        const result: FollowUpRow[] = [];
+
+        for (const patient of patients) {
+          const pendingId = pendingByPatient.get(patient.id);
+
+          if (pendingId) {
+            result.push(
+              await trx
+                .updateTable("follow_ups")
+                .set({
+                  assigned_to_user_id: data.assignedToUserId,
+                  assigned_by_user_id: actor.userId,
+                  level,
+                  track: "FIELD_15_DAY",
+                  scheduled_date: scheduledDate,
+                  notes: data.notes ?? null,
+                  updated_at: now,
+                })
+                .where("id", "=", pendingId)
+                .returningAll()
+                .executeTakeFirstOrThrow()
+            );
+            continue;
+          }
+
+          result.push(
+            await trx
+              .insertInto("follow_ups")
+              .values({
+                patient_id: patient.id,
+                assigned_to_user_id: data.assignedToUserId,
+                assigned_by_user_id: actor.userId,
+                level,
+                track: "FIELD_15_DAY",
+                scheduled_date: scheduledDate,
+                notes: data.notes ?? null,
+              })
+              .returningAll()
+              .executeTakeFirstOrThrow()
+          );
+        }
+
+        return result;
+      });
 
       return reply.code(201).send({
-        data: inserted.map((row) => serializeFollowUp(row)),
-        count: inserted.length,
+        data: rows.map((row) => serializeFollowUp(row)),
+        count: rows.length,
       });
     }
   );
@@ -355,6 +396,7 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
 
   /* ------------------------------------------------------------------ *
    *  PATCH /api/hrp/follow-ups/:id — update follow-up status           *
+   *  Completing a cycle starts the next 15-day field cycle for an HRP. *
    * ------------------------------------------------------------------ */
   app.patch(
     "/:id",
@@ -368,7 +410,11 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
         .innerJoin("patients", "patients.id", "follow_ups.patient_id")
         .innerJoin("facilities", "facilities.id", "patients.facility_id")
         .selectAll("follow_ups")
-        .select("facilities.path as facility_path")
+        .select([
+          "patients.is_hrp as patient_is_hrp",
+          "patients.registered_by as patient_registered_by",
+          "facilities.path as facility_path",
+        ])
         .where("follow_ups.id", "=", id)
         .executeTakeFirst();
       if (!existing) return reply.code(404).send({ message: "Follow-up not found" });
@@ -378,22 +424,73 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
         facilityPath: existing.facility_path,
       });
 
-      const setClause: Record<string, unknown> = {
-        status: data.status,
-        updated_at: new Date(),
-      };
+      const now = new Date();
 
-      if (data.status === "COMPLETE") {
-        setClause.completed_at = new Date();
-        setClause.completed_by_user_id = request.actor.userId;
-      }
+      const result = await db.transaction().execute(async (trx) => {
+        const setClause: Updateable<DB["follow_ups"]> = {
+          status: data.status,
+          updated_at: now,
+        };
 
-      const result = await db
-        .updateTable("follow_ups")
-        .set(setClause as Updateable<import("../db/types.js").DB["follow_ups"]>)
-        .where("id", "=", id)
-        .returningAll()
-        .executeTakeFirstOrThrow();
+        if (data.notes !== undefined) setClause.notes = data.notes;
+        if (data.status === "COMPLETE") {
+          setClause.completed_at = now;
+          setClause.completed_by_user_id = request.actor.userId;
+        }
+
+        const updated = await trx
+          .updateTable("follow_ups")
+          .set(setClause)
+          .where("id", "=", id)
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        if (
+          data.status !== "COMPLETE" ||
+          existing.status === "COMPLETE" ||
+          !existing.patient_is_hrp
+        ) {
+          return updated;
+        }
+
+        // Do not stack a second open cycle on a woman who already has one.
+        const otherOpen = await trx
+          .selectFrom("follow_ups")
+          .select("id")
+          .where("patient_id", "=", existing.patient_id)
+          .where("status", "!=", "COMPLETE")
+          .where("id", "!=", id)
+          .executeTakeFirst();
+
+        if (otherOpen) return updated;
+
+        const registrant = await trx
+          .selectFrom("users")
+          .select(["id", "role"])
+          .where("id", "=", existing.patient_registered_by)
+          .executeTakeFirst();
+
+        const next = nextFieldFollowUpValues({
+          patientId: existing.patient_id,
+          registrantUserId: registrant?.id ?? request.actor.userId,
+          registrantRole: registrant?.role ?? null,
+          assignedByUserId: request.actor.userId,
+          completedAt: now,
+        });
+
+        await trx.insertInto("follow_ups").values(next).execute();
+        await trx
+          .updateTable("patients")
+          .set({
+            follow_up_track: next.track,
+            follow_up_scheduled_date: next.scheduled_date,
+            updated_at: now,
+          })
+          .where("id", "=", existing.patient_id)
+          .execute();
+
+        return updated;
+      });
 
       return serializeFollowUp(result);
     }

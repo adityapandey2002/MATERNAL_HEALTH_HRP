@@ -78,12 +78,22 @@ export class AuthzError extends Error {
   }
 }
 
+/**
+ * Facility levels each app role may work at.
+ *
+ * The hierarchy is ANM -> CHO -> HRP_HELPDESK_BLOCK -> BHM ->
+ * HRP_HELPDESK_DISTRICT -> DHS. A block helpdesk operator sits with the block
+ * nodal officer at the block CHC; the district helpdesk sits at the district
+ * office next to the DHS. Both helpdesk tiers are view/close roles, so they
+ * are scoped to the same facility levels as their supervising officer.
+ */
 const ROLE_FACILITY_LEVELS: Record<UserRole, readonly FacilityLevel[]> = {
-  ANM: ["VILLAGE", "HSC"],
-  CHO: ["HWC"],
+  ANM: ["VILLAGE", "HSC", "HWC"],
+  CHO: ["HWC", "PHC", "CHC"],
+  HRP_HELPDESK_BLOCK: ["BLOCK", "CHC"],
   BHM: ["BLOCK", "CHC"],
+  HRP_HELPDESK_DISTRICT: ["DISTRICT"],
   DHS: ["DISTRICT"],
-  HELPDESK: ["BLOCK", "CHC"],
 };
 
 export function isFacilityRoleCompatible(role: UserRole, level: FacilityLevel): boolean {

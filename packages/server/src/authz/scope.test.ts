@@ -80,12 +80,12 @@ describe("isFacilityRoleCompatible", () => {
   it("maps ANM to village and HSC facilities", () => {
     expect(isFacilityRoleCompatible("ANM", "VILLAGE")).toBe(true);
     expect(isFacilityRoleCompatible("ANM", "HSC")).toBe(true);
-    expect(isFacilityRoleCompatible("ANM", "HWC")).toBe(false);
+    expect(isFacilityRoleCompatible("ANM", "HWC")).toBe(true);
   });
 
   it("maps CHO, BHM and DHS to their levels", () => {
     expect(isFacilityRoleCompatible("CHO", "HWC")).toBe(true);
-    expect(isFacilityRoleCompatible("CHO", "PHC")).toBe(false);
+    expect(isFacilityRoleCompatible("CHO", "PHC")).toBe(true);
     expect(isFacilityRoleCompatible("BHM", "BLOCK")).toBe(true);
     expect(isFacilityRoleCompatible("BHM", "CHC")).toBe(true);
     expect(isFacilityRoleCompatible("BHM", "DISTRICT")).toBe(false);

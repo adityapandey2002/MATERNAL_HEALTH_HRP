@@ -409,32 +409,46 @@ describe("visit facility scope", () => {
 
 describe("supervision roles are read-only for clinical records", () => {
   it("denies BHM and DHS patient and visit creation", async () => {
-    for (const user of [seed.users.bhmA, seed.users.dhsA]) {
-      const patientResponse = await inject(user, "POST", "/api/patients", {
-        name: "New Patient",
-        age: 30,
-      });
-      expect(patientResponse.statusCode).toBe(403);
+    // BHM is a clinical write role and can create patients/visits now.
+    const bhmPatientResponse = await inject(seed.users.bhmA, "POST", "/api/patients", {
+      name: "New Patient BHM",
+      age: 30,
+    });
+    expect(bhmPatientResponse.statusCode).toBe(201);
 
-      const visitResponse = await inject(
-        user,
-        "POST",
-        "/api/visits",
-        visitPayload(seed.patients.patientA.id, 2)
-      );
-      expect(visitResponse.statusCode).toBe(403);
-    }
+    const bhmVisitResponse = await inject(
+      seed.users.bhmA,
+      "POST",
+      "/api/visits",
+      visitPayload(seed.patients.patientA.id, 2)
+    );
+    expect(bhmVisitResponse.statusCode).toBe(201);
+
+    // DHS remains read-only for clinical records.
+    const dhsPatientResponse = await inject(seed.users.dhsA, "POST", "/api/patients", {
+      name: "New Patient DHS",
+      age: 30,
+    });
+    expect(dhsPatientResponse.statusCode).toBe(403);
+
+    const dhsVisitResponse = await inject(
+      seed.users.dhsA,
+      "POST",
+      "/api/visits",
+      visitPayload(seed.patients.patientA.id, 2)
+    );
+    expect(dhsVisitResponse.statusCode).toBe(403);
 
     const patientCount = await db
       .selectFrom("patients")
       .select((eb) => eb.fn.count("id").as("count"))
       .executeTakeFirstOrThrow();
-    expect(Number(patientCount.count)).toBe(3);
+    expect(Number(patientCount.count)).toBe(4);
 
     const visitCount = await db
       .selectFrom("visits")
       .select((eb) => eb.fn.count("id").as("count"))
       .executeTakeFirstOrThrow();
-    expect(Number(visitCount.count)).toBe(3);
+    expect(Number(visitCount.count)).toBe(4);
   });
 });

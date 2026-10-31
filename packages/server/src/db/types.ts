@@ -65,7 +65,7 @@ export interface Patient {
   risk_level: Generated<"GREEN" | "AMBER" | "RED">;
   risk_score: Generated<number>;
   is_high_risk: Generated<boolean>;
-  follow_up_track: "IMMEDIATE_7_DAYS" | "PMSMA_SESSION" | "VHSND_COMMUNITY" | null;
+  follow_up_track: "BLOCK_15_DAY" | "FIELD_15_DAY" | null;
   follow_up_scheduled_date: Date | null;
   follow_up_status: Generated<"PENDING" | "COMPLETE" | "NOT_REACHABLE">;
   created_at: Generated<Date>;
@@ -190,7 +190,7 @@ export interface FollowUp {
   assigned_by_user_id: string;
   level: "BLOCK_NODAL" | "CHO" | "ANM";
   status: Generated<"PENDING" | "COMPLETE" | "NOT_REACHABLE">;
-  track: "IMMEDIATE_7_DAYS" | "PMSMA_SESSION" | "VHSND_COMMUNITY";
+  track: "BLOCK_15_DAY" | "FIELD_15_DAY";
   scheduled_date: Generated<Date>;
   completed_at: Date | null;
   completed_by_user_id: string | null;

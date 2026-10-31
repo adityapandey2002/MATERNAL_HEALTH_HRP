@@ -239,18 +239,23 @@ describe("sync patient scope", () => {
     expect(row.facility_id).toBe(seed.facilities.villageA2.id);
     expect(row.registered_by).toBe(seed.users.anmA.id);
 
-    for (const user of [seed.users.bhmA, seed.users.dhsA]) {
-      const response = await push(user, {
-        patients: [patientPayload({ name: "Supervisor Created" })],
-      });
-      expect(response.statusCode).toBe(403);
-    }
+    // BHM is a clinical write role and can push patients now.
+    const bhmResponse = await push(seed.users.bhmA, {
+      patients: [patientPayload({ name: "Supervisor Created" })],
+    });
+    expect(bhmResponse.statusCode).toBe(200);
+
+    // DHS remains read-only for clinical records.
+    const dhsResponse = await push(seed.users.dhsA, {
+      patients: [patientPayload({ name: "Supervisor Created" })],
+    });
+    expect(dhsResponse.statusCode).toBe(403);
 
     const count = await db
       .selectFrom("patients")
       .select((eb) => eb.fn.count("id").as("count"))
       .executeTakeFirstOrThrow();
-    expect(Number(count.count)).toBe(3);
+    expect(Number(count.count)).toBe(4);
   });
 
   it("creates a new patient at the actor home facility", async () => {
@@ -513,17 +518,17 @@ describe("sync referral scope", () => {
     expect(row.status).toBe("PENDING");
   });
 
-  it("denies referral creation to BHM", async () => {
+  it("lets BHM create referrals", async () => {
     const response = await push(seed.users.bhmA, {
       referrals: [referralPayload(seed.patients.patientA.id, seed.facilities.chcA.id)],
     });
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(200);
 
     const count = await db
       .selectFrom("referrals")
       .select((eb) => eb.fn.count("id").as("count"))
       .executeTakeFirstOrThrow();
-    expect(Number(count.count)).toBe(4);
+    expect(Number(count.count)).toBe(5);
   });
 
   it("lets the creator update reason and urgency without changing routing or status", async () => {

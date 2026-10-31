@@ -211,8 +211,18 @@ export async function seedDatabase() {
         name: "Amit Kumar",
         phone: "9876543214",
         password_hash: passwordHash,
-        role: "HELPDESK",
+        role: "HRP_HELPDESK_BLOCK",
         facility_id: chcId,
+        language: "hi",
+      },
+      {
+        employee_id: "HELP02",
+        email: "helpdesk.district@araria.gov.in",
+        name: "Neha Singh",
+        phone: "9876543215",
+        password_hash: passwordHash,
+        role: "HRP_HELPDESK_DISTRICT",
+        facility_id: districtId,
         language: "hi",
       },
     ])
@@ -251,7 +261,7 @@ export async function seedDatabase() {
         hrp_reason: "PREVIOUS_C_SECTION",
         hrp_complication: "ANEMIA",
         is_hrp: true,
-        follow_up_track: "IMMEDIATE_7_DAYS",
+        follow_up_track: "BLOCK_15_DAY",
         follow_up_scheduled_date: daysFromToday(-2),
         follow_up_status: "PENDING",
         asha_name: "Sunita Devi",
@@ -277,7 +287,7 @@ export async function seedDatabase() {
         hrp_reason: "RH_NEGATIVE",
         hrp_complication: "PIH",
         is_hrp: true,
-        follow_up_track: "PMSMA_SESSION",
+        follow_up_track: "FIELD_15_DAY",
         follow_up_scheduled_date: daysFromToday(5),
         follow_up_status: "PENDING",
         asha_name: "Kavita Patel",
@@ -303,7 +313,7 @@ export async function seedDatabase() {
         hrp_reason: null,
         hrp_complication: null,
         is_hrp: false,
-        follow_up_track: "VHSND_COMMUNITY",
+        follow_up_track: null,
         follow_up_scheduled_date: daysFromToday(10),
         follow_up_status: "PENDING",
         asha_name: "Rekha Ben",
@@ -401,13 +411,15 @@ export async function seedDatabase() {
   await db
     .insertInto("follow_ups")
     .values([
+      // Rekha is a referred HRP, so the block helpdesk owns the open first
+      // cycle and it is already overdue (drives the district escalation queue).
       {
         patient_id: patient1Id,
-        assigned_to_user_id: anmId,
+        assigned_to_user_id: helpdeskId,
         assigned_by_user_id: bhmId,
-        level: "ANM",
+        level: "BLOCK_NODAL",
         status: "PENDING",
-        track: "IMMEDIATE_7_DAYS",
+        track: "BLOCK_15_DAY",
         scheduled_date: daysFromToday(-2),
       },
       {
@@ -416,7 +428,7 @@ export async function seedDatabase() {
         assigned_by_user_id: bhmId,
         level: "ANM",
         status: "PENDING",
-        track: "PMSMA_SESSION",
+        track: "FIELD_15_DAY",
         scheduled_date: daysFromToday(5),
       },
       {
@@ -425,7 +437,7 @@ export async function seedDatabase() {
         assigned_by_user_id: bhmId,
         level: "BLOCK_NODAL",
         status: "PENDING",
-        track: "VHSND_COMMUNITY",
+        track: "FIELD_15_DAY",
         scheduled_date: daysFromToday(10),
       },
       {
@@ -434,7 +446,7 @@ export async function seedDatabase() {
         assigned_by_user_id: bhmId,
         level: "CHO",
         status: "COMPLETE",
-        track: "PMSMA_SESSION",
+        track: "FIELD_15_DAY",
         scheduled_date: daysFromToday(-6),
         completed_at: daysFromToday(-5),
         completed_by_user_id: choId,
@@ -496,7 +508,8 @@ export async function seedDatabase() {
   console.log("  CHO: CHO001 / password123");
   console.log("  BHM: MO001 / password123");
   console.log("  DHS: ADM001 / password123");
-  console.log("  HRP Helpdesk: helpdesk.daskroi@araria.gov.in / password123");
+  console.log("  HRP Helpdesk (block): helpdesk.daskroi@araria.gov.in / password123");
+  console.log("  HRP Helpdesk (district): helpdesk.district@araria.gov.in / password123");
 }
 
 export async function seed() {

@@ -85,6 +85,7 @@ describe("migration plan", () => {
       "004_authz_hardening",
       "005_hrp_follow_up",
       "006_hrp_helpdesk",
+      "007_matru_suraksha_roles",
     ]);
   });
 });
