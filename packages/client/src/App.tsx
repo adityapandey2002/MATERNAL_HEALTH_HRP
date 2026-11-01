@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
 import { api } from "./lib/api";
+import { clearCachedSession, getCachedSession, setCachedSession } from "./lib/session-cache";
 import AddPatient from "./pages/AddPatient";
 import Dashboard from "./pages/Dashboard";
 import FollowUps from "./pages/FollowUps";
@@ -43,9 +44,17 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
       setAuthed(false);
       return;
     }
+    // While offline, trust the cached session instead of hitting the network.
+    if (!navigator.onLine) {
+      setAuthed(getCachedSession() !== null);
+      return;
+    }
     api.auth
       .me()
-      .then(() => setAuthed(true))
+      .then((user) => {
+        setCachedSession(user);
+        setAuthed(true);
+      })
       .catch(() => setAuthed(false));
   }, []);
 
@@ -64,9 +73,17 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
       setAuthed(false);
       return;
     }
+    if (!navigator.onLine) {
+      // Offline: if we have a cached session, treat as authenticated.
+      setAuthed(getCachedSession() !== null);
+      return;
+    }
     api.auth
       .me()
-      .then(() => setAuthed(true))
+      .then((user) => {
+        setCachedSession(user);
+        setAuthed(true);
+      })
       .catch(() => setAuthed(false));
   }, []);
 

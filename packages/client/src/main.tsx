@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { getCachedSession } from "./lib/session-cache";
 import { registerSW } from "./utils/sw";
 import "./styles/index.css";
 
@@ -15,6 +16,12 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+// Seed the session cache so role-gated UI keeps working while offline.
+const cached = getCachedSession();
+if (cached) {
+  queryClient.setQueryData(["auth", "me"], cached.user);
+}
 
 if ("serviceWorker" in navigator) {
   registerSW();

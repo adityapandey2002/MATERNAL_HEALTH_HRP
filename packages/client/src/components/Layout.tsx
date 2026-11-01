@@ -15,6 +15,7 @@ import {
   pageTitleFor,
 } from "../lib/nav";
 import { ROLE_LABEL } from "../lib/session";
+import { clearCachedSession } from "../lib/session-cache";
 import { isOnline, onOnlineChange } from "../utils/sw";
 import { BrandLockup, BrandMark } from "./ui/BrandMark";
 import { LogoutIcon, MoreHorizontalIcon } from "./ui/Icons";
@@ -68,6 +69,7 @@ export default function Layout() {
   const handleLogout = async () => {
     await api.auth.logout();
     localStorage.clear();
+    clearCachedSession();
     window.location.href = "/login";
   };
 
@@ -197,7 +199,7 @@ export default function Layout() {
 
         {!online && (
           <output className="block bg-triage-amber-solid px-4 py-2 text-xs font-semibold text-white sm:px-6">
-            Offline — records are saved on this device and sync when the connection returns.
+            Offline - read-only. Saving a patient, visit, or follow-up requires a connection.
           </output>
         )}
 

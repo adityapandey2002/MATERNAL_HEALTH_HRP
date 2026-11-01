@@ -71,8 +71,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (refreshed) {
       return request(path, options);
     }
-    localStorage.clear();
-    window.location.href = "/login";
+    // A refresh failure caused by "no network" must NOT wipe the session or
+    // redirect to /login — the user may be offline and still needs cached data.
+    if (navigator.onLine) {
+      localStorage.clear();
+      window.location.href = "/login";
+    }
     throw new ApiError(401, null, "Unauthorized");
   }
 
