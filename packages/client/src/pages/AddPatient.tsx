@@ -20,8 +20,11 @@ import {
 import { PageHeader } from "../components/ui/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { api } from "../lib/api";
+import { patientRepo } from "../lib/db/repositories";
 import { eddFromLmp, gestationalAgeLabel } from "../lib/hrp";
 import { useUserRole } from "../lib/session";
+import { getCachedSession } from "../lib/session-cache";
+import { enqueueOp } from "../lib/sync/queue";
 
 interface FormState {
   name: string;
@@ -73,7 +76,61 @@ export default function AddPatientPage() {
   }, [facilities]);
 
   const createMutation = useMutation({
-    mutationFn: (data: CreatePatient) => api.hrp.patients.create(data),
+    mutationFn: async (data: CreatePatient) => {
+      const id = crypto.randomUUID();
+      const cached = getCachedSession();
+      let user = cached?.user;
+      if (!user) {
+        try {
+          user = await api.auth.me();
+        } catch {
+          throw new Error("Sign in once with a connection before adding a case offline.");
+        }
+      }
+      const facilityId = user?.facilityId ?? "";
+      const anmName = user?.name ?? null;
+      const now = new Date().toISOString();
+      await patientRepo.upsert({
+        id,
+        abhaId: data.abhaId ?? null,
+        facilityId,
+        registeredBy: user?.id ?? "",
+        anmName,
+        name: data.name,
+        age: data.age,
+        phone: data.phone ?? null,
+        address: data.address ?? null,
+        hrpReason: (data.hrpReason ?? null) as string | null,
+        hrpComplication: (data.hrpComplication ?? null) as string | null,
+        ashaName: data.ashaName ?? null,
+        ashaPhone: data.ashaPhone ?? null,
+        referred: data.referred,
+        isHrp: data.isHrp ?? true,
+        followUpTrack: null,
+        followUpScheduledDate: null,
+        followUpStatus: data.followUpStatus ?? "PENDING",
+        lmp: data.lmp ? new Date(data.lmp).toISOString() : null,
+        edd: data.edd ? new Date(data.edd).toISOString() : null,
+        gravida: data.gravida ?? 0,
+        para: data.para ?? 0,
+        abortions: data.abortions ?? 0,
+        riskFactors: data.riskFactors ?? [],
+        riskLevel: "AMBER",
+        riskScore: 0,
+        isHighRisk: true,
+        createdAt: now,
+        updatedAt: now,
+        syncStatus: "pending",
+      });
+      await enqueueOp({
+        entityType: "patient",
+        entityId: id,
+        op: "create",
+        payload: { ...data, id },
+        clientUpdatedAt: now,
+      });
+      return id;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       queryClient.invalidateQueries({ queryKey: ["hrp", "patients"] });

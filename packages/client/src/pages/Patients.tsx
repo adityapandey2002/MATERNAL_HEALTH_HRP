@@ -1,6 +1,6 @@
 import { type RiskLevel, gestationalAgeWeeks } from "@hrp/shared";
-import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { PatientList } from "../components/PatientList";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -9,9 +9,10 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Panel } from "../components/ui/Panel";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { Pagination } from "../components/ui/Table";
-import { api } from "../lib/api";
 import { latestVisitByPatient } from "../lib/clinical";
+import { useLocalPatients, useLocalVisits } from "../lib/db/queries";
 import { useCanWriteClinical } from "../lib/session";
+import { pullCohort } from "../lib/sync/pull";
 
 const RISK_OPTIONS: { value: RiskLevel | ""; label: string }[] = [
   { value: "", label: "All" },
@@ -28,29 +29,37 @@ export default function PatientsPage() {
   const canRegister = useCanWriteClinical();
   const limit = 20;
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["patients", "list", { page, search, riskFilter, anmFilter }],
-    queryFn: () =>
-      api.patients.list({
-        page,
-        limit,
-        search: search || undefined,
-        riskLevel: riskFilter || undefined,
-        anmName: anmFilter.trim() || undefined,
-      }),
-    placeholderData: (prev) => prev,
+  // Refresh the local cache when online.
+  useEffect(() => {
+    if (typeof navigator !== "undefined" && navigator.onLine) {
+      void pullCohort();
+    }
+  }, []);
+
+  const allPatients = useLocalPatients() ?? [];
+  const allVisits = useLocalVisits() ?? [];
+
+  const filtered = allPatients.filter((p) => {
+    if (riskFilter && p.riskLevel !== riskFilter) return false;
+    if (
+      anmFilter.trim() &&
+      !(p.anmName ?? "").toLowerCase().includes(anmFilter.trim().toLowerCase())
+    ) {
+      return false;
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const hay = [p.name, p.ashaPhone ?? "", p.id].join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
   });
 
-  const { data: visitsData } = useQuery({
-    queryKey: ["visits", "register", { limit: 100 }],
-    queryFn: () => api.visits.list({ page: 1, limit: 100 }),
-    staleTime: 60 * 1000,
-  });
-
-  const patients = data?.data ?? [];
-  const total = data?.total ?? 0;
-  const totalPages = Math.ceil(total / limit);
-  const latestVisits = latestVisitByPatient(visitsData?.data ?? []);
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(page, totalPages);
+  const patients = filtered.slice((safePage - 1) * limit, safePage * limit);
+  const latestVisits = latestVisitByPatient(allVisits);
 
   const resetTo = <T,>(setter: (value: T) => void) => {
     return (value: T) => {
@@ -107,25 +116,16 @@ export default function PatientsPage() {
           </div>
         </div>
 
-        {isLoading ? (
-          <PatientListSkeleton />
-        ) : error ? (
-          <EmptyState
-            title="Could not load patients"
-            description="Check the connection and try again."
-          />
-        ) : (
-          <PatientList
-            patients={patients}
-            latestVisits={latestVisits}
-            emptyTitle="No patients found"
-            emptyDescription="Try a different search, risk level or ANM name."
-          />
-        )}
+        <PatientList
+          patients={patients}
+          latestVisits={latestVisits}
+          emptyTitle="No patients found"
+          emptyDescription="Try a different search, risk level or ANM name."
+        />
 
-        {!isLoading && !error && total > 0 ? (
+        {total > 0 ? (
           <Pagination
-            page={page}
+            page={safePage}
             totalPages={totalPages}
             total={total}
             limit={limit}
@@ -140,16 +140,6 @@ export default function PatientsPage() {
           ? `${patients.filter((p) => gestationalAgeWeeks(p) === null).length} on this page have no dating yet.`
           : ""}
       </p>
-    </div>
-  );
-}
-
-function PatientListSkeleton() {
-  return (
-    <div className="space-y-2 p-3 sm:p-4" aria-busy="true" aria-label="Loading patients">
-      {[0, 1, 2, 3, 4].map((i) => (
-        <div key={i} className="h-16 animate-pulse rounded bg-line-soft" />
-      ))}
     </div>
   );
 }

@@ -23,6 +23,9 @@ import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { RiskBadge } from "../components/ui/RiskBadge";
 import { api } from "../lib/api";
 import { gaLabel, villageLabel } from "../lib/clinical";
+import { visitRepo } from "../lib/db/repositories";
+import { getCachedSession } from "../lib/session-cache";
+import { enqueueOp } from "../lib/sync/queue";
 
 const VITALS = [
   { key: "bpSystolic", label: "BP Systolic", min: 70, max: 250, unit: "mmHg", step: 1 },
@@ -73,7 +76,54 @@ export default function NewVisitPage() {
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: CreateVisit) => api.visits.create(data),
+    mutationFn: async (data: CreateVisit) => {
+      const visitId = crypto.randomUUID();
+      const cached = getCachedSession();
+      let user = cached?.user;
+      if (!user) {
+        try {
+          user = await api.auth.me();
+        } catch {
+          throw new Error("Sign in once with a connection before recording a visit offline.");
+        }
+      }
+      const now = new Date().toISOString();
+      await visitRepo.upsert({
+        id: visitId,
+        patientId: data.patientId,
+        facilityId: user?.facilityId ?? "",
+        conductedBy: user?.id ?? "",
+        visitNumber: data.visitNumber,
+        visitDate: (data.visitDate instanceof Date
+          ? data.visitDate
+          : new Date(data.visitDate)
+        ).toISOString(),
+        gestationalWeeks: data.gestationalWeeks,
+        bpSystolic: data.bpSystolic ?? null,
+        bpDiastolic: data.bpDiastolic ?? null,
+        hemoglobin: data.hb ?? null,
+        weight: data.weight ?? null,
+        dangerSigns: data.dangerSigns ?? [],
+        supplements: {
+          ifaGiven: data.ifaGiven ?? false,
+          calciumGiven: data.calciumGiven ?? false,
+          albendazoleGiven: data.albendazoleGiven ?? false,
+        },
+        referred: data.referred,
+        notes: data.notes ?? null,
+        createdAt: now,
+        updatedAt: now,
+        syncStatus: "pending",
+      });
+      await enqueueOp({
+        entityType: "visit",
+        entityId: visitId,
+        op: "create",
+        payload: { ...data, id: visitId },
+        clientUpdatedAt: now,
+      });
+      return visitId;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["visits"] });
       queryClient.invalidateQueries({ queryKey: ["patients", id] });
@@ -175,6 +225,18 @@ export default function NewVisitPage() {
       />
 
       <PatientStrip patient={patient} />
+
+      {createMutation.isError && (
+        <div
+          className="rounded border border-triage-red-line bg-triage-red-bg px-4 py-3"
+          role="alert"
+          aria-live="polite"
+        >
+          <p className="text-sm font-medium text-triage-red">
+            Could not save the visit. Check the details and try again.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">

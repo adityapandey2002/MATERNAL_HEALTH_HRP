@@ -198,8 +198,10 @@ export default function SettingsPage() {
                 <div className="rounded border border-info-line bg-info-bg px-4 py-3">
                   <h3 className="text-sm font-semibold text-info">Automatic sync is on</h3>
                   <p className="mt-1 text-sm text-ink-muted">
-                    Records save on this device first and sync when the connection returns. Use the
-                    button below to force a sync now.
+                    Offline saving is not available yet: creating or editing a record requires a
+                    connection. Once the offline update is installed, records will save on this
+                    device first and sync when the connection returns. Use the button below to sync
+                    cached data now.
                   </p>
                 </div>
 

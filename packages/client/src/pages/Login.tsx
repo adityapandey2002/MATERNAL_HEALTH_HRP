@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { BrandMark } from "../components/ui/BrandMark";
 import { CheckIcon, ShieldCheckIcon } from "../components/ui/Icons";
 import { type ApiError, api } from "../lib/api";
+import { setCachedSession } from "../lib/session-cache";
+import { pullCohort } from "../lib/sync/pull";
 
 const CAPABILITIES = [
   "Register high-risk pregnancies at the village level",
@@ -21,6 +23,8 @@ export default function LoginPage() {
     mutationFn: api.auth.login,
     onSuccess: (data) => {
       localStorage.setItem("accessToken", data.accessToken);
+      setCachedSession(data.user);
+      void pullCohort();
       navigate("/");
     },
     onError: (err: ApiError) => {
@@ -168,7 +172,7 @@ export default function LoginPage() {
 
             <p className="mt-6 flex items-center justify-center gap-1.5 text-center text-xs text-ink-subtle">
               <CheckIcon className="h-3.5 w-3.5 text-triage-green-solid" />
-              Works offline. Data syncs when online.
+              Sign in once with a connection to enable offline viewing.
             </p>
           </div>
 

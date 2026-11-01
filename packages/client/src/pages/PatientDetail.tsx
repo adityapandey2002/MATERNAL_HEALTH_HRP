@@ -7,6 +7,7 @@ import {
   type HrpReason,
   type Patient,
   type UpdatePatient,
+  type User,
   type Visit,
   gestationalAgeWeeks,
   getFollowUpPlan,
@@ -14,6 +15,7 @@ import {
 } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { useLiveQuery } from "dexie-react-hooks";
 import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -41,7 +43,12 @@ import {
   toneTextClass,
   villageLabel,
 } from "../lib/clinical";
+import { type LocalPatient, type LocalVisit, db } from "../lib/db/local-db";
+import { toPatient, toVisit } from "../lib/db/queries";
+import { patientRepo } from "../lib/db/repositories";
 import { useCanWriteClinical } from "../lib/session";
+import { getCachedSession } from "../lib/session-cache";
+import { enqueueOp } from "../lib/sync/queue";
 
 const DANGER_SIGNS: { value: DangerSign; label: string }[] = [
   { value: "HYPERTENSION", label: "Hypertension / Pre-eclampsia" },
@@ -66,6 +73,71 @@ const FOLLOW_UP_LABEL: Record<FollowUpStatus, string> = {
   UPCOMING: "Upcoming",
 };
 
+async function resolveUser(): Promise<User | null> {
+  const cached = getCachedSession()?.user ?? null;
+  if (cached) return cached;
+  try {
+    return await api.auth.me();
+  } catch {
+    return null;
+  }
+}
+
+async function persistPatientUpdate(
+  patient: Patient | undefined,
+  data: UpdatePatient,
+  id: string
+): Promise<void> {
+  const now = new Date().toISOString();
+  if (patient) {
+    const local: Record<string, unknown> = {
+      ...patient,
+      ...data,
+      id,
+      updatedAt: now,
+      syncStatus: "pending",
+    };
+    if (local.lmp instanceof Date) local.lmp = local.lmp.toISOString();
+    if (local.edd instanceof Date) local.edd = local.edd.toISOString();
+    await patientRepo.upsert(local as never);
+  }
+  await enqueueOp({
+    entityType: "patient",
+    entityId: id,
+    op: "update",
+    payload: { ...data, id },
+    clientUpdatedAt: now,
+  });
+}
+
+/**
+ * A local row that has not reached the server yet wins over the server copy:
+ * otherwise an offline edit disappears from the screen until a sync completes.
+ */
+function resolvePatient(
+  serverPatient: Patient | undefined,
+  localPatient: LocalPatient | undefined
+): Patient | undefined {
+  if (localPatient && localPatient.syncStatus !== "synced") return toPatient(localPatient);
+  if (serverPatient) return serverPatient;
+  if (localPatient) return toPatient(localPatient);
+  return undefined;
+}
+
+/** Server visits win once synced; pending local visits are merged in. */
+function resolveVisits(
+  visitsData: Visit[] | undefined,
+  localVisits: LocalVisit[] | undefined
+): Visit[] {
+  const byId = new Map<string, Visit>();
+  for (const visit of visitsData ?? []) byId.set(visit.id, visit);
+  for (const local of localVisits ?? []) {
+    if (local.syncStatus !== "synced" || !byId.has(local.id)) {
+      byId.set(local.id, toVisit(local));
+    }
+  }
+  return [...byId.values()];
+}
 export default function PatientDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -74,22 +146,43 @@ export default function PatientDetailPage() {
   const [editing, setEditing] = useState(isNew);
   const canWrite = useCanWriteClinical();
 
-  const { data: patient, isLoading } = useQuery({
+  const { data: serverPatient, isLoading } = useQuery({
     queryKey: ["patients", id],
     queryFn: () => api.patients.get(id ?? ""),
-    enabled: !isNew,
+    enabled: !isNew && (typeof navigator === "undefined" || navigator.onLine),
   });
+
+  const localPatient = useLiveQuery(
+    () => (id && !isNew ? db.patients.get(id) : undefined),
+    [id, isNew]
+  );
+
+  const patient = resolvePatient(serverPatient, localPatient);
 
   const { data: visitsData } = useQuery({
     queryKey: ["visits", "byPatient", id],
     queryFn: () => api.visits.byPatient(id ?? ""),
-    enabled: !isNew,
+    enabled: !isNew && (typeof navigator === "undefined" || navigator.onLine),
   });
 
+  const localVisits = useLiveQuery(
+    () => (id && !isNew ? db.visits.where("patientId").equals(id).toArray() : []),
+    [id, isNew]
+  );
+  const visits: Visit[] = resolveVisits(visitsData, localVisits);
+
   const saveMutation = useMutation({
-    mutationFn: isNew
-      ? (data: CreatePatient) => api.patients.create(data)
-      : (data: UpdatePatient) => api.patients.update(id ?? "", data),
+    mutationFn: async (data: CreatePatient | UpdatePatient) => {
+      const user = await resolveUser();
+      if (!user) {
+        throw new Error("Sign in once with a connection before editing offline.");
+      }
+      if (isNew) {
+        return api.patients.create(data as CreatePatient);
+      }
+      await persistPatientUpdate(patient, data as UpdatePatient, id ?? "");
+      return { id: id ?? "" } as Patient;
+    },
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
       if (isNew) navigate(`/patients/${saved.id}`);
@@ -192,7 +285,6 @@ export default function PatientDetailPage() {
   }
 
   const p = patient ?? ({ ...form } as Patient);
-  const visits = visitsData ?? [];
   const followUpPlan = isNew ? [] : getFollowUpPlan(p, visits.length, 3);
 
   return (

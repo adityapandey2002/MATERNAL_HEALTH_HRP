@@ -4,10 +4,12 @@ import {
   getHrpStatusBadge,
   getHrpStatusLabel,
 } from "@hrp/shared";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { api } from "../../lib/api";
+import { useLocalFollowUpItems, useLocalPatients } from "../../lib/db/queries";
+import { followUpRepo } from "../../lib/db/repositories";
 import {
   type FollowUpRow,
   attributionLabel,
@@ -15,6 +17,9 @@ import {
   formatShortDate,
   summariseFollowUps,
 } from "../../lib/hrp";
+import { getCachedSession } from "../../lib/session-cache";
+import { pullCohort } from "../../lib/sync/pull";
+import { enqueueOp } from "../../lib/sync/queue";
 import { EmptyState } from "../ui/EmptyState";
 import {
   CalendarIcon,
@@ -36,43 +41,64 @@ interface UpdateStatusVariables {
 /**
  * Field panel for ANM and CHO.
  *
- * The server scopes the list to the signed-in user's facility (ANM) or
- * facility subtree (CHO). A referred woman's first cycle belongs to the Block
- * HRP Helpdesk, so it shows in a read-only "Awaiting block review" section
- * until the block closes it; every cycle after that is the field team's.
+ * The list is read from the device cache, so a worker with no signal still sees
+ * her assigned 15-day contacts. Status changes are written locally first and
+ * queued for the next sync; the server remains the system of record for the
+ * next cycle it schedules.
+ *
+ * A referred woman's first cycle belongs to the Block HRP Helpdesk, so it shows
+ * in a read-only "Awaiting block review" section until the block closes it;
+ * every cycle after that is the field team's.
  */
 export default function FieldFollowUpPanel() {
-  const queryClient = useQueryClient();
+  const patients = useLocalPatients();
+  const records = useLocalFollowUpItems();
 
-  const {
-    data: recordsData,
-    isLoading: recordsLoading,
-    isError,
-  } = useQuery({
-    queryKey: ["hrp", "follow-ups", "field-panel"],
-    queryFn: () => api.hrp.followUps.list({ page: 1, limit: 100 }),
-  });
+  // Refresh the cache when a connection is available; the list renders from
+  // Dexie either way, so this never blocks the first paint.
+  useEffect(() => {
+    if (typeof navigator === "undefined" || navigator.onLine) void pullCohort();
+  }, []);
 
-  const { data: patientsData, isLoading: patientsLoading } = useQuery({
-    queryKey: ["patients", "follow-ups"],
-    queryFn: () => api.hrp.patients.list({ page: 1, limit: 100 }),
-  });
-
-  const records = recordsData?.data ?? [];
-  const patients = patientsData?.data ?? [];
-  const rows = buildFollowUpLineList(patients, records);
+  const rows = buildFollowUpLineList(patients ?? [], records ?? []);
 
   const awaitingBlock = rows.filter((row) => row.isBlockStage);
   const fieldRows = rows.filter((row) => !row.isBlockStage);
   const summary = summariseFollowUps(fieldRows);
-  const loading = recordsLoading || patientsLoading;
+  const loading = patients === undefined || records === undefined;
 
   const statusMutation = useMutation({
-    mutationFn: ({ followUpId, status }: UpdateStatusVariables) =>
-      api.hrp.followUps.update(followUpId, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["hrp", "follow-ups"] });
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
+    mutationFn: async ({ followUpId, status }: UpdateStatusVariables) => {
+      const existing = await followUpRepo.get(followUpId);
+      if (!existing) {
+        throw new Error("This contact is not cached on this device yet.");
+      }
+      const user = getCachedSession()?.user ?? null;
+      const now = new Date().toISOString();
+      const completedAt = status === "COMPLETE" ? now : null;
+
+      await followUpRepo.upsert({
+        ...existing,
+        status,
+        completedAt,
+        completedByUserId: status === "COMPLETE" ? (user?.id ?? null) : null,
+        updatedAt: now,
+        syncStatus: "pending",
+      });
+      await enqueueOp({
+        entityType: "followUp",
+        entityId: followUpId,
+        op: "update",
+        payload: {
+          id: followUpId,
+          patientId: existing.patientId,
+          status,
+          completedAt,
+          updatedAt: now,
+        },
+        clientUpdatedAt: now,
+      });
+      return followUpId;
     },
   });
 
@@ -130,7 +156,7 @@ export default function FieldFollowUpPanel() {
           role="alert"
         >
           <p className="text-sm font-medium text-triage-red">
-            Could not update that follow-up. Check the connection and try again.
+            Could not save that change on this device. Try again.
           </p>
         </div>
       ) : null}
@@ -141,13 +167,6 @@ export default function FieldFollowUpPanel() {
             <div key={index} className="h-36 animate-pulse rounded-lg bg-line-soft" />
           ))}
         </div>
-      ) : isError ? (
-        <Panel>
-          <EmptyState
-            title="Follow-ups could not load"
-            description="The block list is unavailable right now. Pull to refresh when the network returns."
-          />
-        </Panel>
       ) : rows.length === 0 ? (
         <Panel>
           <EmptyState
@@ -226,7 +245,7 @@ export default function FieldFollowUpPanel() {
 
       <p className="flex items-center gap-1.5 text-xs text-ink-subtle">
         <SyncIcon className="h-3.5 w-3.5" />
-        Updates save immediately and sync to the block line list.
+        Changes save on this device and sync to the block line list when the network returns.
       </p>
     </div>
   );

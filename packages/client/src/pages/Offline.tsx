@@ -4,11 +4,9 @@ import { CheckIcon, SyncIcon, WifiOffIcon } from "../components/ui/Icons";
 import { isOnline, onOnlineChange } from "../utils/sw";
 
 const OFFLINE_CAPABILITIES = [
-  "Register new patients",
-  "Record ANC visits and vitals",
-  "Flag danger signs",
-  "Track 15-day HRP follow-ups",
-  "View patient history",
+  "View cached patients and history",
+  "Review 15-day HRP follow-ups (read-only)",
+  "Check due visits and danger signs",
 ];
 
 export default function OfflinePage() {
@@ -51,8 +49,9 @@ export default function OfflinePage() {
           <div className="px-5 py-6 sm:px-6">
             <h1 className="text-xl font-semibold tracking-tight text-ink">You're Offline</h1>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
-              Matru Suraksha works offline. Your data is saved locally and will sync automatically
-              when you're back online.
+              Matru Suraksha is read-only while offline. Viewing cached records works without a
+              connection; saving a new patient, visit, or follow-up requires a connection until the
+              offline update is installed.
             </p>
 
             <div className="mt-5 rounded border border-line-soft bg-canvas px-4 py-4">

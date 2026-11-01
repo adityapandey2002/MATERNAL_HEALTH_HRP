@@ -1,58 +1,85 @@
-import type { Patient } from "@hrp/shared";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../lib/api";
+import type { LocalFollowUp, LocalPatient } from "../lib/db/local-db";
+import { db } from "../lib/db/local-db";
+import { clearAllLocalData, opRepo } from "../lib/db/repositories";
 import FollowUpsPage from "./FollowUps";
 
 vi.mock("../lib/api", () => ({
   api: {
     auth: { me: vi.fn() },
     hrp: {
-      followUps: {
-        list: vi.fn(),
-        update: vi.fn(),
-      },
-      patients: {
-        list: vi.fn(),
-      },
+      followUps: { list: vi.fn(), update: vi.fn() },
+      patients: { list: vi.fn() },
     },
     patients: { list: vi.fn() },
+    sync: {
+      pull: vi.fn().mockRejectedValue(new Error("offline in test")),
+      push: vi.fn(),
+    },
   },
 }));
 
-const basePatient: Patient = {
-  id: "11111111-1111-4111-8111-111111111111",
-  abhaId: null,
-  facilityId: "22222222-2222-4222-8222-222222222222",
-  registeredBy: "33333333-3333-4333-8333-333333333333",
-  anmName: "Asha Ben",
-  name: "Patient",
-  age: 24,
-  phone: "9876543210",
-  address: "Shivrajpur",
-  hrpReason: "HYPERTENSION",
-  hrpComplication: "PIH",
-  ashaName: null,
-  ashaPhone: null,
-  referred: false,
-  isHrp: true,
-  followUpStatus: "PENDING",
-  followUpTrack: "FIELD_15_DAY",
-  followUpScheduledDate: new Date(),
-  lmp: new Date("2026-08-01"),
-  edd: new Date("2027-05-08"),
-  gravida: 1,
-  para: 0,
-  abortions: 0,
-  riskFactors: [],
-  riskLevel: "AMBER",
-  riskScore: 40,
-  isHighRisk: true,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-};
+const PATIENT_ID = "11111111-1111-4111-8111-111111111111";
+const ANM_ID = "33333333-3333-4333-8333-333333333333";
+
+function makePatient(overrides: Partial<LocalPatient> = {}): LocalPatient {
+  return {
+    id: PATIENT_ID,
+    abhaId: null,
+    facilityId: "22222222-2222-4222-8222-222222222222",
+    registeredBy: ANM_ID,
+    anmName: "Asha Ben",
+    name: "Patient",
+    age: 24,
+    phone: "9876543210",
+    address: "Shivrajpur",
+    hrpReason: "HYPERTENSION",
+    hrpComplication: "PIH",
+    ashaName: null,
+    ashaPhone: null,
+    referred: false,
+    isHrp: true,
+    followUpTrack: "FIELD_15_DAY",
+    followUpScheduledDate: new Date().toISOString(),
+    followUpStatus: "PENDING",
+    lmp: "2026-08-01T00:00:00.000Z",
+    edd: "2027-05-08T00:00:00.000Z",
+    gravida: 1,
+    para: 0,
+    abortions: 0,
+    riskFactors: [],
+    riskLevel: "AMBER",
+    riskScore: 40,
+    isHighRisk: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    syncStatus: "synced",
+    ...overrides,
+  };
+}
+
+function makeFollowUp(overrides: Partial<LocalFollowUp> = {}): LocalFollowUp {
+  return {
+    id: "44444444-4444-4444-8444-444444444444",
+    patientId: PATIENT_ID,
+    assignedToUserId: ANM_ID,
+    assignedByUserId: "55555555-5555-4555-8555-555555555555",
+    level: "ANM",
+    track: "FIELD_15_DAY",
+    status: "PENDING",
+    scheduledDate: new Date().toISOString(),
+    completedAt: null,
+    completedByUserId: null,
+    notes: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    syncStatus: "synced",
+    ...overrides,
+  };
+}
 
 const createWrapper = () => {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -64,61 +91,14 @@ const createWrapper = () => {
 };
 
 describe("FollowUpsPage", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
-    vi.mocked(api.auth.me).mockResolvedValue({
-      id: "33333333-3333-4333-8333-333333333333",
-      name: "Asha Ben",
-      employeeId: "ANM001",
-      phone: "9988776655",
-      role: "ANM",
-      facilityId: "22222222-2222-4222-8222-222222222222",
-      language: "en",
-      isActive: true,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
+    await clearAllLocalData();
   });
 
-  it("renders the assigned follow-up contacts for the 15-day stage", async () => {
-    vi.mocked(api.hrp.followUps.list).mockResolvedValue({
-      data: [
-        {
-          id: "fu-1",
-          patientId: basePatient.id,
-          assignedToUserId: "33333333-3333-4333-8333-333333333333",
-          assignedByUserId: "admin",
-          level: "ANM",
-          track: "FIELD_15_DAY",
-          scheduledDate: new Date().toISOString(),
-          status: "PENDING",
-          completedAt: null,
-          completedByUserId: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          patientName: "Urgent Woman",
-          patientAge: 25,
-          patientPhone: "9876543210",
-          patientRiskLevel: "RED",
-          hrpComplication: "PIH",
-          village: "Shivrajpur",
-          blockName: "Darbhanga Sadar",
-          assignedToName: "Asha Ben",
-          assignedToRole: "ANM",
-          completedByName: null,
-          completedByRole: null,
-        },
-      ],
-      total: 1,
-      page: 1,
-      limit: 100,
-    });
-    vi.mocked(api.hrp.patients.list).mockResolvedValue({
-      data: [{ ...basePatient, name: "Urgent Woman" }],
-      total: 1,
-      page: 1,
-      limit: 100,
-    });
+  it("renders the assigned follow-up contacts for the 15-day stage from the device cache", async () => {
+    await db.patients.put(makePatient({ name: "Urgent Woman" }));
+    await db.followUps.put(makeFollowUp());
 
     render(<FollowUpsPage />, { wrapper: createWrapper() });
 
@@ -132,52 +112,42 @@ describe("FollowUpsPage", () => {
     expect(screen.getByRole("link", { name: /Call mother/i })).toBeInTheDocument();
   });
 
+  it("writes a completion to the local store and queues it for sync", async () => {
+    await db.patients.put(makePatient({ name: "Urgent Woman" }));
+    const followUp = makeFollowUp();
+    await db.followUps.put(followUp);
+
+    render(<FollowUpsPage />, { wrapper: createWrapper() });
+
+    fireEvent.click(await screen.findByRole("button", { name: /Mark complete for Urgent Woman/i }));
+
+    await vi.waitFor(async () => {
+      const local = await db.followUps.get(followUp.id);
+      expect(local?.status).toBe("COMPLETE");
+      expect(local?.completedAt).not.toBeNull();
+      expect(local?.syncStatus).toBe("pending");
+    });
+
+    const ops = await opRepo.list();
+    expect(
+      ops.some(
+        (op) => op.entityType === "followUp" && op.entityId === followUp.id && op.op === "update"
+      )
+    ).toBe(true);
+  });
+
   it("shows a referred woman's first cycle as awaiting block review", async () => {
-    vi.mocked(api.hrp.followUps.list).mockResolvedValue({
-      data: [
-        {
-          id: "fu-block",
-          patientId: basePatient.id,
-          assignedToUserId: "44444444-4444-4444-8444-444444444444",
-          assignedByUserId: "admin",
-          level: "BLOCK_NODAL",
-          track: "BLOCK_15_DAY",
-          scheduledDate: new Date().toISOString(),
-          status: "PENDING",
-          completedAt: null,
-          completedByUserId: null,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-          patientName: "Referred Woman",
-          patientAge: 28,
-          patientPhone: "9876543211",
-          patientRiskLevel: "RED",
-          hrpComplication: "ANEMIA",
-          village: "Shivrajpur",
-          blockName: "Darbhanga Sadar",
-          assignedToName: "Amit Kumar",
-          assignedToRole: "HRP_HELPDESK_BLOCK",
-          completedByName: null,
-          completedByRole: null,
-        },
-      ],
-      total: 1,
-      page: 1,
-      limit: 100,
-    });
-    vi.mocked(api.hrp.patients.list).mockResolvedValue({
-      data: [
-        {
-          ...basePatient,
-          name: "Referred Woman",
-          referred: true,
-          followUpTrack: "BLOCK_15_DAY",
-        },
-      ],
-      total: 1,
-      page: 1,
-      limit: 100,
-    });
+    await db.patients.put(
+      makePatient({ name: "Referred Woman", referred: true, followUpTrack: "BLOCK_15_DAY" })
+    );
+    await db.followUps.put(
+      makeFollowUp({
+        id: "66666666-6666-4666-8666-666666666666",
+        assignedToUserId: "77777777-7777-4777-8777-777777777777",
+        level: "BLOCK_NODAL",
+        track: "BLOCK_15_DAY",
+      })
+    );
 
     render(<FollowUpsPage />, { wrapper: createWrapper() });
 
@@ -189,14 +159,6 @@ describe("FollowUpsPage", () => {
   });
 
   it("shows the empty state when no follow-ups are assigned", async () => {
-    vi.mocked(api.hrp.followUps.list).mockResolvedValue({
-      data: [],
-      total: 0,
-      page: 1,
-      limit: 100,
-    });
-    vi.mocked(api.hrp.patients.list).mockResolvedValue({ data: [], total: 0, page: 1, limit: 100 });
-
     render(<FollowUpsPage />, { wrapper: createWrapper() });
 
     expect(await screen.findByText("No follow-up list assigned yet")).toBeInTheDocument();
