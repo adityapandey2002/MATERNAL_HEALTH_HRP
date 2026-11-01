@@ -23,7 +23,19 @@ import type {
   VisitFilter,
 } from "@hrp/shared";
 
-const API_BASE = import.meta.env.VITE_API_URL ?? "/api";
+const API_BASE = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
+
+/**
+ * The Capacitor build is served from `https://localhost`, so the httpOnly
+ * refresh cookie is cross-site and never sent. Native builds ask the server
+ * for the refresh token in the response body and keep it on the device.
+ */
+export const IS_NATIVE_APP = import.meta.env.VITE_NATIVE_APP === "true";
+const NATIVE_REFRESH_KEY = "hrp-native-refresh-token";
+
+function nativeHeaders(): Record<string, string> {
+  return IS_NATIVE_APP ? { "X-Client-Platform": "native" } : {};
+}
 
 class ApiError extends Error {
   constructor(
@@ -90,19 +102,25 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 async function refreshToken(): Promise<boolean> {
-  // The refresh token lives in an httpOnly cookie the browser sends
-  // automatically. It is never read or written from JavaScript.
+  // On the web the refresh token lives in an httpOnly cookie the browser sends
+  // automatically. The bundled Android app has no such cookie, so it presents
+  // the token the server returned at login.
+  const nativeToken = IS_NATIVE_APP ? localStorage.getItem(NATIVE_REFRESH_KEY) : null;
   try {
     const response = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...nativeHeaders() },
       credentials: "include",
+      body: nativeToken ? JSON.stringify({ refreshToken: nativeToken }) : undefined,
     });
 
     if (response.ok) {
       const data = await response.json();
       if (data.accessToken) {
         localStorage.setItem("accessToken", data.accessToken);
+        if (IS_NATIVE_APP && data.refreshToken) {
+          localStorage.setItem(NATIVE_REFRESH_KEY, data.refreshToken);
+        }
         return true;
       }
     }
@@ -114,14 +132,27 @@ async function refreshToken(): Promise<boolean> {
 
 export const api = {
   auth: {
-    login: (data: Login) =>
-      request<{ accessToken: string; user: User }>("/auth/login", {
+    login: async (data: Login) => {
+      const result = await request<{
+        accessToken: string;
+        refreshToken?: string;
+        user: User;
+      }>("/auth/login", {
         method: "POST",
+        headers: nativeHeaders(),
         body: JSON.stringify(data),
-      }),
+      });
+      if (IS_NATIVE_APP && result.refreshToken) {
+        localStorage.setItem(NATIVE_REFRESH_KEY, result.refreshToken);
+      }
+      return result;
+    },
     refresh: () => request<{ accessToken: string }>("/auth/refresh", { method: "POST" }),
     me: () => request<User>("/auth/me"),
-    logout: () => request<void>("/auth/logout", { method: "POST" }),
+    logout: () => {
+      localStorage.removeItem(NATIVE_REFRESH_KEY);
+      return request<void>("/auth/logout", { method: "POST" });
+    },
   },
 
   patients: {

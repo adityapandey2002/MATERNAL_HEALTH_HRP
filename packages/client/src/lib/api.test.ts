@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError, api } from "./api";
 
 const store = new Map<string, string>();
@@ -159,6 +159,40 @@ describe("request", () => {
 
     await expect(api.patients.get("p1")).rejects.toBeInstanceOf(ApiError);
     expect(store.size).toBe(0);
+  });
+});
+
+describe("native client auth", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("keeps the rotated refresh token on device and sends it in the body", async () => {
+    vi.stubEnv("VITE_NATIVE_APP", "true");
+    vi.resetModules();
+    const nativeApi = (await import("./api")).api;
+
+    fetchMock
+      .mockResolvedValueOnce(
+        jsonResponse({ accessToken: "a1", refreshToken: "r1", user: { id: "u1" } })
+      )
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+      .mockResolvedValueOnce(jsonResponse({ accessToken: "a2", refreshToken: "r2" }))
+      .mockResolvedValueOnce(jsonResponse({ id: "p1" }));
+
+    await nativeApi.auth.login({ employeeId: "ANM001", password: "password123" });
+
+    expect(store.get("hrp-native-refresh-token")).toBe("r1");
+    expect(fetchMock.mock.calls[0][1].headers).toMatchObject({
+      "X-Client-Platform": "native",
+    });
+
+    await nativeApi.patients.get("p1");
+
+    const refreshCall = fetchMock.mock.calls[2];
+    expect(refreshCall[0]).toBe("/api/auth/refresh");
+    expect(JSON.parse(refreshCall[1].body as string)).toEqual({ refreshToken: "r1" });
+    expect(store.get("hrp-native-refresh-token")).toBe("r2");
   });
 });
 

@@ -1,7 +1,7 @@
 import { UserRole } from "@hrp/shared";
 import { LoginSchema } from "@hrp/shared/schemas";
 import bcrypt from "bcryptjs";
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest } from "fastify";
 import { sql } from "kysely";
 import { config } from "../config.js";
 import { db } from "../db/client.js";
@@ -9,6 +9,15 @@ import { serializeUser } from "../lib/serializers.js";
 import { validateBody } from "../lib/validate.js";
 
 const REFRESH_COOKIE = "refreshToken";
+
+/**
+ * The bundled Android app is served from `https://localhost`, so the httpOnly
+ * refresh cookie is cross-site and is never sent. Native builds therefore ask
+ * for the refresh token in the response body and present it on refresh.
+ */
+function isNativeRequest(request: FastifyRequest): boolean {
+  return request.headers["x-client-platform"] === "native";
+}
 
 export const authRoutes: FastifyPluginAsync = async (app) => {
   app.post("/login", { preValidation: validateBody(LoginSchema) }, async (request, reply) => {
@@ -47,6 +56,10 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
       { expiresIn: config.jwtRefreshTtl, key: config.jwtRefreshSecret }
     );
 
+    if (isNativeRequest(request)) {
+      return { accessToken, refreshToken, user: serializedUser };
+    }
+
     reply.setCookie(REFRESH_COOKIE, refreshToken, {
       httpOnly: true,
       secure: config.cookieSecure,
@@ -59,7 +72,9 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
   });
 
   app.post("/refresh", async (request, reply) => {
-    const refreshToken = request.cookies[REFRESH_COOKIE];
+    const native = isNativeRequest(request);
+    const bodyToken = (request.body as { refreshToken?: string } | undefined)?.refreshToken;
+    const refreshToken = native ? bodyToken : request.cookies[REFRESH_COOKIE];
 
     if (!refreshToken) {
       return reply.code(401).send({ message: "No refresh token provided" });
@@ -89,6 +104,10 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
         { sub: user.id, type: "refresh" },
         { expiresIn: config.jwtRefreshTtl, key: config.jwtRefreshSecret }
       );
+
+      if (native) {
+        return { accessToken: newAccessToken, refreshToken: newRefreshToken };
+      }
 
       reply.setCookie(REFRESH_COOKIE, newRefreshToken, {
         httpOnly: true,

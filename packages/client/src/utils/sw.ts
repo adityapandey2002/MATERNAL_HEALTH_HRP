@@ -1,27 +1,61 @@
-export async function registerSW(): Promise<void> {
-  if ("serviceWorker" in navigator) {
-    try {
-      const registration = await navigator.serviceWorker.register("/sw.js", {
-        scope: "/",
-      });
-      console.log("[SW] Registered:", registration.scope);
+type UpdateListener = () => void;
 
-      registration.addEventListener("updatefound", () => {
-        const newWorker = registration.installing;
-        if (newWorker) {
-          newWorker.addEventListener("statechange", () => {
-            if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-              console.log("[SW] New version available");
-              if (confirm("A new version of Matru Suraksha is available. Reload to update?")) {
-                window.location.reload();
-              }
-            }
-          });
-        }
-      });
-    } catch (error) {
-      console.error("[SW] Registration failed:", error);
+let waitingWorker: ServiceWorker | null = null;
+let reloading = false;
+const updateListeners = new Set<UpdateListener>();
+
+/**
+ * Notifies the UI that a new build is installed and waiting.
+ *
+ * The app never reloads on its own: a field worker may be halfway through a
+ * registration form, so applying the update is always an explicit tap.
+ */
+export function onUpdateReady(callback: UpdateListener): () => void {
+  updateListeners.add(callback);
+  if (waitingWorker) callback();
+  return () => {
+    updateListeners.delete(callback);
+  };
+}
+
+/** Activates the waiting build. The page reloads once it takes control. */
+export function applyUpdate(): void {
+  if (!waitingWorker) return;
+  reloading = true;
+  waitingWorker.postMessage({ type: "SKIP_WAITING" });
+}
+
+function announce(worker: ServiceWorker | null): void {
+  if (!worker) return;
+  const check = () => {
+    if (worker.state !== "installed") return;
+    // No controller means this is the first install, not an update.
+    if (!navigator.serviceWorker.controller) return;
+    waitingWorker = worker;
+    for (const listener of updateListeners) listener();
+  };
+  check();
+  worker.addEventListener("statechange", check);
+}
+
+export async function registerSW(): Promise<void> {
+  if (!("serviceWorker" in navigator)) return;
+  try {
+    const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloading) window.location.reload();
+    });
+
+    if (registration.waiting) {
+      waitingWorker = registration.waiting;
+      for (const listener of updateListeners) listener();
     }
+
+    registration.addEventListener("updatefound", () => announce(registration.installing));
+    announce(registration.installing);
+  } catch (error) {
+    console.error("[SW] Registration failed:", error);
   }
 }
 
@@ -34,7 +68,7 @@ export function requestNotificationPermission(): Promise<NotificationPermission>
 
 export function showNotification(title: string, options?: NotificationOptions): void {
   if ("Notification" in window && Notification.permission === "granted") {
-    new Notification(title, { icon: "/pwa-192.svg", badge: "/pwa-192.svg", ...options });
+    new Notification(title, { icon: "/pwa-192x192.png", badge: "/pwa-192x192.png", ...options });
   }
 }
 

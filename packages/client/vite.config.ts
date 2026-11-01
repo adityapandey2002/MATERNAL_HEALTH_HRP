@@ -15,36 +15,21 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       VitePWA({
-        registerType: "autoUpdate",
-        includeAssets: ["favicon.ico", "robots.txt"],
-        manifest: {
-          name: "Matru Suraksha",
-          short_name: "Matru Suraksha",
-          description: "Matru Suraksha — high-risk pregnancy care in Araria",
-          theme_color: "#16a34a",
-          background_color: "#ffffff",
-          display: "standalone",
-          orientation: "portrait",
-          scope: "/",
-          start_url: "/",
-          icons: [
-            { src: "pwa-192.svg", sizes: "192x192", type: "image/svg+xml" },
-            { src: "pwa-512.svg", sizes: "512x512", type: "image/svg+xml" },
-          ],
-        },
+        // The worker is registered by `utils/sw.ts` so the app controls when a
+        // waiting build is activated. The manifest is the static
+        // `public/manifest.json` linked from index.html.
+        registerType: "prompt",
+        injectRegister: null,
+        manifest: false,
+        includeAssets: ["robots.txt"],
         workbox: {
           globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
-          runtimeCaching: [
-            {
-              urlPattern: /^https:\/\/.*\/api\/.*/,
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "api-cache",
-                expiration: { maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 7 },
-                networkTimeoutSeconds: 10,
-              },
-            },
-          ],
+          // A deep link opened with no connection must boot the shell.
+          navigateFallback: "/index.html",
+          navigateFallbackDenylist: [/^\/api\//],
+          cleanupOutdatedCaches: true,
+          // No runtime caching of API responses: patient data lives in Dexie,
+          // never in Cache Storage.
         },
       }),
     ],

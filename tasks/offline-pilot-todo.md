@@ -9,9 +9,9 @@ Plan: `tasks/offline-pilot-plan.md` · Created: 2026-10-31
 
 - [x] **Decision D2 — Android package ID:** `in.gov.araria.matrusuraksha` (subject to district IT owning the `in.gov` namespace)
 - [x] **Decision D5 — offline scope:** ANM/CHO full local-first; BHM/helpdesk/DHS online-first read-only offline
-- [ ] **Decision D1 — pilot data:** synthetic only, or real PHI with Level 2 controls (see plan Appendix A). Hard constraint: free Render/Neon demo stays synthetic-only.
-- [ ] **Decision D3 — conflicts:** server-wins + visible conflict list (no automatic merge). Confirm whether "UI merge" means refetch or field-level merge.
-- [ ] **Decision D4 — APK channel:** recommended CI → GitHub Release → shared-drive mirror → WhatsApp link
+- [x] **Decision D1 — pilot data:** real PHI, so Conditional Phase 5A is required. Hard constraint: free Render/Neon demo stays synthetic-only; real records need a separate, non-shared pilot backend.
+- [x] **Decision D3 — conflicts:** server-wins + visible conflict list (no automatic merge). The unsynced version stays on the device and is listed in Settings.
+- [x] **Decision D4 — APK channel:** CI → GitHub Release (APK + SHA-256) → shared-drive mirror → WhatsApp link
 
 ## Phase 0 — Baseline and a failing test (0.5–1 day)
 
@@ -95,25 +95,25 @@ Plan: `tasks/offline-pilot-plan.md` · Created: 2026-10-31
   - Files: `pages/NewVisit.tsx`, `pages/PatientDetail.tsx`, tests
   - Depends: 2.3 · Size: M
 
-- [ ] **2.5 PatientDetail edits locally first**
+- [x] **2.5 PatientDetail edits locally first**
   - Acceptance: offline edit persists/syncs; conflict visible, not discarded
   - Verify: component + integration tests
   - Files: `pages/PatientDetail.tsx`, tests
   - Depends: 2.3 · Size: S
 
-- [ ] **2.6 Field follow-ups locally**
+- [x] **2.6 Field follow-ups locally**
   - Acceptance: offline completion persists; server uses real completion date; `BLOCK_15_DAY` stays non-actionable for field
   - Verify: `offline-followup` E2E + 1.4b integration
   - Files: `components/follow-ups/FieldFollowUpPanel.tsx`, `pages/FollowUps.tsx`, `pages/FieldHome.tsx`, tests
   - Depends: 1.4b, 2.2 · Size: M
 
-- [ ] **2.7 Real sync status UI**
+- [x] **2.7 Real sync status UI**
   - Acceptance: queue counts match Dexie; retry works; no false "complete"; accessible status
   - Verify: component tests + manual
   - Files: `components/SyncStatus.tsx`, `components/Layout.tsx`, `pages/Settings.tsx`, tests
   - Depends: 2.3–2.6 · Size: M
 
-- [ ] **2.8 Dashboard/FieldHome offline counts**
+- [x] **2.8 Dashboard/FieldHome offline counts**
   - Acceptance: offline counts in <1 s with "as of" time; no spinner
   - Verify: component test + manual
   - Files: `pages/Dashboard.tsx`, `pages/FieldHome.tsx`, tests
@@ -123,13 +123,13 @@ Plan: `tasks/offline-pilot-plan.md` · Created: 2026-10-31
 
 ## Phase 3 — PWA shell hardening (0.5–1 day)
 
-- [ ] **3.1 Navigation fallback, update prompt, cache cleanup**
+- [x] **3.1 Navigation fallback, update prompt, cache cleanup**
   - Acceptance: cold offline deep link works; prompt never reloads a dirty form; no PHI in Cache Storage
   - Verify: Playwright cold-start + cache inspection
   - Files: `vite.config.ts`, `utils/sw.ts`, `components/UpdatePrompt.tsx`, tests
   - Depends: 2.7 · Size: M
 
-- [ ] **3.2 Manifest, icons, theme, persistent storage**
+- [x] **3.2 Manifest, icons, theme, persistent storage**
   - Acceptance: installable; theme `#0D7A73`; short name `Matru`; PNG/maskable icons; persist requested
   - Verify: Lighthouse + manual install
   - Files: `vite.config.ts`, `public/*`, `main.tsx`, tests
@@ -139,35 +139,36 @@ Plan: `tasks/offline-pilot-plan.md` · Created: 2026-10-31
 
 ## Phase 4 — Capacitor Android APK (2.5–3 days)
 
-- [ ] **4.0a Native API transport and CORS**
+- [x] **4.0a Native API transport and CORS**
   - Acceptance: WebView origin can call `/health` and `/auth/login`; web build still uses `/api`; no wildcard CORS
   - Verify: server CORS tests + manual WebView call
   - Files: `lib/api.ts`, `server/index.ts`, `server/config.ts`, `.env.example`, tests
   - Depends: 3.2 · Size: M
 
-- [ ] **4.0b Native refresh token and demo gating**
+- [x] **4.0b Native refresh token and demo gating**
   - Acceptance: APK login survives 15-min expiry + restart; web keeps httpOnly cookie; pilot APK shows no demo credentials
   - Verify: auth tests for both client types + device test
   - Files: `routes/auth.ts`, `lib/api.ts`, `lib/session-cache.ts`, `pages/Login.tsx`, tests
   - Depends: 4.0a, 1.1 · Size: M
 
-- [ ] **4.1 Add Capacitor + Android project**
+- [x] **4.1 Add Capacitor + Android project**
   - Acceptance: debug APK launches; no cleartext; `allowBackup=false`; minSdk 23 / targetSdk 35
   - Verify: `cap sync android` + `gradlew assembleDebug`
   - Files: `package.json`, `capacitor.config.ts`, `android/*`, docs
   - Depends: 3.2 · Size: M
 
-- [ ] **4.2 Native lifecycle and storage**
+- [x] **4.2 Native lifecycle and storage**
   - Acceptance: offline record survives kill/relaunch; sync on resume/reconnect; back button does not lose form
   - Verify: device matrix
   - Files: `lib/native.ts`, `main.tsx`, `App.tsx`, `AndroidManifest.xml`
   - Depends: 4.1 · Size: M
 
-- [ ] **4.3 Signed release APK pipeline**
+- [~] **4.3 Signed release APK pipeline**
   - Acceptance: CI artifact is signed; installs over previous key with data intact; no keystore in tree
   - Verify: `workflow_dispatch` run + clean-device install
   - Files: `.github/workflows/android.yml`, `android/app/build.gradle`, runbook
   - Depends: 4.1 · Size: M
+  - Note: workflow written; first real run blocked on the four signing secrets
 
 - [ ] **4.4 Export, wipe, update notice**
   - Acceptance: export opens share sheet; wipe clears Dexie/caches; update banner names version + steps

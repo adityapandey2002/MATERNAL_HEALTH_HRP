@@ -43,7 +43,9 @@ async function notify(): Promise<void> {
 export function onSyncStatus(cb: (s: SyncStatusSummary) => void): () => void {
   listeners.add(cb);
   void notify();
-  return () => listeners.delete(cb);
+  return () => {
+    listeners.delete(cb);
+  };
 }
 
 export async function enqueueOp(
@@ -124,90 +126,76 @@ export async function drain(): Promise<void> {
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
   draining = true;
   try {
-    await drainBatch();
-  } catch (err) {
-    // A wiped or closed local store must never surface as an unhandled
-    // rejection. The next online/visibility trigger retries.
-    lastError = err instanceof Error ? err.message : String(err);
-    console.warn("[sync] drain failed:", lastError);
+    // Retry any ops whose backoff window has passed.
+    const ops = await opRepo.list();
+    const now = Date.now();
+    const ready = ops.filter((o) => (o.nextAttemptAt ?? 0) <= now);
+    if (ready.length === 0) {
+      await notify();
+      return;
+    }
+
+    // Group by entity type, cap at 100 per type per request.
+    const patients = ready
+      .filter((o) => o.entityType === "patient")
+      .slice(0, 100)
+      .map((o) => o.payload);
+    const visits = ready
+      .filter((o) => o.entityType === "visit")
+      .slice(0, 100)
+      .map((o) => o.payload);
+    const followUps = ready
+      .filter((o) => o.entityType === "followUp")
+      .slice(0, 100)
+      .map((o) => o.payload);
+
+    const sentOps = ready.filter((o) => {
+      if (o.entityType === "patient") return patients.includes(o.payload);
+      if (o.entityType === "visit") return visits.includes(o.payload);
+      if (o.entityType === "followUp") return followUps.includes(o.payload);
+      return false;
+    });
+
+    if (patients.length === 0 && visits.length === 0 && followUps.length === 0) {
+      await notify();
+      return;
+    }
+
+    try {
+      const res = await api.sync.push({
+        patients: patients as never,
+        visits: visits as never,
+        followUps: followUps as never,
+      });
+      await applyServerResponse(res as never);
+
+      // Remove acked ops (those we sent and that did not become conflicts).
+      const conflictIds = new Set(
+        (res.conflicts ?? []).map((c: { entityId: string }) => c.entityId)
+      );
+      for (const op of sentOps) {
+        if (conflictIds.has(op.entityId)) continue;
+        if (op.seq !== undefined) await opRepo.remove(op.seq);
+      }
+      lastError = null;
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : String(err);
+      // Exponential backoff per op.
+      const base = 5_000;
+      for (const op of sentOps) {
+        if (op.seq === undefined) continue;
+        const attempts = (op.attempts ?? 0) + 1;
+        const delay = Math.min(base * 2 ** (attempts - 1), 5 * 60 * 1000);
+        await opRepo.markFailed(op.seq, lastError, Date.now() + delay);
+      }
+    }
   } finally {
     draining = false;
-    await notify().catch((err) => {
-      console.warn("[sync] status update failed:", err instanceof Error ? err.message : err);
-    });
-    try {
-      // If more ops remain, schedule another drain.
-      const remaining = await opRepo.count();
-      if (remaining > 0 && (typeof navigator === "undefined" || navigator.onLine)) {
-        setTimeout(() => void drain(), 100);
-      }
-    } catch (err) {
-      console.warn("[sync] could not reschedule:", err instanceof Error ? err.message : err);
-    }
-  }
-}
-
-/** One push attempt for every op whose backoff window has passed. */
-async function drainBatch(): Promise<void> {
-  // Retry any ops whose backoff window has passed.
-  const ops = await opRepo.list();
-  const now = Date.now();
-  const ready = ops.filter((o) => (o.nextAttemptAt ?? 0) <= now);
-  if (ready.length === 0) {
     await notify();
-    return;
-  }
-
-  // Group by entity type, cap at 100 per type per request.
-  const patients = ready
-    .filter((o) => o.entityType === "patient")
-    .slice(0, 100)
-    .map((o) => o.payload);
-  const visits = ready
-    .filter((o) => o.entityType === "visit")
-    .slice(0, 100)
-    .map((o) => o.payload);
-  const followUps = ready
-    .filter((o) => o.entityType === "followUp")
-    .slice(0, 100)
-    .map((o) => o.payload);
-
-  const sentOps = ready.filter((o) => {
-    if (o.entityType === "patient") return patients.includes(o.payload);
-    if (o.entityType === "visit") return visits.includes(o.payload);
-    if (o.entityType === "followUp") return followUps.includes(o.payload);
-    return false;
-  });
-
-  if (patients.length === 0 && visits.length === 0 && followUps.length === 0) {
-    await notify();
-    return;
-  }
-
-  try {
-    const res = await api.sync.push({
-      patients: patients as never,
-      visits: visits as never,
-      followUps: followUps as never,
-    });
-    await applyServerResponse(res as never);
-
-    // Remove acked ops (those we sent and that did not become conflicts).
-    const conflictIds = new Set((res.conflicts ?? []).map((c: { entityId: string }) => c.entityId));
-    for (const op of sentOps) {
-      if (conflictIds.has(op.entityId)) continue;
-      if (op.seq !== undefined) await opRepo.remove(op.seq);
-    }
-    lastError = null;
-  } catch (err) {
-    lastError = err instanceof Error ? err.message : String(err);
-    // Exponential backoff per op.
-    const base = 5_000;
-    for (const op of sentOps) {
-      if (op.seq === undefined) continue;
-      const attempts = (op.attempts ?? 0) + 1;
-      const delay = Math.min(base * 2 ** (attempts - 1), 5 * 60 * 1000);
-      await opRepo.markFailed(op.seq, lastError, Date.now() + delay);
+    // If more ops remain, schedule another drain.
+    const remaining = await opRepo.count();
+    if (remaining > 0 && (typeof navigator === "undefined" || navigator.onLine)) {
+      setTimeout(() => void drain(), 100);
     }
   }
 }

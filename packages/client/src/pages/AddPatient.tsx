@@ -22,6 +22,7 @@ import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { api } from "../lib/api";
 import { patientRepo } from "../lib/db/repositories";
 import { eddFromLmp, gestationalAgeLabel } from "../lib/hrp";
+import { useUnsavedChangesGuard } from "../lib/native";
 import { useUserRole } from "../lib/session";
 import { getCachedSession } from "../lib/session-cache";
 import { enqueueOp } from "../lib/sync/queue";
@@ -59,6 +60,9 @@ export default function AddPatientPage() {
   const role = useUserRole();
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+
+  // Android's back button must not silently throw away a half-typed form.
+  useUnsavedChangesGuard(JSON.stringify(form) !== JSON.stringify(INITIAL_FORM));
 
   const { data: facilities } = useQuery({
     queryKey: ["facilities"],

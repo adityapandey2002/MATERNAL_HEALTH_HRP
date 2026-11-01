@@ -24,6 +24,7 @@ import { RiskBadge } from "../components/ui/RiskBadge";
 import { api } from "../lib/api";
 import { gaLabel, villageLabel } from "../lib/clinical";
 import { visitRepo } from "../lib/db/repositories";
+import { useUnsavedChangesGuard } from "../lib/native";
 import { getCachedSession } from "../lib/session-cache";
 import { enqueueOp } from "../lib/sync/queue";
 
@@ -152,6 +153,15 @@ export default function NewVisitPage() {
     const weeks = gestationalAgeWeeks(patient);
     if (weeks !== null) setGestationalWeeks(weeks);
   }, [patient]);
+
+  // A visit form with any clinical value entered is worth a confirmation before
+  // the hardware back button throws it away.
+  const hasEnteredData =
+    Object.values(vitals).some((value) => value.trim() !== "") ||
+    dangerSigns.length > 0 ||
+    referred ||
+    notes.trim() !== "";
+  useUnsavedChangesGuard(hasEnteredData, "Discard this visit? Nothing has been saved yet.");
 
   const toggleDangerSign = (sign: DangerSign) => {
     setDangerSigns((prev) =>

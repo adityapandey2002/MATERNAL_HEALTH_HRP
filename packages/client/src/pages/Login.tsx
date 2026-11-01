@@ -14,6 +14,9 @@ const CAPABILITIES = [
   "Follow every HRP on a repeating 15-day cycle",
 ];
 
+/** Shared demo logins must never ship in the pilot APK. */
+const SHOW_DEMO_ACCESS = import.meta.env.VITE_DEMO_MODE !== "false";
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Login>({ employeeId: "", password: "" });
@@ -176,15 +179,17 @@ export default function LoginPage() {
             </p>
           </div>
 
-          <div className="mt-4 rounded border border-line bg-surface px-4 py-3">
-            <p className="text-2xs font-semibold uppercase tracking-wider text-ink-subtle">
-              Demo access
-            </p>
-            <p className="mt-1 text-xs leading-relaxed text-ink-muted">
-              ANM001 or CHO001 · password <span className="tnum font-medium">password123</span>.
-              Synthetic data only.
-            </p>
-          </div>
+          {SHOW_DEMO_ACCESS ? (
+            <div className="mt-4 rounded border border-line bg-surface px-4 py-3">
+              <p className="text-2xs font-semibold uppercase tracking-wider text-ink-subtle">
+                Demo access
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-ink-muted">
+                ANM001 or CHO001 · password <span className="tnum font-medium">password123</span>.
+                Synthetic data only.
+              </p>
+            </div>
+          ) : null}
         </div>
       </main>
     </div>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Patient data only ever travels over TLS. Cleartext is denied for every domain,
+  including localhost, so a misconfigured API URL fails loudly instead of
+  quietly sending records over plain HTTP on a shared network.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

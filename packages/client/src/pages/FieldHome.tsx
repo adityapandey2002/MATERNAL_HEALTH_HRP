@@ -1,4 +1,3 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -10,9 +9,45 @@ import {
   SyncIcon,
 } from "../components/ui/Icons";
 import { Panel, PanelBody } from "../components/ui/Panel";
-import { api } from "../lib/api";
+import { useLocalFollowUpItems, useLocalPatients } from "../lib/db/queries";
 import { buildFollowUpLineList, isBreached } from "../lib/hrp";
+import { syncNow, useSyncStatus } from "../lib/sync/engine";
+import { pullCohort } from "../lib/sync/pull";
 import { isOnline, onOnlineChange } from "../utils/sw";
+
+/**
+ * One sentence pair for the status strip. Kept out of the JSX so the screen
+ * stays readable and the wording lives in one place.
+ */
+function describeSyncStrip({
+  online,
+  pendingChanges,
+  pendingContacts,
+}: {
+  online: boolean;
+  pendingChanges: number;
+  pendingContacts: number;
+}): { title: string; detail: string } {
+  const pluralChanges = pendingChanges === 1 ? "change" : "changes";
+  if (!online) {
+    const title = "Offline — records are saved on this device";
+    const detail =
+      pendingChanges > 0
+        ? `${pendingChanges} ${pluralChanges} will sync when the connection returns.`
+        : "Everything recorded here stays on this device until the connection returns.";
+    return { title, detail };
+  }
+  if (pendingChanges > 0) {
+    return {
+      title: `${pendingChanges} ${pluralChanges} waiting to sync`,
+      detail: "They will be sent automatically. You can also send them now.",
+    };
+  }
+  return {
+    title: "All follow-ups on track",
+    detail: `${pendingContacts} pending contact${pendingContacts === 1 ? "" : "s"} in your village list.`,
+  };
+}
 
 /**
  * First screen for ANM and CHO.
@@ -20,39 +55,50 @@ import { isOnline, onOnlineChange } from "../utils/sw";
  * The whole screen is one action: register a case. The only other thing on it
  * is the critical instruction strip at the bottom — an urgent follow-up or a
  * sync prompt — because that is the one message a field worker must not miss.
+ *
+ * Everything is read from the device cache, so the screen and its counts are
+ * correct with no connection.
  */
 export default function FieldHome() {
-  const queryClient = useQueryClient();
   const [online, setOnline] = useState(true);
-  const [syncedAt, setSyncedAt] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+
+  const patients = useLocalPatients();
+  const records = useLocalFollowUpItems();
+  const sync = useSyncStatus();
 
   useEffect(() => {
     setOnline(navigator.onLine);
     return onOnlineChange(setOnline);
   }, []);
 
-  const { data } = useQuery({
-    queryKey: ["patients", "field-home"],
-    queryFn: () => api.patients.list({ page: 1, limit: 100 }),
-    staleTime: 60 * 1000,
-  });
+  useEffect(() => {
+    if (typeof navigator === "undefined" || navigator.onLine) void pullCohort();
+  }, []);
 
-  const patients = data?.data ?? [];
-  const rows = buildFollowUpLineList(patients, []);
+  const rows = buildFollowUpLineList(patients ?? [], records ?? []);
   const urgent = rows.filter(
     (row) => row.status !== "COMPLETE" && (row.riskLevel === "RED" || isBreached(row))
   );
   const pending = rows.filter((row) => row.status !== "COMPLETE").length;
+  const pendingChanges = sync?.pending ?? 0;
 
-  const syncMutation = useMutation({
-    mutationFn: () => api.sync.push({ patients: [], visits: [], referrals: [] }),
-    onSuccess: () => {
-      const now = new Date();
-      localStorage.setItem("lastSyncTime", String(now.getTime()));
-      setSyncedAt(format(now, "HH:mm"));
-      queryClient.invalidateQueries({ queryKey: ["patients"] });
-    },
-  });
+  const lastSync = sync?.lastSync ? new Date(sync.lastSync) : null;
+  const strip = describeSyncStrip({ online, pendingChanges, pendingContacts: pending });
+
+  const runSync = async () => {
+    setSyncing(true);
+    setMessage(null);
+    try {
+      await syncNow();
+      setMessage("Sync finished.");
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Sync failed.");
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className="flex min-h-[calc(100vh-11rem)] flex-col gap-4">
@@ -118,30 +164,30 @@ export default function FieldHome() {
                 {online ? <CheckIcon className="h-5 w-5" /> : <SyncIcon className="h-5 w-5" />}
               </span>
               <div className="min-w-0 flex-1">
-                <h2 className="text-sm font-semibold text-ink">
-                  {online
-                    ? "All follow-ups on track"
-                    : "Offline — records are saved on this device"}
-                </h2>
-                <p className="mt-0.5 text-xs text-ink-subtle">
-                  {online
-                    ? `${pending} pending contact${pending === 1 ? "" : "s"} in your village list.`
-                    : "Sync now so the block helpdesk sees today's work."}
-                </p>
+                <h2 className="text-sm font-semibold text-ink">{strip.title}</h2>
+                <p className="mt-0.5 text-xs text-ink-subtle">{strip.detail}</p>
+                {message ? (
+                  <output className="mt-1 block text-xs text-ink-muted">{message}</output>
+                ) : null}
               </div>
-              {syncedAt ? (
-                <span className="badge badge-green">Synced {syncedAt}</span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => syncMutation.mutate()}
-                  disabled={syncMutation.isPending}
-                  className="btn btn-secondary btn-sm"
-                >
-                  <SyncIcon className="h-3.5 w-3.5" />
-                  {syncMutation.isPending ? "Syncing…" : "Sync now"}
-                </button>
-              )}
+              <div className="flex items-center gap-2">
+                {lastSync ? (
+                  <span className={online ? "badge badge-green" : "badge badge-amber"}>
+                    {online ? "Synced" : "As of"} {format(lastSync, "HH:mm")}
+                  </span>
+                ) : null}
+                {online ? (
+                  <button
+                    type="button"
+                    onClick={() => void runSync()}
+                    disabled={syncing}
+                    className="btn btn-secondary btn-sm"
+                  >
+                    <SyncIcon className="h-3.5 w-3.5" />
+                    {syncing ? "Syncing…" : "Sync now"}
+                  </button>
+                ) : null}
+              </div>
             </PanelBody>
           </Panel>
         )}

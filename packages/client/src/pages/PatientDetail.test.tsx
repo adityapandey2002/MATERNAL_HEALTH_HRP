@@ -4,8 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../lib/api";
-import { db } from "../lib/db/local-db";
-import { clearAllLocalData, opRepo } from "../lib/db/repositories";
+import { clearAllLocalData, opRepo, patientRepo } from "../lib/db/repositories";
 import PatientDetailPage from "./PatientDetail";
 
 vi.mock("../lib/api", () => ({
@@ -96,6 +95,8 @@ const createWrapper = (path = `/patients/${patient.id}`) => {
 describe("PatientDetailPage", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
+    // Clear rows instead of closing the database: an in-flight drain would
+    // otherwise reject with DatabaseClosedError after the test ends.
     await clearAllLocalData();
     vi.mocked(api.sync.push).mockRejectedValue(new Error("offline in test"));
     vi.mocked(api.auth.me).mockResolvedValue({
@@ -145,7 +146,7 @@ describe("PatientDetailPage", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Changes" }));
 
     await vi.waitFor(async () => {
-      const local = await db.patients.get(patient.id);
+      const local = await patientRepo.get(patient.id);
       expect(local?.name).toBe("Rekha Kumari");
       expect(local?.hrpReason).toBe("CARDIAC_DISEASE");
       expect(local?.referred).toBe(false);

@@ -100,7 +100,11 @@ export default function Layout() {
               }`}
             />
             <p className="truncate text-2xs font-semibold uppercase tracking-wide text-ink-subtle">
-              {online ? "Field sync · normal" : "Offline · saved on device"}
+              {online
+                ? "Field sync · normal"
+                : isFieldRole(role)
+                  ? "Offline · saved on device"
+                  : "Offline · read-only"}
             </p>
           </div>
         </div>
@@ -199,7 +203,9 @@ export default function Layout() {
 
         {!online && (
           <output className="block bg-triage-amber-solid px-4 py-2 text-xs font-semibold text-white sm:px-6">
-            Offline - read-only. Saving a patient, visit, or follow-up requires a connection.
+            {isFieldRole(role)
+              ? "Offline — records save on this device and sync when the connection returns."
+              : "Offline — showing the last data this device received. Changes need a connection."}
           </output>
         )}
 

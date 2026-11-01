@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Layout from "./components/Layout";
+import { UpdatePrompt } from "./components/UpdatePrompt";
 import { api } from "./lib/api";
+import { isFieldRole } from "./lib/nav";
 import { clearCachedSession, getCachedSession, setCachedSession } from "./lib/session-cache";
 import AddPatient from "./pages/AddPatient";
 import Dashboard from "./pages/Dashboard";
@@ -92,19 +94,27 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function OnlineGuard({ children }: { children: React.ReactNode }) {
+/**
+ * Field roles work fully offline (D5), so nothing may block them when the
+ * connection drops. Oversight screens read from the server, so those roles get
+ * an explicit notice instead of a screen full of failed requests.
+ */
+function OfflineGate({ children }: { children: React.ReactNode }) {
   const [online, setOnline] = useState(true);
   useEffect(() => {
     setOnline(navigator.onLine);
     return onOnlineChange(setOnline);
   }, []);
-  if (!online) return <Offline />;
-  return <>{children}</>;
+  if (online) return <>{children}</>;
+  const role = getCachedSession()?.user.role;
+  if (role && isFieldRole(role)) return <>{children}</>;
+  return <Offline />;
 }
 
 export default function App() {
   return (
-    <OnlineGuard>
+    <OfflineGate>
+      <UpdatePrompt />
       <Routes>
         <Route
           path="/login"
@@ -134,6 +144,6 @@ export default function App() {
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-    </OnlineGuard>
+    </OfflineGate>
   );
 }

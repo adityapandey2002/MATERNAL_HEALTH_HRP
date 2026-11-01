@@ -39,11 +39,78 @@ import {
   latestVisitByPatient,
   toneTextClass,
 } from "../lib/clinical";
+import { useLocalFollowUpItems, useLocalPatients, useLocalVisits } from "../lib/db/queries";
 import { buildFollowUpLineList, summariseFollowUps } from "../lib/hrp";
 import { useUserRole } from "../lib/session";
+import { useSyncStatus } from "../lib/sync/engine";
+import { pullCohort } from "../lib/sync/pull";
+import type { SyncStatusSummary } from "../lib/sync/queue";
 import { isOnline, onOnlineChange } from "../utils/sw";
 
 const RISK_ORDER: Record<RiskLevel, number> = { RED: 0, AMBER: 1, GREEN: 2 };
+
+/**
+ * Server rows are authoritative once they arrive, but a change made on this
+ * device that has not been sent yet must not disappear from the screen.
+ */
+function mergePatients(server: Patient[] | undefined, local: Patient[] | undefined): Patient[] {
+  const byId = new Map<string, Patient>((server ?? []).map((patient) => [patient.id, patient]));
+  for (const row of local ?? []) {
+    const current = byId.get(row.id);
+    if (!current || row.updatedAt.getTime() > current.updatedAt.getTime()) byId.set(row.id, row);
+  }
+  return [...byId.values()];
+}
+
+function mergeVisits(server: Visit[] | undefined, local: Visit[] | undefined): Visit[] {
+  const byId = new Map<string, Visit>((server ?? []).map((visit) => [visit.id, visit]));
+  for (const row of local ?? []) {
+    const current = byId.get(row.id);
+    if (!current || row.updatedAt.getTime() > current.updatedAt.getTime()) byId.set(row.id, row);
+  }
+  return [...byId.values()];
+}
+
+type DataStatusTone = "neutral" | "primary" | "red" | "amber" | "green";
+
+/** Honest device status for the field dashboard tile. */
+function describeDataStatus({
+  online,
+  pendingChanges,
+  conflicts,
+  lastSync,
+}: {
+  online: boolean;
+  pendingChanges: number;
+  conflicts: number;
+  lastSync: string | null;
+}): { value: string; hint: string; tone: DataStatusTone } {
+  const asOf = lastSync ? `as of ${format(new Date(lastSync), "HH:mm")}` : null;
+  if (conflicts > 0) {
+    return {
+      value: "Review",
+      hint: `${conflicts} conflict${conflicts === 1 ? "" : "s"} in Settings`,
+      tone: "red",
+    };
+  }
+  if (!online) {
+    const saved =
+      pendingChanges > 0 ? `${pendingChanges} saved on this device` : "Saved on this device";
+    return {
+      value: "Offline",
+      hint: asOf ? `${saved} · ${asOf}` : saved,
+      tone: "amber",
+    };
+  }
+  if (pendingChanges > 0) {
+    return {
+      value: `${pendingChanges} waiting`,
+      hint: "Sending automatically",
+      tone: "amber",
+    };
+  }
+  return { value: "Synced", hint: asOf ?? "All changes sent", tone: "green" };
+}
 
 export default function Dashboard() {
   const role = useUserRole();
@@ -54,25 +121,36 @@ export default function Dashboard() {
     return onOnlineChange(setOnline);
   }, []);
 
+  useEffect(() => {
+    if (typeof navigator === "undefined" || navigator.onLine) void pullCohort();
+  }, []);
+
+  const localPatients = useLocalPatients();
+  const localVisits = useLocalVisits();
+
   const { data: patientsData, isLoading: patientsLoading } = useQuery({
     queryKey: ["patients", "dashboard"],
     queryFn: () => api.patients.list({ page: 1, limit: 100 }),
+    enabled: online,
   });
 
   const { data: visitsData, isLoading: visitsLoading } = useQuery({
     queryKey: ["visits", "dashboard"],
     queryFn: () => api.visits.list({ page: 1, limit: 100 }),
+    enabled: online,
   });
 
   const { data: alertsData, isLoading: alertsLoading } = useQuery({
     queryKey: ["supervision", "alerts"],
     queryFn: () => api.supervision.alerts({ page: 1, limit: 10, acknowledged: false }),
+    enabled: online,
   });
 
-  const patients = patientsData?.data ?? [];
-  const visits = visitsData?.data ?? [];
+  const patients = mergePatients(patientsData?.data, localPatients);
+  const visits = mergeVisits(visitsData?.data, localVisits);
   const alerts = (alertsData?.data as SupervisionAlert[]) ?? [];
   const latestVisits = latestVisitByPatient(visits);
+  const sync = useSyncStatus();
 
   const completedByPatient = new Map<string, number>();
   for (const visit of visits) {
@@ -99,7 +177,9 @@ export default function Dashboard() {
     due: duePatientIds.size,
   };
 
-  if (patientsLoading || visitsLoading || alertsLoading) {
+  // A warm device cache paints immediately; only a cold start waits on the
+  // network (and offline it never does).
+  if ((patientsLoading || visitsLoading || alertsLoading) && localPatients === undefined) {
     return <DashboardSkeleton />;
   }
 
@@ -111,6 +191,7 @@ export default function Dashboard() {
         dueFollowUps={dueFollowUps}
         counts={counts}
         online={online}
+        sync={sync}
       />
     );
   }
@@ -148,6 +229,7 @@ interface FieldDashboardProps {
   dueFollowUps: DueFollowUp[];
   counts: DashboardCounts;
   online: boolean;
+  sync: SyncStatusSummary | null;
 }
 
 function FieldDashboard({
@@ -156,6 +238,7 @@ function FieldDashboard({
   dueFollowUps,
   counts,
   online,
+  sync,
 }: FieldDashboardProps) {
   const urgent = [...patients]
     .filter((patient) => patient.riskLevel !== "GREEN")
@@ -164,6 +247,15 @@ function FieldDashboard({
 
   const urgentIds = new Set(urgent.map((patient) => patient.id));
   const routine = dueFollowUps.filter((item) => !urgentIds.has(item.patient.id)).slice(0, 5);
+
+  const pendingChanges = sync?.pending ?? 0;
+  const conflicts = sync?.conflicts ?? 0;
+  const dataStatus = describeDataStatus({
+    online,
+    pendingChanges,
+    conflicts,
+    lastSync: sync?.lastSync ?? null,
+  });
 
   return (
     <div className="space-y-5">
@@ -204,10 +296,10 @@ function FieldDashboard({
         />
         <StatTile
           label="Data status"
-          value={online ? "Synced" : "Offline"}
-          hint={online ? "Changes saved" : "Saved on this device"}
+          value={dataStatus.value}
+          hint={dataStatus.hint}
           icon={<SyncIcon className="h-4 w-4" />}
-          tone={online ? "green" : "amber"}
+          tone={dataStatus.tone}
           compact
         />
       </div>
@@ -379,17 +471,10 @@ function UrgentPatientCard({ patient, visit }: { patient: Patient; visit: Visit 
  * check-up, open cycles past their due date and overall compliance.
  */
 function HrpCycleSection() {
-  const { data: recordsData } = useQuery({
-    queryKey: ["hrp", "follow-ups", "cho-dashboard"],
-    queryFn: () => api.hrp.followUps.list({ page: 1, limit: 100 }),
-  });
+  const patients = useLocalPatients() ?? [];
+  const records = useLocalFollowUpItems() ?? [];
 
-  const { data: patientsData } = useQuery({
-    queryKey: ["hrp", "patients", "cho-dashboard"],
-    queryFn: () => api.hrp.patients.list({ page: 1, limit: 100 }),
-  });
-
-  const rows = buildFollowUpLineList(patientsData?.data ?? [], recordsData?.data ?? []);
+  const rows = buildFollowUpLineList(patients, records);
   const summary = summariseFollowUps(rows);
   const fieldPending = summary.byStage.FIELD_15_DAY.pending;
 

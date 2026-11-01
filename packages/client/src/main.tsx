@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { isNativeApp, registerNativeLifecycle } from "./lib/native";
 import { getCachedSession } from "./lib/session-cache";
 import { registerSW } from "./utils/sw";
 import "./styles/index.css";
@@ -23,8 +24,17 @@ if (cached) {
   queryClient.setQueryData(["auth", "me"], cached.user);
 }
 
-if ("serviceWorker" in navigator) {
+// The APK ships its own shell, so a service worker adds nothing there; the
+// native build relies on the bundled assets and its own lifecycle hooks.
+if ("serviceWorker" in navigator && !isNativeApp()) {
   registerSW();
+}
+
+void registerNativeLifecycle();
+
+// A field device must not lose unsynced records to cache eviction.
+if (navigator.storage?.persist) {
+  void navigator.storage.persist();
 }
 
 const rootElement = document.getElementById("root");

@@ -157,6 +157,43 @@ describe("Auth Routes", () => {
     expect(response.json()).toEqual({ message: "Invalid refresh token" });
   });
 
+  it("returns a rotated refresh token in the body for the native client", async () => {
+    const login = await app.inject({
+      method: "POST",
+      url: "/api/auth/login",
+      headers: { "x-client-platform": "native" },
+      payload: { employeeId: "ANM001", password: "password123" },
+    });
+
+    expect(login.statusCode).toBe(200);
+    const refreshToken = login.json().refreshToken as string;
+    expect(refreshToken).toBeTruthy();
+    expect(login.cookies.some((item) => item.name === "refreshToken")).toBe(false);
+
+    const refreshed = await app.inject({
+      method: "POST",
+      url: "/api/auth/refresh",
+      headers: { "x-client-platform": "native" },
+      payload: { refreshToken },
+    });
+
+    expect(refreshed.statusCode).toBe(200);
+    expect(refreshed.json().accessToken).toBeTruthy();
+    expect(refreshed.json().refreshToken).toBeTruthy();
+    expect(refreshed.cookies.some((item) => item.name === "refreshToken")).toBe(false);
+  });
+
+  it("rejects a native refresh without a body token", async () => {
+    const response = await app.inject({
+      method: "POST",
+      url: "/api/auth/refresh",
+      headers: { "x-client-platform": "native" },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(response.json()).toEqual({ message: "No refresh token provided" });
+  });
+
   it("returns the current user for a valid access token", async () => {
     const login = await app.inject({
       method: "POST",

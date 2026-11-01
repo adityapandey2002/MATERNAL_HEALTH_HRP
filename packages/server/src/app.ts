@@ -11,6 +11,7 @@ import { sql } from "kysely";
 import { AuthzError, createDbActorLookup, resolveActor } from "./authz/scope.js";
 import { config } from "./config.js";
 import { db } from "./db/client.js";
+import { corsOriginOption } from "./lib/cors.js";
 import { registerClientStatic } from "./lib/static-client.js";
 import { authRoutes } from "./routes/auth.js";
 import { facilityRoutes } from "./routes/facilities.js";
@@ -80,7 +81,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.register(cors, {
-    origin: config.corsOrigins.length > 0 ? config.corsOrigins : config.nodeEnv !== "production",
+    origin: corsOriginOption(config.corsOrigins, config.nodeEnv),
     credentials: true,
   });
 

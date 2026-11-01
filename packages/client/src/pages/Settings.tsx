@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { useEffect, useState } from "react";
 import { BrandMark } from "../components/ui/BrandMark";
 import { BellIcon, CheckIcon, InfoIcon, SyncIcon, UserIcon } from "../components/ui/Icons";
@@ -8,6 +9,7 @@ import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { api } from "../lib/api";
 import { initialsFor } from "../lib/nav";
 import { ROLE_LABEL } from "../lib/session";
+import { syncNow, useSyncStatus } from "../lib/sync/engine";
 
 type SettingsTab = "profile" | "sync" | "notifications" | "about";
 
@@ -48,10 +50,61 @@ function readPrefs(): Record<NotificationId, boolean> {
   }
 }
 
+function pluralChanges(count: number): string {
+  return `${count} ${count === 1 ? "change" : "changes"}`;
+}
+
+/**
+ * One honest sentence about the device, in the order that matters to a field
+ * worker: a conflict needs a human, then "you are offline", then "still
+ * sending", and only then "all clear".
+ */
+function describeSyncState({
+  online,
+  pendingChanges,
+  conflicts,
+}: {
+  online: boolean;
+  pendingChanges: number;
+  conflicts: number;
+}): { title: string; detail: string; tone: "green" | "amber" | "red" } {
+  if (conflicts > 0) {
+    return {
+      title: "Some changes need your review",
+      detail:
+        "The server kept a newer version of these records. Your copy is still on this device — open the patient, check the details, and re-enter anything that is still missing.",
+      tone: "red",
+    };
+  }
+  if (!online) {
+    return {
+      title: "Offline — records are saved on this device",
+      detail:
+        pendingChanges > 0
+          ? `${pluralChanges(pendingChanges)} will be sent automatically when the connection returns.`
+          : "Anything you record now stays on this phone and syncs later.",
+      tone: "amber",
+    };
+  }
+  if (pendingChanges > 0) {
+    return {
+      title: `${pluralChanges(pendingChanges)} waiting to sync`,
+      detail: "They are sent automatically. You can also send them now.",
+      tone: "amber",
+    };
+  }
+  return {
+    title: "Everything is synced",
+    detail: "No records are waiting on this device.",
+    tone: "green",
+  };
+}
+
 export default function SettingsPage() {
-  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<SettingsTab>("profile");
   const [prefs, setPrefs] = useState<Record<NotificationId, boolean>>(DEFAULT_PREFS);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setPrefs(readPrefs());
@@ -59,14 +112,20 @@ export default function SettingsPage() {
 
   const { data: user } = useQuery({ queryKey: ["auth", "me"], queryFn: api.auth.me });
   const { data: facilities } = useQuery({ queryKey: ["facilities"], queryFn: api.facilities.list });
+  const sync = useSyncStatus();
 
-  const syncMutation = useMutation({
-    mutationFn: api.sync.push,
-    onSuccess: () => {
-      localStorage.setItem("lastSyncTime", String(Date.now()));
-      queryClient.invalidateQueries({ queryKey: ["sync"] });
-    },
-  });
+  const pendingChanges = sync?.pending ?? 0;
+  const conflicts = sync?.conflicts ?? 0;
+  const online = sync?.online ?? true;
+  const syncState = describeSyncState({ online, pendingChanges, conflicts });
+
+  const runSync = async () => {
+    setSyncing(true);
+    setSyncMessage(null);
+    await syncNow();
+    setSyncMessage("Sync finished. Anything rejected stays here until you resend it.");
+    setSyncing(false);
+  };
 
   const facilityList = Array.isArray(facilities) ? facilities : [];
   const facilityName = facilityList.find((f) => f.id === user?.facilityId)?.name;
@@ -193,67 +252,90 @@ export default function SettingsPage() {
 
           {activeTab === "sync" && (
             <Panel>
-              <PanelHeader title="Sync" description="Device data and server synchronisation" />
+              <PanelHeader
+                title="Sync"
+                description="What is on this device and what the server has"
+              />
               <PanelBody className="space-y-5">
-                <div className="rounded border border-info-line bg-info-bg px-4 py-3">
-                  <h3 className="text-sm font-semibold text-info">Automatic sync is on</h3>
-                  <p className="mt-1 text-sm text-ink-muted">
-                    Offline saving is not available yet: creating or editing a record requires a
-                    connection. Once the offline update is installed, records will save on this
-                    device first and sync when the connection returns. Use the button below to sync
-                    cached data now.
-                  </p>
+                <div
+                  className={
+                    syncState.tone === "red"
+                      ? "rounded border border-triage-red-line bg-triage-red-bg px-4 py-3"
+                      : syncState.tone === "amber"
+                        ? "rounded border border-triage-amber-line bg-triage-amber-bg px-4 py-3"
+                        : "rounded border border-triage-green-line bg-triage-green-bg px-4 py-3"
+                  }
+                >
+                  <h3
+                    className={
+                      syncState.tone === "red"
+                        ? "text-sm font-semibold text-triage-red"
+                        : syncState.tone === "amber"
+                          ? "text-sm font-semibold text-triage-amber"
+                          : "text-sm font-semibold text-triage-green"
+                    }
+                  >
+                    {syncState.title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-relaxed text-ink-muted">{syncState.detail}</p>
                 </div>
+
+                <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-2">
+                  <div className="field-row">
+                    <dt>Waiting to sync</dt>
+                    <dd className="tnum">{pluralChanges(pendingChanges)}</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Needs review</dt>
+                    <dd className="tnum">{conflicts > 0 ? `${conflicts} to review` : "Nothing"}</dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Last successful sync</dt>
+                    <dd className="tnum">
+                      {sync?.lastSync ? format(new Date(sync.lastSync), "d MMM, HH:mm") : "Not yet"}
+                    </dd>
+                  </div>
+                  <div className="field-row">
+                    <dt>Records stored</dt>
+                    <dd>This device only</dd>
+                  </div>
+                </dl>
 
                 <button
                   type="button"
                   className="btn btn-primary btn-block"
-                  onClick={() => syncMutation.mutate({ patients: [], visits: [], referrals: [] })}
-                  disabled={syncMutation.isPending}
+                  onClick={() => void runSync()}
+                  disabled={syncing || !online}
                 >
-                  {syncMutation.isPending ? (
+                  {syncing ? (
                     <>
                       <span
                         aria-hidden="true"
                         className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
                       />
-                      Syncing…
+                      Sending…
                     </>
                   ) : (
                     <>
                       <SyncIcon className="h-4 w-4" />
-                      Sync Now
+                      Send now
                     </>
                   )}
                 </button>
 
-                {syncMutation.isSuccess && (
-                  <p className="flex items-center justify-center gap-1.5 text-sm text-triage-green">
+                {syncMessage ? (
+                  <output className="flex items-center justify-center gap-1.5 text-sm text-triage-green">
                     <CheckIcon className="h-4 w-4" />
-                    Sync complete
-                  </p>
-                )}
+                    {syncMessage}
+                  </output>
+                ) : null}
 
-                <dl className="grid gap-x-6 sm:grid-cols-2">
-                  <div className="field-row">
-                    <dt>Storage</dt>
-                    <dd>IndexedDB on this device</dd>
-                  </div>
-                  <div className="field-row">
-                    <dt>Server</dt>
-                    <dd>PostgreSQL</dd>
-                  </div>
-                  <div className="field-row">
-                    <dt>Mode</dt>
-                    <dd>Background / manual</dd>
-                  </div>
-                  <div className="field-row">
-                    <dt>Offline access</dt>
-                    <dd>
-                      <span className="badge badge-green">Enabled</span>
-                    </dd>
-                  </div>
-                </dl>
+                {sync?.lastError ? (
+                  <p className="rounded border border-line bg-canvas px-3 py-2 text-xs leading-relaxed text-ink-muted">
+                    Last attempt could not reach the server. Nothing was lost: those records stay on
+                    this device and are retried automatically.
+                  </p>
+                ) : null}
               </PanelBody>
             </Panel>
           )}

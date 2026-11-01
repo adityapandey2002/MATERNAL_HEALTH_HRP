@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { BrandMark } from "../components/ui/BrandMark";
-import { CheckIcon, SyncIcon, WifiOffIcon } from "../components/ui/Icons";
+import { SyncIcon, WifiOffIcon } from "../components/ui/Icons";
 import { isOnline, onOnlineChange } from "../utils/sw";
 
-const OFFLINE_CAPABILITIES = [
-  "View cached patients and history",
-  "Review 15-day HRP follow-ups (read-only)",
-  "Check due visits and danger signs",
-];
-
+/**
+ * Shown to oversight roles (block, district) when the connection drops.
+ *
+ * Those screens read live district data from the server, so they cannot be
+ * served from the device. Field staff never see this page: ANM and CHO keep
+ * working from the on-device store and their changes sync later.
+ */
 export default function OfflinePage() {
   const [online, setOnline] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
@@ -49,24 +50,10 @@ export default function OfflinePage() {
           <div className="px-5 py-6 sm:px-6">
             <h1 className="text-xl font-semibold tracking-tight text-ink">You're Offline</h1>
             <p className="mt-1.5 text-sm leading-relaxed text-ink-muted">
-              Matru Suraksha is read-only while offline. Viewing cached records works without a
-              connection; saving a new patient, visit, or follow-up requires a connection until the
-              offline update is installed.
+              This view reads live data from the district server, so it needs a connection. Field
+              workers on the mobile app can keep registering patients and recording visits and
+              follow-ups offline; those changes sync when the connection returns.
             </p>
-
-            <div className="mt-5 rounded border border-line-soft bg-canvas px-4 py-4">
-              <h2 className="text-2xs font-semibold uppercase tracking-wider text-ink-subtle">
-                What you can do offline
-              </h2>
-              <ul className="mt-2.5 space-y-1.5">
-                {OFFLINE_CAPABILITIES.map((item) => (
-                  <li key={item} className="flex items-center gap-2 text-sm text-ink-muted">
-                    <CheckIcon className="h-4 w-4 shrink-0 text-triage-green-solid" />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
 
             {lastSync && (
               <p className="mt-4 flex items-center gap-1.5 text-xs text-ink-subtle">
@@ -96,7 +83,7 @@ export default function OfflinePage() {
         </div>
 
         <p className="mt-4 text-center text-2xs text-ink-subtle">
-          Records stay on this device until the connection returns.
+          Your session stays signed in on this device.
         </p>
       </div>
     </div>

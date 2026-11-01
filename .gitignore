@@ -28,6 +28,15 @@ npm-debug.log*
 # Test coverage
 coverage/
 
+# Test artefacts
+playwright-report/
+test-results/
+
+# Android signing material (CI provides it)
+*.jks
+*.keystore
+keystore.properties
+
 # Docker
 .docker/
 

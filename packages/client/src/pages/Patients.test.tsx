@@ -5,7 +5,6 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { db } from "../lib/db/local-db";
-import { clearAllLocalData } from "../lib/db/repositories";
 import PatientsPage from "./Patients";
 
 vi.mock("../lib/api", () => ({
@@ -55,7 +54,8 @@ const createWrapper = () => {
 describe("PatientsPage", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    await clearAllLocalData();
+    await db.delete();
+    await db.open();
     await db.patients.put(patient as unknown as never);
   });
 

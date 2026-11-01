@@ -4,7 +4,7 @@ import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { LocalFollowUp, LocalPatient } from "../lib/db/local-db";
 import { db } from "../lib/db/local-db";
-import { clearAllLocalData, opRepo } from "../lib/db/repositories";
+import { opRepo } from "../lib/db/repositories";
 import FollowUpsPage from "./FollowUps";
 
 vi.mock("../lib/api", () => ({
@@ -93,7 +93,8 @@ const createWrapper = () => {
 describe("FollowUpsPage", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
-    await clearAllLocalData();
+    await db.delete();
+    await db.open();
   });
 
   it("renders the assigned follow-up contacts for the 15-day stage from the device cache", async () => {
