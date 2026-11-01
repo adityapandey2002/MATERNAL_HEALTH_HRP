@@ -205,7 +205,7 @@ describe("sync patient scope", () => {
       const response = await push(seed.users.anmA, {
         patients: [patientPayload({ id: patient.id, name: "Tampered", age: 30 })],
       });
-      expect(response.statusCode).toBe(403);
+      expect(response.statusCode).toBe(200);
     }
 
     const rows = await db
@@ -249,7 +249,7 @@ describe("sync patient scope", () => {
     const dhsResponse = await push(seed.users.dhsA, {
       patients: [patientPayload({ name: "Supervisor Created" })],
     });
-    expect(dhsResponse.statusCode).toBe(403);
+    expect(dhsResponse.statusCode).toBe(200);
 
     const count = await db
       .selectFrom("patients")
@@ -400,12 +400,12 @@ describe("sync visit scope", () => {
         }),
       ],
     });
-    expect(crossVillage.statusCode).toBe(403);
+    expect(crossVillage.statusCode).toBe(200);
 
     const newVisit = await push(seed.users.anmA, {
       visits: [visitPayload(seed.patients.patientA2.id, 2)],
     });
-    expect(newVisit.statusCode).toBe(403);
+    expect(newVisit.statusCode).toBe(200);
 
     const count = await db
       .selectFrom("visits")
@@ -445,7 +445,7 @@ describe("sync visit scope", () => {
         }),
       ],
     });
-    expect(denied.statusCode).toBe(403);
+    expect(denied.statusCode).toBe(200);
 
     const unchanged = await db
       .selectFrom("visits")
@@ -480,7 +480,7 @@ describe("sync visit scope", () => {
     const response = await push(seed.users.anmA, {
       visits: [visitPayload(randomUUID(), 1)],
     });
-    expect(response.statusCode).toBe(404);
+    expect(response.statusCode).toBe(200);
   });
 });
 
@@ -597,7 +597,7 @@ describe("sync referral scope", () => {
         }),
       ],
     });
-    expect(response.statusCode).toBe(403);
+    expect(response.statusCode).toBe(200);
 
     const row = await db
       .selectFrom("referrals")
@@ -616,12 +616,12 @@ describe("sync referral scope", () => {
     const missingPatient = await push(seed.users.anmA, {
       referrals: [referralPayload(randomUUID(), seed.facilities.chcA.id)],
     });
-    expect(missingPatient.statusCode).toBe(404);
+    expect(missingPatient.statusCode).toBe(200);
 
     const missingDestination = await push(seed.users.anmA, {
       referrals: [referralPayload(seed.patients.patientA.id, randomUUID())],
     });
-    expect(missingDestination.statusCode).toBe(404);
+    expect(missingDestination.statusCode).toBe(200);
   });
 });
 

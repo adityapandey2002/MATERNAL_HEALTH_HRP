@@ -425,6 +425,15 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
       });
 
       const now = new Date();
+      const completedAtRaw = data.completedAt ? new Date(data.completedAt) : now;
+      // Clamp to a sane window so a bad clock can't backdate or future-date a cycle.
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      const completedAt =
+        completedAtRaw < thirtyDaysAgo
+          ? thirtyDaysAgo
+          : completedAtRaw > now
+            ? now
+            : completedAtRaw;
 
       const result = await db.transaction().execute(async (trx) => {
         const setClause: Updateable<DB["follow_ups"]> = {
@@ -434,7 +443,7 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
 
         if (data.notes !== undefined) setClause.notes = data.notes;
         if (data.status === "COMPLETE") {
-          setClause.completed_at = now;
+          setClause.completed_at = completedAt;
           setClause.completed_by_user_id = request.actor.userId;
         }
 
@@ -475,7 +484,7 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
           registrantUserId: registrant?.id ?? request.actor.userId,
           registrantRole: registrant?.role ?? null,
           assignedByUserId: request.actor.userId,
-          completedAt: now,
+          completedAt: completedAt,
         });
 
         await trx.insertInto("follow_ups").values(next).execute();
