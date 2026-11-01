@@ -23,11 +23,15 @@ $env:PATH = "C:\Users\ADITYA\AppData\Local\Programs\DockerDesktop\resources\bin;
 ### First time
 ```powershell
 # 1) Start Postgres only and wait for it to become healthy
-c
+npm run db:up
 
-# 2) Apply the database schema (idempotent) and load demo data
+# 2) Apply the database schema (idempotent; includes migration 007_matru_suraksha_roles) and load demo data
 npm run db:migrate
 npm run db:seed
+
+# The Docker entrypoint (demo bootstrap) only seeds when SEED_DEMO_DATA=true and
+# the users table is empty. db:seed itself refuses to run in production unless
+# ALLOW_PRODUCTION_SEED=true.
 
 # 3) Start the whole stack (db + api server + client PWA)
 docker compose up -d
@@ -60,6 +64,35 @@ npm run dev:server   # Fastify API -> http://localhost:3000
 npm run dev:client   # Vite PWA      -> http://localhost:5173
 ```
 
+## 3a. Environment variables
+
+Copy `.env.example` to `.env` (or set them in the shell / compose) and adjust.
+Key variables:
+
+| Variable | Default / example | Purpose |
+|----------|-------------------|---------|
+| `NODE_ENV` | `development` | Runtime mode |
+| `PORT` | `3000` | API port |
+| `HOST` | `0.0.0.0` | Bind address |
+| `DATABASE_URL` | `postgresql://hrp:hrp_dev@localhost:5432/hrp` | Postgres connection |
+| `JWT_SECRET` | (32+ chars) | Access-token signing secret |
+| `JWT_REFRESH_SECRET` | (different 32+ chars) | Refresh-token signing secret |
+| `JWT_ACCESS_TTL` | `15m` | Access-token lifetime |
+| `JWT_REFRESH_TTL` | `7d` | Refresh-token lifetime |
+| `CORS_ORIGINS` | `http://localhost:5173` | Allowed browser origins |
+| `COOKIE_SECURE` | `false` | Secure cookie flag (true in production) |
+| `TRUST_PROXY` | `false` | Trust reverse-proxy headers |
+| `DB_POOL_MAX` | `10` | Max DB connections |
+| `DB_MIGRATION_LOCK_ID` | `727001` | Advisory lock for migrations |
+| `RATE_LIMIT_AUTH` | `100` | Auth requests/min/IP |
+| `RATE_LIMIT_API` | `500` | API requests/min/IP |
+| `RATE_LIMIT_SYNC` | `60` | Sync requests/min/IP |
+| `LOG_LEVEL` | `info` | Pino log level |
+| `APP_VERSION` | `0.0.0` | Reported app version |
+| `GIT_SHA` | `unknown` | Reported git SHA |
+| `VITE_API_URL` | `/api` | Client API base path |
+| `SEED_DEMO_DATA` | (unset) | Docker entrypoint one-time demo seed opt-in |
+
 ## 4. Open the app
 
 | Service | URL |
@@ -78,6 +111,19 @@ npm run dev:client   # Vite PWA      -> http://localhost:5173
 | BHM | MO001 | Dr. Rajesh Kumar |
 | HRP Helpdesk (district) | helpdesk.district@araria.gov.in | Neha Singh |
 | DHS | ADM001 | District Admin |
+
+### Roles
+
+Six roles in the hierarchy:
+
+```
+ANM -> CHO -> HRP_HELPDESK_BLOCK -> BHM -> HRP_HELPDESK_DISTRICT -> DHS
+```
+
+Account provisioning follows the same order: DHS creates BHM and district
+helpdesk accounts; BHM creates ANM, CHO and block helpdesk accounts. A
+referred HRP's first 15-day cycle is owned by the Block HRP Helpdesk
+(`HRP_HELPDESK_BLOCK`); later cycles are 15-day field cycles for ANM/CHO.
 
 ### What lands on the front page
 - ANM/CHO `/` → **Add HRP case** action, then `/dashboard` for field triage and `/follow-ups` for the 15-day cycle.

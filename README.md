@@ -11,6 +11,12 @@ Multi-tier high-risk pregnancy care for India's public health system.
 - **Offline**: IndexedDB via Dexie + Service Worker
 - **Sync**: Custom push/pull with conflict detection
 
+## Live demo
+
+- URL: `https://hrp-demo.onrender.com` (Render free tier, single origin)
+- Synthetic data only. Do not enter real patient information.
+- Demo users (password `password123`): see [Test Users](#test-users-after-seed).
+
 ## Quick Start
 
 ### Option A: Docker (everything in containers)
@@ -87,6 +93,23 @@ helpdesk accounts; BHM creates ANM, CHO and block helpdesk accounts. See
 [`docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md`](docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md)
 for the full matrix and the 15-day follow-up rule.
 
+## Build (production)
+
+```bash
+# Shared types/schemas/rules
+npm run build --workspace=packages/shared
+
+# Client PWA
+npm run build --workspace=packages/client   # tsc --noEmit && vite build
+
+# Server API
+npm run build --workspace=packages/server    # tsc -> dist/
+npm run start --workspace=packages/server    # node dist/index.js
+```
+
+The client build output is `packages/client/dist`. The server build output is
+`packages/server/dist`.
+
 ## Quality Gates
 
 ```bash
@@ -143,13 +166,25 @@ hrp/
 - `packages/server` → never imports `packages/client`
 - `packages/shared` → types, utilities, rule engine only
 
-## Offline-First Design
+## Offline status (current vs planned)
 
-1. ANM registers patient/visit on mobile (PWA)
-2. Data stored in IndexedDB (Dexie) immediately
-3. Background sync pushes to server when online
-4. Server processes & broadcasts to CHO dashboard
-5. Conflicts resolved via Last-Write-Wins (field-level)
+- **Today:** the app requires a network connection to sign in and to save
+  patients, visits, and follow-up actions. The PWA shell is precached and a
+  valid cached session is not yet available offline, so offline use is
+  read-only at best.
+- **Planned (not implemented):** local-first writes to IndexedDB (Dexie) with
+  a queued, retrying sync engine, cached sessions that survive offline, and
+  field-level conflict handling. Design and task breakdown live in
+  [`tasks/offline-pilot-plan.md`](tasks/offline-pilot-plan.md) and
+  [`tasks/offline-pilot-todo.md`](tasks/offline-pilot-todo.md).
+
+## Android APK status
+
+- **Planned, not shipped.** A signed Android APK will be built with
+  Capacitor in CI (GitHub Actions) and distributed directly to pilot
+  stakeholders (no Play Store listing in this phase). The signing keystore
+  lives in repository secrets. See
+  [`tasks/offline-pilot-plan.md`](tasks/offline-pilot-plan.md) Phase 4.
 
 ## Key Features (MVP)
 
@@ -161,7 +196,7 @@ hrp/
 - [x] Automatic DHS escalation when a 15-day window closes incomplete
 - [x] Block, district and field dashboards
 - [x] Delegated account provisioning (DHS -> BHM -> ANM/CHO)
-- [x] Offline sync with conflict handling
+- [ ] Offline-first write queue (planned; read-only offline today)
 - [x] Supervision alerts (ANM offline, overdue visits)
 - [x] JWT auth with refresh tokens
 - [ ] ABDM integration (v2)

@@ -13,6 +13,9 @@
 - **Stack:** React + Vite + TypeScript, RxDB/WatermelonDB, Fastify/Node, PostgreSQL
 - **Timeline:** 6-8 months, 5-8 devs, 1 district pilot
 - **Key docs:** `docs/specs/SPEC-matru-suraksha-roles-and-follow-up.md`, `docs/ideas/hrp-tracking-mvp.md`
+- **Current work:** `tasks/offline-pilot-plan.md` (offline-first pilot + Capacitor APK), `tasks/offline-pilot-todo.md`. Live demo: https://hrp-demo.onrender.com (synthetic data only).
+- **Offline status:** read-only offline today (cached GETs, app shell); write queue + Android APK planned, not shipped.
+- **Project map:** `docs/PROJECT_MAP.md`.
 
 ## Quality Gates
 

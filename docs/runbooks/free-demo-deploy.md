@@ -82,16 +82,17 @@ Expected:
 - `/` → the Add landing page (not a JSON 404)
 - a hard refresh on `/dashboard` → still the app, not a 404
 
-Sign in with the seeded synthetic users:
+Sign in with the seeded synthetic users (helpdesk accounts also accept their
+email address):
 
-| Role | Employee ID | Password |
-|------|-------------|----------|
+| Role | Login (employee ID or email) | Password |
+|------|------------------------------|----------|
 | ANM | `ANM001` | `password123` |
 | CHO | `CHO001` | `password123` |
 | BHM | `MO001` | `password123` |
 | DHS | `ADM001` | `password123` |
-| HRP Helpdesk (block) | `HELP01` | `password123` |
-| HRP Helpdesk (district) | `HELP02` | `password123` |
+| HRP Helpdesk (block) | `HELP01` or `helpdesk.daskroi@araria.gov.in` | `password123` |
+| HRP Helpdesk (district) | `HELP02` or `helpdesk.district@araria.gov.in` | `password123` |
 
 Then exercise the critical flow: Add → register a referred woman → her first
 15-day cycle appears for the block helpdesk → close it → the next field cycle

@@ -27,7 +27,7 @@ Plan: `tasks/offline-pilot-plan.md` · Created: 2026-10-31
   - Files: `playwright.config.ts`, `src/test/e2e/offline-write.spec.ts`, `global-setup.ts`, `fixtures.ts`
   - Depends: 0.1 · Size: M
 
-- [ ] **0.3 Interim honest copy**
+- [x] **0.3 Interim honest copy**
   - Acceptance: no screen claims local save/sync it cannot do
   - Verify: string search + component tests
   - Files: `pages/Offline.tsx`, `pages/Settings.tsx`, `components/Layout.tsx`, `pages/Login.tsx`
@@ -37,31 +37,31 @@ Plan: `tasks/offline-pilot-plan.md` · Created: 2026-10-31
 
 ## Phase 1 — Local store, session, sync engine (2–3 days)
 
-- [ ] **1.1 Offline-capable cached session**
+- [x] **1.1 Offline-capable cached session**
   - Acceptance: airplane mode + cached session reloads `/patients`; real online 401 still redirects; logout clears
   - Verify: unit + guard component test
   - Files: `lib/session.ts`, `lib/api.ts`, `App.tsx`, `lib/session-cache.ts`, tests
   - Depends: 0.1 · Size: M
 
-- [ ] **1.2 Dexie schema and repositories**
+- [x] **1.2 Dexie schema and repositories**
   - Acceptance: entities round-trip; queue survives reload; `clearAll` wipes; no PHI in localStorage
   - Verify: Vitest + `fake-indexeddb`
   - Files: `lib/db/local-db.ts`, `lib/db/repositories.ts`, `lib/db/ids.ts`, `package.json`, tests
   - Depends: 1.1 · Size: M
 
-- [ ] **1.3 Queue engine and drain triggers**
+- [x] **1.3 Queue engine and drain triggers**
   - Acceptance: exactly-once drain; backoff on failure; no concurrent drains; 250 ops in 3 chunks; conflicts kept
   - Verify: unit with fake API/DB + double-push integration test
   - Files: `lib/sync/queue.ts`, `lib/sync/push.ts`, `lib/sync/triggers.ts`, tests
   - Depends: 1.2, 1.4a · Size: M
 
-- [ ] **1.4a Transactional, per-item `/sync/push`**
+- [x] **1.4a Transactional, per-item `/sync/push`**
   - Acceptance: bad visit does not roll back valid patients; rejection returned; DB error rolls back all
   - Verify: server integration tests
   - Files: `routes/sync.ts`, `packages/shared/src/schemas.ts`, `routes/sync.test.ts`
   - Size: M
 
-- [ ] **1.4b Follow-up sync with real completion time**
+- [x] **1.4b Follow-up sync with real completion time**
   - Acceptance: offline completion on day 0 synced day 3 schedules day 15; double push creates one cycle; scope enforced
   - Verify: server integration + schema tests
   - Files: `schemas.ts`, `routes/sync.ts`, `routes/follow-ups.ts`, `services/hrp-follow-up.ts`, tests
@@ -71,25 +71,25 @@ Plan: `tasks/offline-pilot-plan.md` · Created: 2026-10-31
 
 ## Phase 2 — Field flows local-first (2–3 days)
 
-- [ ] **2.1 Pre-cache the assigned cohort**
+- [x] **2.1 Pre-cache the assigned cohort**
   - Acceptance: one online login makes list/visits/follow-ups readable offline; delta pull on second sync
   - Verify: two-round sync test
   - Files: `lib/sync/pull.ts`, `lib/sync/engine.ts`, `lib/db/repositories.ts`, tests
   - Depends: 1.2 · Size: M
 
-- [ ] **2.2 Patients list/detail read from Dexie**
+- [x] **2.2 Patients list/detail read from Dexie**
   - Acceptance: offline list/detail render; pending badge; cached visits
   - Verify: component tests + airplane-mode check
   - Files: `pages/Patients.tsx`, `pages/PatientDetail.tsx`, `lib/db/queries.ts`, tests
   - Depends: 1.2, 2.1 · Size: M
 
-- [ ] **2.3 AddPatient writes locally first**
+- [x] **2.3 AddPatient writes locally first**
   - Acceptance: offline create survives reload; reconnect writes one row; double tap creates one
   - Verify: component test; `offline-write` E2E green
   - Files: `pages/AddPatient.tsx`, `lib/sync/queue.ts`, tests
   - Depends: 1.3, 2.2 · Size: S
 
-- [ ] **2.4 NewVisit writes locally first + real error handling**
+- [x] **2.4 NewVisit writes locally first + real error handling**
   - Acceptance: offline visit appears immediately; write failure alerts and keeps form; one visit after sync
   - Verify: component test; `offline-visit` E2E
   - Files: `pages/NewVisit.tsx`, `pages/PatientDetail.tsx`, tests
