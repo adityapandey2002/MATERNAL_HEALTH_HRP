@@ -127,10 +127,20 @@ export const SyncReferralSchema = CreateReferralSchema.extend({
   updatedAt: DateInput.optional(),
 });
 
+export const SyncFollowUpSchema = z.object({
+  id: z.string().uuid().optional(),
+  patientId: z.string().uuid(),
+  status: z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]).optional(),
+  notes: z.string().nullable().optional(),
+  completedAt: DateInput.optional(),
+  updatedAt: DateInput.optional(),
+});
+
 export const SyncPayloadSchema = z.object({
   patients: z.array(SyncPatientSchema).max(100).optional(),
   visits: z.array(SyncVisitSchema).max(100).optional(),
   referrals: z.array(SyncReferralSchema).max(100).optional(),
+  followUps: z.array(SyncFollowUpSchema).max(100).optional(),
   lastSyncTimestamp: DateInput.optional(),
 });
 
@@ -142,6 +152,7 @@ export const SyncResponseSchema = z.object({
   patients: z.array(PatientSchema).optional(),
   visits: z.array(VisitSchema).optional(),
   referrals: z.array(ReferralSchema).optional(),
+  followUps: z.array(z.any()).optional(),
   serverTimestamp: z.date(),
   conflicts: z
     .array(
@@ -150,6 +161,15 @@ export const SyncResponseSchema = z.object({
         entityId: z.string(),
         serverVersion: z.unknown(),
         clientVersion: z.unknown(),
+      })
+    )
+    .optional(),
+  rejected: z
+    .array(
+      z.object({
+        entityType: z.string(),
+        entityId: z.string().optional(),
+        reason: z.string(),
       })
     )
     .optional(),
@@ -168,6 +188,7 @@ export type VisitFilter = z.infer<typeof VisitFilterSchema>;
 export type SupervisionFilter = z.infer<typeof SupervisionFilterSchema>;
 export type ReferralFilter = z.infer<typeof ReferralFilterSchema>;
 export type SyncPatient = z.infer<typeof SyncPatientSchema>;
+export type SyncFollowUp = z.infer<typeof SyncFollowUpSchema>;
 export type SyncVisit = z.infer<typeof SyncVisitSchema>;
 export type SyncReferral = z.infer<typeof SyncReferralSchema>;
 export type SyncPayload = z.infer<typeof SyncPayloadSchema>;
@@ -191,6 +212,7 @@ export const CreateFollowUpSchema = z.object({
 export const UpdateFollowUpSchema = z.object({
   status: z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]),
   notes: z.string().nullable().optional(),
+  completedAt: DateInput.optional(),
 });
 
 export const FollowUpFilterSchema = z.object({
