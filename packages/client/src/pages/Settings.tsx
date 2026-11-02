@@ -1,12 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import { BrandMark } from "../components/ui/BrandMark";
 import { BellIcon, CheckIcon, InfoIcon, SyncIcon, UserIcon } from "../components/ui/Icons";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { api } from "../lib/api";
+import { changePin, isPinSet } from "../lib/lock";
 import { initialsFor } from "../lib/nav";
 import { ROLE_LABEL } from "../lib/session";
 import { syncNow, useSyncStatus } from "../lib/sync/engine";
@@ -98,6 +99,105 @@ function describeSyncState({
     detail: "No records are waiting on this device.",
     tone: "green",
   };
+}
+
+function ChangePinForm() {
+  const [oldPin, setOldPin] = useState("");
+  const [newPin, setNewPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+
+    if (newPin.length !== 6 || !/^\d+$/.test(newPin)) {
+      setError("New PIN must be exactly 6 digits.");
+      return;
+    }
+    if (newPin !== confirmPin) {
+      setError("New PINs don't match.");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const ok = await changePin(oldPin, newPin);
+      if (ok) {
+        setMessage("PIN changed successfully.");
+        setOldPin("");
+        setNewPin("");
+        setConfirmPin("");
+      } else {
+        setError("Current PIN is incorrect.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to change PIN.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label htmlFor="old-pin" className="label">
+          Current PIN
+        </label>
+        <input
+          id="old-pin"
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={6}
+          value={oldPin}
+          onChange={(e) => setOldPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          className="input"
+          autoComplete="current-password"
+        />
+      </div>
+      <div>
+        <label htmlFor="new-pin" className="label">
+          New PIN (6 digits)
+        </label>
+        <input
+          id="new-pin"
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={6}
+          value={newPin}
+          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          className="input"
+          autoComplete="new-password"
+        />
+      </div>
+      <div>
+        <label htmlFor="confirm-pin" className="label">
+          Confirm new PIN
+        </label>
+        <input
+          id="confirm-pin"
+          type="password"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={6}
+          value={confirmPin}
+          onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          className="input"
+          autoComplete="new-password"
+        />
+      </div>
+      {error && <p className="text-sm font-medium text-triage-red">{error}</p>}
+      {message && <p className="text-sm font-medium text-triage-green">{message}</p>}
+      <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
+        {saving ? "Changing…" : "Change PIN"}
+      </button>
+    </form>
+  );
 }
 
 export default function SettingsPage() {
@@ -246,6 +346,18 @@ export default function SettingsPage() {
                     </dd>
                   </div>
                 </dl>
+              </PanelBody>
+            </Panel>
+          )}
+
+          {activeTab === "profile" && isPinSet() && (
+            <Panel>
+              <PanelHeader
+                title="Device PIN"
+                description="Change the PIN that protects this device"
+              />
+              <PanelBody className="space-y-4">
+                <ChangePinForm />
               </PanelBody>
             </Panel>
           )}
