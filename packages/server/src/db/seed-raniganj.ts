@@ -2,7 +2,7 @@ import bcrypt from "bcryptjs";
 import { db } from "./client.js";
 
 // Auto-generated from HR_DATA_RANIGANJ.xlsx
-// Raniganj block, Araria district - real ANM accounts
+// Raniganj block, Araria district - real ANM + CHO accounts
 // Default password for all accounts: Raniganj@2026 (change on first login)
 
 const DEFAULT_PASSWORD = "Raniganj@2026";
@@ -516,18 +516,21 @@ export async function seedRaniganj() {
   }));
   await db.insertInto("users").values(anmValues).execute();
 
+  // CHO accounts - one per HSC
+  const choValues = HSCS.map((hsc, idx) => ({
+    employee_id: `CHO_RANIGANJ_${hscCode(hsc)}_${String(idx + 1).padStart(2, "0")}`,
+    name: `CHO ${hsc}`,
+    phone: `910000${String(idx + 1).padStart(4, "0")}`,
+    password_hash: passwordHash,
+    role: "CHO" as const,
+    facility_id: facilityIds.get(hscCode(hsc)) as string,
+    language: "hi",
+  }));
+  await db.insertInto("users").values(choValues).execute();
+
   await db
     .insertInto("users")
     .values([
-      {
-        employee_id: "CHO_RANIGANJ_01",
-        name: "CHO Raniganj",
-        phone: "9000000001",
-        password_hash: passwordHash,
-        role: "CHO",
-        facility_id: blockId,
-        language: "hi",
-      },
       {
         employee_id: "BHM_RANIGANJ_01",
         name: "BHM Raniganj",
@@ -570,10 +573,11 @@ export async function seedRaniganj() {
     .execute();
 
   console.log(
-    `Seeded ${ANMS.length} ANMs, ${HSCS.length} HSCs, and 5 helpdesk/BHM/DHS/CHO accounts.`
+    `Seeded ${ANMS.length} ANMs, ${HSCS.length} HSCs, ${choValues.length} CHOs, and 4 helpdesk/BHM/DHS accounts.`
   );
   console.log(`Default password for all accounts: ${DEFAULT_PASSWORD}`);
   console.log("Employee IDs: ARR_RANIGANJ_<HSC>_<NN>");
+  console.log("CHO IDs: CHO_RANIGANJ_<HSC>_<NN>");
 }
 
 const isMain =
