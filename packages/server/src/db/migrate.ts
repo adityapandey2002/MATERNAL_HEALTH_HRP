@@ -10,7 +10,13 @@ export async function migrate(): Promise<void> {
   const migrations = await loadMigrations();
 
   await db.transaction().execute(async (trx) => {
-    await sql`select pg_advisory_xact_lock(${config.dbMigrationLockId})`.execute(trx);
+    // Postgres supports advisory locks to serialize concurrent migrations.
+    // CockroachDB does not, so fall back to the transaction itself.
+    try {
+      await sql`select pg_advisory_xact_lock(${config.dbMigrationLockId})`.execute(trx);
+    } catch {
+      console.warn("Advisory lock not available on this database; relying on transaction isolation");
+    }
 
     await sql`
       create table if not exists schema_migrations (

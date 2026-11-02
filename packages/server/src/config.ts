@@ -23,6 +23,7 @@ const RawConfigSchema = z.object({
   SERVE_CLIENT: booleanString.default(false),
   CLIENT_DIST_PATH: z.string().min(1).default("packages/client/dist"),
   DB_POOL_MAX: z.coerce.number().int().positive().default(10),
+  DB_SSL_CA: z.string().optional(),
   RATE_LIMIT_AUTH: z.coerce.number().int().positive().default(100),
   RATE_LIMIT_API: z.coerce.number().int().positive().default(500),
   RATE_LIMIT_SYNC: z.coerce.number().int().positive().default(60),
@@ -47,6 +48,7 @@ export interface AppConfig {
   serveClient: boolean;
   clientDistPath: string;
   dbPoolMax: number;
+  dbSslCa?: string;
   rateLimitAuth: number;
   rateLimitApi: number;
   rateLimitSync: number;
@@ -119,6 +121,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     serveClient: raw.SERVE_CLIENT,
     clientDistPath: raw.CLIENT_DIST_PATH,
     dbPoolMax: raw.DB_POOL_MAX,
+    dbSslCa: raw.DB_SSL_CA,
     rateLimitAuth: raw.RATE_LIMIT_AUTH,
     rateLimitApi: raw.RATE_LIMIT_API,
     rateLimitSync: raw.RATE_LIMIT_SYNC,
