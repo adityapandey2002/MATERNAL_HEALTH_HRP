@@ -1,5 +1,5 @@
-import { Kysely, PostgresDialect } from "kysely";
 import { readFileSync } from "node:fs";
+import { Kysely, PostgresDialect } from "kysely";
 import { Pool } from "pg";
 import { config } from "../config.js";
 import type { DB } from "./types.js";

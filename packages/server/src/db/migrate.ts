@@ -15,7 +15,9 @@ export async function migrate(): Promise<void> {
     try {
       await sql`select pg_advisory_xact_lock(${config.dbMigrationLockId})`.execute(trx);
     } catch {
-      console.warn("Advisory lock not available on this database; relying on transaction isolation");
+      console.warn(
+        "Advisory lock not available on this database; relying on transaction isolation"
+      );
     }
 
     await sql`
