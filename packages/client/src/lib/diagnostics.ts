@@ -47,7 +47,7 @@ export function buildDiagnostics(input: DiagnosticInput): DiagnosticSnapshot {
 /** Renders the snapshot as plain text, safe to paste into a ticket. */
 export function formatDiagnostics(snapshot: DiagnosticSnapshot): string {
   return [
-    `Matru Suraksha diagnostics`,
+    "Matru Suraksha diagnostics",
     `Generated: ${snapshot.generatedAt}`,
     `Device ID: ${snapshot.deviceId ?? "unknown"}`,
     `App version: ${snapshot.appVersion}`,

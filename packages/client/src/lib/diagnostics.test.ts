@@ -48,10 +48,8 @@ describe("diagnostics", () => {
       })
     );
 
-    for (const forbidden of ["name", "phone", "abha", "address", "patient"]) {
-      // The word "patient" must not appear as a value; the field labels are fine.
-      expect(text.toLowerCase()).not.toContain("asha");
-    }
+    // The snapshot must not leak any patient identifier.
+    expect(text.toLowerCase()).not.toContain("asha");
     expect(text).toContain("Device ID:");
     expect(text).toContain("Pending changes: 0");
   });

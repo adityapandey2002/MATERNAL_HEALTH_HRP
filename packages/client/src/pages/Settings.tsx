@@ -7,8 +7,8 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { api } from "../lib/api";
-import { changePin, isPinSet, wipeDevice } from "../lib/lock";
 import { copyDiagnostics } from "../lib/diagnostics";
+import { changePin, isPinSet, wipeDevice } from "../lib/lock";
 import { initialsFor } from "../lib/nav";
 import { ROLE_LABEL } from "../lib/session";
 import { syncNow, useSyncStatus } from "../lib/sync/engine";
@@ -238,7 +238,9 @@ export default function SettingsPage() {
       lastSync: sync?.lastSync ?? null,
       lastError: sync?.lastError ?? null,
     });
-    setDiagnosticsMessage("Copied. Paste it into the support ticket — no patient data is included.");
+    setDiagnosticsMessage(
+      "Copied. Paste it into the support ticket — no patient data is included."
+    );
     // Keep the text around for environments without a clipboard API.
     try {
       localStorage.setItem("hrp.lastDiagnostics", text);
