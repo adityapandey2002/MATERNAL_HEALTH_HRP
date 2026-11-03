@@ -15,8 +15,9 @@
         android:theme="@style/AppTheme"
         tools:targetApi="35">
 
-        <!-- nosemgrep: the launcher activity must be exported to be startable.
-             It holds no privileged data and is the only exported component. -->
+        <!-- Launcher activity: must be exported to be startable by the system.
+             It holds no privileged data; it is the only exported component. -->
+        <!-- nosemgrep -->
         <activity
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
             android:name=".MainActivity"
