@@ -173,15 +173,17 @@ jobs:
           retention-days: 30
 
       - name: Publish release assets
-        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
+          tag_name: v${{ steps.version.outputs.name }}
+          name: v${{ steps.version.outputs.name }}
           files: artifacts/*
           body: |
             Matru Suraksha pilot build.
 
             Install `${{ steps.version.outputs.file }}` on the device, then check
             the file against `${{ steps.version.outputs.file }}.sha256` before sharing it.
+          fail_on_unmatched_files: false
 
       - name: Remove signing material
         if: always()
