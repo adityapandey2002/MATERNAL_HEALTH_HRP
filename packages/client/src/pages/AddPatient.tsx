@@ -264,7 +264,7 @@ export default function AddPatientPage() {
               title="Woman and household"
               action={
                 <span className="inline-flex">
-                  <UserPlusIcon className="h-8 w-8 text-primary" />
+                  <UserPlusIcon className="h-10 w-10 text-primary" />
                 </span>
               }
             />
