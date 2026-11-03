@@ -172,8 +172,8 @@ export default function Layout() {
       </aside>
 
       <div className="flex min-h-screen flex-1 flex-col lg:pl-60">
-        <header className="sticky top-0 z-30 border-b border-line bg-surface">
-          <div className="flex h-14 items-center gap-3 px-4 sm:h-16 sm:px-6">
+        <header className="sticky top-0 z-30 border-b border-line bg-surface pt-safe">
+          <div className="flex h-14 items-center gap-2 px-3 sm:h-16 sm:gap-3 sm:px-6">
             <span className="lg:hidden">
               <BrandMark size={28} variant="compact" title={null} />
             </span>
@@ -280,7 +280,7 @@ export default function Layout() {
                 to={item.path}
                 end={item.path === "/" || item.path === "/patients"}
                 onClick={() => setMoreOpen(false)}
-                className="flex min-h-touch items-center gap-3 rounded px-3 text-sm font-medium text-ink-muted hover:bg-canvas"
+                className="flex min-h-touch items-center gap-3 rounded px-3 text-sm font-medium text-ink hover:bg-canvas"
               >
                 <item.icon className="h-5 w-5 text-ink-subtle" />
                 {item.label}

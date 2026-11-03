@@ -45,7 +45,7 @@ export function Sheet({ open, onClose, title, description, children }: SheetProp
       <button
         type="button"
         aria-label="Close menu"
-        className="absolute inset-0 bg-ink/40"
+        className="absolute inset-0 bg-ink/30"
         onClick={onClose}
       />
       <dialog
@@ -53,7 +53,7 @@ export function Sheet({ open, onClose, title, description, children }: SheetProp
         aria-modal="true"
         aria-labelledby="sheet-title"
         aria-describedby={description ? "sheet-description" : undefined}
-        className="static m-0 w-full max-w-lg rounded-t-xl border border-line bg-surface p-0 shadow-overlay"
+        className="static m-0 w-full max-w-lg rounded-t-xl border border-line bg-surface p-0 pb-safe shadow-overlay"
       >
         <div className="flex items-start justify-between gap-4 border-b border-line-soft px-4 py-3">
           <div>
