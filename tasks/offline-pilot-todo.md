@@ -226,19 +226,19 @@ Plan: `tasks/offline-pilot-plan.md` · Created: 2026-10-31
     re-encrypted by `migrateLocalData()` on unlock. Coded clinical fields stay
     plaintext locally, as stated in the residual-risk note.
 
-- [ ] **5A.3 Wipe + device revocation**
+- [x] **5A.3 Wipe + device revocation**
   - Acceptance: logout wipe, 10-failure wipe, server revoke flag applied on sync, admin revoke action
   - Verify: integration + device test
   - Files: `lib/lock.ts`, `lib/sync/pull.ts`, `routes/staff.ts` or `routes/devices.ts`, tests
   - Depends: 5A.1, 4.4 · Size: M
 
-- [ ] **5A.4 Android hardening + pilot backend**
+- [x] **5A.4 Android hardening + pilot backend**
   - Acceptance: `FLAG_SECURE`, `allowBackup=false`, release flags; separate non-shared backend signed off
   - Verify: checklist review + manual
   - Files: `android/...`, runbook, config
   - Depends: 4.1, 4.3 · Size: M
 
-- [ ] **5A.5 Privacy gate**
+- [x] **5A.5 Privacy gate**
   - Acceptance: written go/no-go, consent + retention evidence
   - Verify: review
   - Files: `docs/runbooks/offline-pilot.md`, `docs/compliance/*`
