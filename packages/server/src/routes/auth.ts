@@ -7,6 +7,13 @@ import { config } from "../config.js";
 import { db } from "../db/client.js";
 import { serializeUser } from "../lib/serializers.js";
 import { validateBody } from "../lib/validate.js";
+import {
+  DEVICE_HEADER,
+  isDeviceRevoked,
+  parseDeviceId,
+  parsePlatform,
+  registerDevice,
+} from "../services/devices.js";
 
 const REFRESH_COOKIE = "refreshToken";
 
@@ -46,13 +53,29 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     }
 
     const serializedUser = serializeUser(user);
+    const deviceId = parseDeviceId(request.headers[DEVICE_HEADER]);
+
+    if (deviceId) {
+      // A phone the district has cut off must not get a new session, even with
+      // the right password. The account stays usable on a replacement device.
+      if (await isDeviceRevoked(db, deviceId)) {
+        return reply.code(401).send({ message: "Device revoked", code: "DEVICE_REVOKED" });
+      }
+      await registerDevice(db, {
+        deviceId,
+        userId: user.id,
+        platform: parsePlatform(isNativeRequest(request) ? "android" : "web"),
+      });
+    }
+
     const accessToken = app.jwt.sign({
       sub: user.id,
       role: serializedUser.role,
       facilityId: user.facility_id,
+      ...(deviceId ? { dev: deviceId } : {}),
     });
     const refreshToken = app.jwt.sign(
-      { sub: user.id, type: "refresh" },
+      { sub: user.id, type: "refresh", ...(deviceId ? { dev: deviceId } : {}) },
       { expiresIn: config.jwtRefreshTtl, key: config.jwtRefreshSecret }
     );
 
@@ -81,10 +104,23 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
     }
 
     try {
-      const decoded = app.jwt.verify<{ sub: string; type: string }>(refreshToken, {
+      const decoded = app.jwt.verify<{ sub: string; type: string; dev?: string }>(refreshToken, {
         key: config.jwtRefreshSecret,
       });
       if (decoded.type !== "refresh") throw new Error("Invalid token type");
+
+      // The refresh token names the install it was issued to. A token lifted
+      // from a phone cannot be replayed from another device, and a revoked
+      // install cannot rotate its way back in.
+      const headerDeviceId = parseDeviceId(request.headers[DEVICE_HEADER]);
+      if (decoded.dev) {
+        if (headerDeviceId !== decoded.dev) throw new Error("Device mismatch");
+        if (await isDeviceRevoked(db, decoded.dev)) {
+          return reply.code(401).send({ message: "Device revoked", code: "DEVICE_REVOKED" });
+        }
+      } else if (headerDeviceId && (await isDeviceRevoked(db, headerDeviceId))) {
+        return reply.code(401).send({ message: "Device revoked", code: "DEVICE_REVOKED" });
+      }
 
       const user = await db
         .selectFrom("users")
@@ -99,9 +135,10 @@ export const authRoutes: FastifyPluginAsync = async (app) => {
         sub: user.id,
         role: UserRole.parse(user.role),
         facilityId: user.facility_id,
+        ...(decoded.dev ? { dev: decoded.dev } : {}),
       });
       const newRefreshToken = app.jwt.sign(
-        { sub: user.id, type: "refresh" },
+        { sub: user.id, type: "refresh", ...(decoded.dev ? { dev: decoded.dev } : {}) },
         { expiresIn: config.jwtRefreshTtl, key: config.jwtRefreshSecret }
       );
 

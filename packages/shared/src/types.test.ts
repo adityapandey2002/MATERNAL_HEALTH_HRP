@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BooleanInput,
   DateInput,
+  DeviceSchema,
   FacilityLevel,
   PatientSchema,
   RiskLevel,
@@ -181,5 +182,36 @@ describe("VisitSchema", () => {
 
   it("rejects a gestational age beyond 45 weeks", () => {
     expect(VisitSchema.safeParse({ ...valid, gestationalWeeks: 46 }).success).toBe(false);
+  });
+});
+
+describe("DeviceSchema", () => {
+  const valid = {
+    id: "55555555-5555-4555-8555-555555555555",
+    userId: "33333333-3333-4333-8333-333333333333",
+    userName: "Radha Kumari",
+    employeeId: "ARR_RANIGANJ_HSC01_01",
+    userRole: "ANM",
+    label: null,
+    platform: "android",
+    createdAt: "2026-11-01T00:00:00.000Z",
+    lastSeenAt: "2026-11-02T00:00:00.000Z",
+    revokedAt: null,
+  };
+
+  it("accepts a registered install", () => {
+    const parsed = DeviceSchema.parse(valid);
+    expect(parsed.platform).toBe("android");
+    expect(parsed.revokedAt).toBeNull();
+    expect(parsed.lastSeenAt).toBeInstanceOf(Date);
+  });
+
+  it("parses a revocation timestamp", () => {
+    const parsed = DeviceSchema.parse({ ...valid, revokedAt: "2026-11-03T09:00:00.000Z" });
+    expect(parsed.revokedAt).toBeInstanceOf(Date);
+  });
+
+  it("rejects an unknown platform", () => {
+    expect(DeviceSchema.safeParse({ ...valid, platform: "ios" }).success).toBe(false);
   });
 });

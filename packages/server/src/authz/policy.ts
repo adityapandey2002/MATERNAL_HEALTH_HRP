@@ -27,6 +27,7 @@ export const ACTIONS = [
   "staff:manage",
   "staff:read",
   "followup:manage",
+  "device:revoke",
 ] as const;
 
 export type Action = (typeof ACTIONS)[number];
@@ -274,6 +275,20 @@ function canReadStaff(actor: ActorScope, target: ResourceTarget): PolicyResult {
   return canReadFacilityScoped(actor, target);
 }
 
+/**
+ * Revoking a phone that holds patient data is an account-level action, so it
+ * follows the same bar as provisioning: BHM and DHS, inside their own subtree.
+ * An ANM cannot revoke a colleague's device, and a supervisor cannot reach
+ * across districts.
+ */
+function canRevokeDevice(actor: ActorScope, target: ResourceTarget): PolicyResult {
+  if (!STAFF_ADMIN_ROLES.includes(actor.role)) {
+    return deny("ROLE_NOT_PERMITTED");
+  }
+
+  return canReadFacilityScoped(actor, target);
+}
+
 function evaluate(actor: ActorScope, action: Action, target: ResourceTarget): PolicyResult {
   switch (action) {
     case "patient:read":
@@ -320,6 +335,9 @@ function evaluate(actor: ActorScope, action: Action, target: ResourceTarget): Po
 
     case "staff:read":
       return canReadStaff(actor, target);
+
+    case "device:revoke":
+      return canRevokeDevice(actor, target);
 
     default:
       return deny("UNKNOWN_ACTION");

@@ -1,5 +1,6 @@
 import { UserRole } from "@hrp/shared";
 import type {
+  Device,
   Facility,
   FollowUp,
   Patient,
@@ -10,6 +11,8 @@ import type {
   Visit,
 } from "@hrp/shared";
 import type {
+  DbUserRole,
+  DeviceRow,
   FacilityRow,
   FollowUpRow,
   PatientRow,
@@ -185,5 +188,31 @@ export function serializeFollowUp(row: FollowUpRow): FollowUp {
     notes: row.notes,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+  };
+}
+
+/**
+ * A device row plus the owner columns the supervision query joins in.
+ * `userName`, `employeeId` and `userRole` are optional so the same function
+ * serializes a bare row in a unit test.
+ */
+export function serializeDevice(
+  row: DeviceRow & {
+    user_name?: string | null;
+    user_employee_id?: string | null;
+    user_role?: DbUserRole | null;
+  }
+): Device {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    userName: row.user_name ?? null,
+    employeeId: row.user_employee_id ?? null,
+    userRole: (row.user_role ?? null) as Device["userRole"],
+    label: row.label,
+    platform: row.platform,
+    createdAt: row.created_at,
+    lastSeenAt: row.last_seen_at,
+    revokedAt: row.revoked_at,
   };
 }

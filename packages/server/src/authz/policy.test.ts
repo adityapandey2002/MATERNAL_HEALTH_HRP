@@ -75,6 +75,7 @@ const EXPECTED_ALLOWED: Record<UserRole, ReadonlySet<Action>> = {
     "staff:manage",
     "staff:read",
     "followup:manage",
+    "device:revoke",
   ]),
   HRP_HELPDESK_DISTRICT: new Set([...BASE_READS, "referral:respond", "followup:manage"]),
   DHS: new Set([
@@ -86,6 +87,7 @@ const EXPECTED_ALLOWED: Record<UserRole, ReadonlySet<Action>> = {
     "staff:manage",
     "staff:read",
     "followup:manage",
+    "device:revoke",
   ]),
 };
 

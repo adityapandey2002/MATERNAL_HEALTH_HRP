@@ -86,6 +86,7 @@ describe("migration plan", () => {
       "005_hrp_follow_up",
       "006_hrp_helpdesk",
       "007_matru_suraksha_roles",
+      "008_device_registry",
     ]);
   });
 });

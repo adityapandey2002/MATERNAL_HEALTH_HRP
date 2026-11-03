@@ -235,7 +235,21 @@ export const SupervisionAlertSchema = z.object({
   createdAt: DateInput,
 });
 
+export const DeviceSchema = z.object({
+  id: z.string().uuid(),
+  userId: z.string().uuid(),
+  userName: z.string().nullable(),
+  employeeId: z.string().nullable(),
+  userRole: UserRole.nullable(),
+  label: z.string().nullable(),
+  platform: z.enum(["web", "android"]),
+  createdAt: DateInput,
+  lastSeenAt: DateInput,
+  revokedAt: DateInput.nullable(),
+});
+
 export type Facility = z.infer<typeof FacilitySchema>;
+export type Device = z.infer<typeof DeviceSchema>;
 export type User = z.infer<typeof UserSchema>;
 export type Patient = z.infer<typeof PatientSchema>;
 export type Visit = z.infer<typeof VisitSchema>;

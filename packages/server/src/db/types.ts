@@ -155,6 +155,16 @@ export interface SchemaMigration {
   applied_at: Generated<Date>;
 }
 
+export interface Device {
+  id: string;
+  user_id: string;
+  label: string | null;
+  platform: Generated<"web" | "android">;
+  created_at: Generated<Date>;
+  last_seen_at: Generated<Date>;
+  revoked_at: Date | null;
+}
+
 export interface DB {
   facilities: Facility;
   users: User;
@@ -167,6 +177,7 @@ export interface DB {
   follow_ups: FollowUp;
   user_nodal_designations: UserNodalDesignation;
   field_level_lists: FieldLevelList;
+  devices: Device;
   schema_migrations: SchemaMigration;
 }
 
@@ -182,6 +193,7 @@ export type ResponsibilityRow = Selectable<DB["responsibilities"]>;
 export type FollowUpRow = Selectable<DB["follow_ups"]>;
 export type UserNodalDesignationRow = Selectable<DB["user_nodal_designations"]>;
 export type FieldLevelListRow = Selectable<DB["field_level_lists"]>;
+export type DeviceRow = Selectable<DB["devices"]>;
 
 export interface FollowUp {
   id: Generated<string>;

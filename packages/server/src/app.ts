@@ -14,6 +14,7 @@ import { db } from "./db/client.js";
 import { corsOriginOption } from "./lib/cors.js";
 import { registerClientStatic } from "./lib/static-client.js";
 import { authRoutes } from "./routes/auth.js";
+import { deviceRoutes } from "./routes/devices.js";
 import { facilityRoutes } from "./routes/facilities.js";
 import { fieldLevelRoutes } from "./routes/field-level.js";
 import { followUpRoutes } from "./routes/follow-ups.js";
@@ -26,6 +27,7 @@ import { staffRoutes } from "./routes/staff.js";
 import { supervisionRoutes } from "./routes/supervision.js";
 import { syncRoutes } from "./routes/sync.js";
 import { visitRoutes } from "./routes/visits.js";
+import { DEVICE_HEADER, isDeviceRevoked, parseDeviceId } from "./services/devices.js";
 
 export interface LoggerOptions {
   enabled?: boolean;
@@ -139,6 +141,20 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       }
       throw error;
     }
+
+    // A token minted for one install is only accepted from that install, and a
+    // revoked install is refused even while its access token is still valid.
+    // That is what makes a lost phone lose access before the token expires.
+    const headerDeviceId = parseDeviceId(request.headers[DEVICE_HEADER]);
+    const tokenDeviceId = (request.user as { dev?: string }).dev;
+
+    if (tokenDeviceId && tokenDeviceId !== headerDeviceId) {
+      return reply.code(401).send({ message: authzMessage(401) });
+    }
+
+    if (headerDeviceId && (await isDeviceRevoked(db, headerDeviceId))) {
+      return reply.code(401).send({ message: "Device revoked", code: "DEVICE_REVOKED" });
+    }
   });
 
   app.get("/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));
@@ -168,6 +184,7 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
   });
 
   app.register(authRoutes, { prefix: "/api/auth" });
+  app.register(deviceRoutes, { prefix: "/api/devices" });
   app.register(staffRoutes, { prefix: "/api/staff" });
   app.register(patientRoutes, { prefix: "/api/patients" });
   app.register(hrpRoutes, { prefix: "/api/hrp/patients" });
