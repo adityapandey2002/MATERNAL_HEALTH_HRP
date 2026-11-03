@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { canUseLocalData } from "../crypto";
 import type { PendingOp } from "../db/local-db";
 import {
   conflictRepo,
@@ -123,6 +124,9 @@ async function applyServerResponse(res: {
 
 export async function drain(): Promise<void> {
   if (draining) return;
+  // A locked pilot build has no data key: reading a queued payload would throw
+  // and writing it back would leave plaintext. Resume after unlock.
+  if (!canUseLocalData()) return;
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
   draining = true;
   try {

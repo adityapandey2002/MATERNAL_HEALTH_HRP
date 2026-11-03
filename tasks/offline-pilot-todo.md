@@ -205,17 +205,26 @@ Plan: `tasks/offline-pilot-plan.md` · Created: 2026-10-31
 
 ## Conditional Phase 5A — only if D1 = real PHI (+2–3 days)
 
-- [ ] **5A.1 App PIN lock + key management**
+- [x] **5A.1 App PIN lock + key management**
   - Acceptance: 6-digit PIN, PBKDF2 (600k), lock on launch + 3-min background, 10 failures → wipe, PIN change needs old PIN
   - Verify: unit + device test
   - Files: `lib/lock.ts`, `pages/LockScreen.tsx`, `App.tsx`, tests
   - Depends: 1.2, 4.1 · Size: M
+  - Done: PBKDF2 derives a KEK that wraps a random data key (DEK), so a PIN
+    change re-wraps the DEK instead of orphaning encrypted records. Demo builds
+    skip the gate; pilot builds (`VITE_DEMO_MODE=false`) force setup.
 
-- [ ] **5A.2 Field encryption + blind index**
+- [x] **5A.2 Field encryption + blind index**
   - Acceptance: identifiers/notes encrypted at rest; HMAC name index; decrypt before render/sync
   - Verify: unit tests with a known ciphertext vector
   - Files: `lib/crypto.ts`, `lib/db/repositories.ts`, tests
   - Depends: 5A.1 · Size: M
+  - Done: AES-256-GCM (`enc:v1:` values) for patient name, phone, ABHA, address,
+    ASHA name/phone, and visit/follow-up notes; sync payloads and conflict
+    versions are encrypted too. HMAC-SHA-256 blind index (HKDF-derived) scoped by
+    facility powers exact-name duplicate checks on registration. Legacy rows are
+    re-encrypted by `migrateLocalData()` on unlock. Coded clinical fields stay
+    plaintext locally, as stated in the residual-risk note.
 
 - [ ] **5A.3 Wipe + device revocation**
   - Acceptance: logout wipe, 10-failure wipe, server revoke flag applied on sync, admin revoke action

@@ -26,6 +26,16 @@ const ClientConfigSchema = z
           "VITE_API_URL must be an absolute https URL when VITE_NATIVE_APP=true (the WebView origin is https://localhost)",
       });
     }
+    // The APK is handed to ANMs for real patient data. Demo mode allows the
+    // PIN gate to be skipped, so it must never ship inside the bundle.
+    if (value.VITE_NATIVE_APP === "true" && value.VITE_DEMO_MODE !== "false") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["VITE_DEMO_MODE"],
+        message:
+          'VITE_DEMO_MODE must be "false" when VITE_NATIVE_APP=true: the bundled app handles real patient data',
+      });
+    }
   });
 
 export interface ClientConfig {

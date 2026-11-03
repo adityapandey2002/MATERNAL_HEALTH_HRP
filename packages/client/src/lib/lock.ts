@@ -3,23 +3,31 @@
  *
  * A 6-digit PIN protects everything stored on the phone. The PIN is never
  * stored in plain text: PBKDF2 (600 000 iterations, SHA-256) derives a 256-bit
- * key from the PIN and a random salt. Only the salt and a verification hash
- * are persisted; the key lives in memory and is cleared on lock or app kill.
+ * key-encryption key (KEK) from the PIN and a random salt. The KEK does not
+ * encrypt patient data directly; it wraps a random data-encryption key (DEK),
+ * which is what `crypto.ts` uses for fields. Changing the PIN only re-wraps the
+ * DEK, so re-keying never risks the records already on the device.
+ *
+ * Only the salt, a verification hash and the wrapped DEK are persisted. The
+ * DEK lives in memory and is cleared on lock or app kill.
  *
  * Ten consecutive wrong PINs wipe the device. The app also locks after three
  * minutes in the background.
  */
 
+import { getDataKey, setDataKey } from "./crypto";
+
 const PIN_LENGTH = 6;
 const MAX_ATTEMPTS = 10;
 const AUTO_LOCK_MS = 3 * 60 * 1000;
 const PBKDF2_ITERATIONS = 600_000;
+const IV_BYTES = 12;
 
 const SALT_KEY = "hrp-pin-salt";
 const VERIFY_KEY = "hrp-pin-verify";
 const ATTEMPTS_KEY = "hrp-pin-attempts";
+const DEK_KEY = "hrp-dek-wrapped";
 
-let unlockedKey: CryptoKey | null = null;
 let locked = true;
 let lastHiddenAt = 0;
 let registered = false;
@@ -40,7 +48,7 @@ function toBase64(bytes: ArrayBuffer | Uint8Array): string {
 function fromBase64(b64: string): Uint8Array {
   const binary = atob(b64);
   const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) (bytes as Uint8Array)[i] = binary.charCodeAt(i);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes;
 }
 
@@ -68,6 +76,80 @@ async function sha256(data: ArrayBuffer): Promise<Uint8Array> {
   return new Uint8Array(hash);
 }
 
+async function importKek(bits: ArrayBuffer): Promise<CryptoKey> {
+  return crypto.subtle.importKey("raw", bits, { name: "AES-GCM", length: 256 }, false, [
+    "encrypt",
+    "decrypt",
+  ]);
+}
+
+/**
+ * The DEK is extractable because changing the PIN needs its raw bytes to wrap
+ * it under the new KEK. Any script that could call `exportKey` already runs
+ * with access to the decrypted data, so this adds no practical exposure.
+ */
+async function importDataKey(raw: Uint8Array): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    "raw",
+    raw as BufferSource,
+    { name: "AES-GCM", length: 256 },
+    true,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function wrapDek(kek: CryptoKey, raw: Uint8Array): Promise<string> {
+  const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv: iv as BufferSource },
+    kek,
+    raw as BufferSource
+  );
+  const payload = new Uint8Array(IV_BYTES + ciphertext.byteLength);
+  payload.set(iv, 0);
+  payload.set(new Uint8Array(ciphertext), IV_BYTES);
+  return toBase64(payload);
+}
+
+async function unwrapDek(kek: CryptoKey, wrapped: string): Promise<Uint8Array> {
+  const payload = fromBase64(wrapped);
+  const iv = payload.slice(0, IV_BYTES);
+  const ciphertext = payload.slice(IV_BYTES);
+  const raw = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: iv as BufferSource },
+    kek,
+    ciphertext as BufferSource
+  );
+  return new Uint8Array(raw);
+}
+
+/**
+ * Store a new salt/verifier for `pin` and wrap `dekRaw` under it. Reused by
+ * first-time setup and by a PIN change so the data key survives.
+ */
+async function installPin(pin: string, dekRaw: Uint8Array): Promise<CryptoKey> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const bits = await deriveBits(pin, salt);
+  const hash = await sha256(bits);
+  const kek = await importKek(bits);
+  const wrapped = await wrapDek(kek, dekRaw);
+
+  try {
+    localStorage.setItem(SALT_KEY, toBase64(salt));
+    localStorage.setItem(VERIFY_KEY, toBase64(hash));
+    localStorage.setItem(ATTEMPTS_KEY, "0");
+    localStorage.setItem(DEK_KEY, wrapped);
+  } catch {
+    throw new Error("Could not store PIN data");
+  }
+
+  const key = await importDataKey(dekRaw);
+  setDataKey(key);
+  locked = false;
+  notify();
+  return key;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -85,7 +167,7 @@ export function isLocked(): boolean {
 }
 
 export function getDerivedKey(): CryptoKey | null {
-  return unlockedKey;
+  return getDataKey();
 }
 
 export function onLockChange(cb: (locked: boolean) => void): () => void {
@@ -102,40 +184,20 @@ export function getFailedAttempts(): number {
 }
 
 /**
- * Create a new PIN. Stores a random salt and a verification hash derived
- * from the PIN. Returns the derived CryptoKey for use by the encryption layer.
+ * First-time PIN setup. Generates a fresh data key and wraps it under the PIN.
+ * Returns the data key for the encryption layer.
  */
 export async function setupPin(pin: string): Promise<CryptoKey> {
   if (pin.length !== PIN_LENGTH || !/^\d+$/.test(pin)) {
     throw new Error("PIN must be exactly 6 digits");
   }
-  const salt = crypto.getRandomValues(new Uint8Array(16));
-  const bits = await deriveBits(pin, salt);
-  const hash = await sha256(bits);
-
-  try {
-    localStorage.setItem(SALT_KEY, toBase64(salt));
-    localStorage.setItem(VERIFY_KEY, toBase64(hash));
-    localStorage.setItem(ATTEMPTS_KEY, "0");
-  } catch {
-    throw new Error("Could not store PIN data");
-  }
-
-  const key = await crypto.subtle.importKey("raw", bits, { name: "AES-GCM", length: 256 }, false, [
-    "encrypt",
-    "decrypt",
-  ]);
-
-  unlockedKey = key;
-  locked = false;
-  notify();
-  return key;
+  const dekRaw = crypto.getRandomValues(new Uint8Array(32));
+  return installPin(pin, dekRaw);
 }
 
 /**
- * Verify a PIN. On success, stores the derived key in memory and unlocks.
+ * Verify a PIN. On success, unwraps the data key into memory and unlocks.
  * On failure, increments the attempt counter; at MAX_ATTEMPTS, wipes.
- * Returns true on success, false on failure.
  */
 export async function verifyPin(pin: string): Promise<boolean> {
   if (!isPinSet()) return false;
@@ -151,20 +213,31 @@ export async function verifyPin(pin: string): Promise<boolean> {
   const computedHash = await sha256(bits);
 
   if (constantTimeEqual(computedHash, storedHash)) {
-    // Success — reset attempts, store key, unlock
     try {
       localStorage.setItem(ATTEMPTS_KEY, "0");
     } catch {
       /* ignore */
     }
-    const key = await crypto.subtle.importKey(
-      "raw",
-      bits,
-      { name: "AES-GCM", length: 256 },
-      false,
-      ["encrypt", "decrypt"]
-    );
-    unlockedKey = key;
+
+    const kek = await importKek(bits);
+    let wrapped = localStorage.getItem(DEK_KEY);
+    let dekRaw: Uint8Array;
+    if (wrapped) {
+      dekRaw = await unwrapDek(kek, wrapped);
+    } else {
+      // A device that set a PIN before wrapping existed has no DEK yet. Make
+      // one now; no field has been encrypted under an older key.
+      dekRaw = crypto.getRandomValues(new Uint8Array(32));
+      wrapped = await wrapDek(kek, dekRaw);
+      try {
+        localStorage.setItem(DEK_KEY, wrapped);
+      } catch {
+        /* the key still works for this session */
+      }
+    }
+
+    const key = await importDataKey(dekRaw);
+    setDataKey(key);
     locked = false;
     notify();
     return true;
@@ -187,32 +260,30 @@ export async function verifyPin(pin: string): Promise<boolean> {
 }
 
 /**
- * Change the PIN. Requires the old PIN to be correct first.
+ * Change the PIN. Requires the old PIN, then re-wraps the existing data key so
+ * records already on the device stay readable.
  */
 export async function changePin(oldPin: string, newPin: string): Promise<boolean> {
   if (newPin.length !== PIN_LENGTH || !/^\d+$/.test(newPin)) {
     throw new Error("New PIN must be exactly 6 digits");
   }
-  // Verify old PIN first (but don't unlock if it was locked)
-  const wasLocked = locked;
+
   const success = await verifyPin(oldPin);
   if (!success) return false;
 
-  // Re-lock if it was locked before
-  if (wasLocked) {
-    locked = true;
-    // Keep the key in memory briefly for re-encryption (5A.2 will use it)
-  }
+  const current = getDataKey();
+  if (!current) return false;
 
-  await setupPin(newPin);
+  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", current));
+  await installPin(newPin, raw);
   return true;
 }
 
 /**
- * Lock the device. Clears the derived key from memory.
+ * Lock the device. Clears the data key from memory.
  */
 export function lock(): void {
-  unlockedKey = null;
+  setDataKey(null);
   locked = true;
   notify();
 }
@@ -230,7 +301,7 @@ export async function wipeDevice(): Promise<void> {
     // Best effort — continue even if DB clear fails
   }
 
-  // Clear all storage
+  // Clear all storage (this also removes the wrapped data key)
   try {
     localStorage.clear();
   } catch {
@@ -250,7 +321,7 @@ export async function wipeDevice(): Promise<void> {
     /* ignore */
   }
 
-  unlockedKey = null;
+  setDataKey(null);
   locked = true;
   notify();
 }

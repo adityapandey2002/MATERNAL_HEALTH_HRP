@@ -37,6 +37,8 @@ import {
   wipeDevice,
 } from "./lock";
 
+import { decryptString, encryptString } from "./crypto";
+
 describe("device lock", () => {
   beforeEach(() => {
     store.clear();
@@ -91,7 +93,7 @@ describe("device lock", () => {
     expect(getFailedAttempts()).toBe(1);
   });
 
-  it("locks after 10 failed attempts and wipes", async () => {
+  it("locks after 10 failed attempts and wipes", { timeout: 20_000 }, async () => {
     await setupPin("123456");
     lock();
 
@@ -144,5 +146,30 @@ describe("device lock", () => {
 
     expect(isPinSet()).toBe(false);
     expect(localStorage.getItem("test-key")).toBeNull();
+  });
+
+  it(
+    "wraps the data key so a PIN change does not orphan records",
+    { timeout: 20_000 },
+    async () => {
+      await setupPin("123456");
+      expect(localStorage.getItem("hrp-dek-wrapped")).toBeTruthy();
+
+      const ciphertext = await encryptString("Rekha Devi");
+
+      expect(await changePin("123456", "654321")).toBe(true);
+
+      lock();
+      expect(await verifyPin("654321")).toBe(true);
+      expect(await decryptString(ciphertext)).toBe("Rekha Devi");
+    }
+  );
+
+  it("does not re-wrap the data key when the old PIN is wrong", async () => {
+    await setupPin("123456");
+    const wrappedBefore = localStorage.getItem("hrp-dek-wrapped");
+
+    expect(await changePin("000000", "654321")).toBe(false);
+    expect(localStorage.getItem("hrp-dek-wrapped")).toBe(wrappedBefore);
   });
 });

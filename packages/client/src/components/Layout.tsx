@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import { api } from "../lib/api";
+import { clearAllLocalData } from "../lib/db/repositories";
 import {
   type NavItem,
   type NavSection,
@@ -67,10 +68,20 @@ export default function Layout() {
   );
 
   const handleLogout = async () => {
-    await api.auth.logout();
-    localStorage.clear();
-    clearCachedSession();
-    window.location.href = "/login";
+    // Signing out removes every cached patient record. The PIN and its wrapped
+    // data key are deliberately kept so the device stays locked and usable
+    // after the next sign-in; wiping the key would orphan the local database.
+    try {
+      await api.auth.logout();
+    } finally {
+      clearCachedSession();
+      try {
+        await clearAllLocalData();
+      } catch {
+        // A closed or unavailable database must not trap the user in the app.
+      }
+      window.location.href = "/login";
+    }
   };
 
   return (

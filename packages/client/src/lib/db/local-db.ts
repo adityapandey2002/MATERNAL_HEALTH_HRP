@@ -33,6 +33,8 @@ export interface LocalPatient {
   createdAt: string;
   updatedAt: string;
   syncStatus: SyncStatus;
+  /** HMAC of facility + name; populated only while the data key is unlocked. */
+  nameIndex?: string | null;
 }
 
 export interface LocalVisit {
@@ -117,6 +119,11 @@ export class HrpLocalDb extends Dexie {
       pendingOps: "++seq, entityType, entityId, createdAt",
       conflicts: "++id, entityType, entityId, seenAt",
       meta: "key",
+    });
+    // Additive index only: existing rows get an undefined nameIndex and are
+    // rewritten by migrateLocalData() once the PIN unlocks.
+    this.version(2).stores({
+      patients: "id, facilityId, updatedAt, syncStatus, isHrp, nameIndex",
     });
   }
 }

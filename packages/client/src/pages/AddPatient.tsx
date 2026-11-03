@@ -20,6 +20,7 @@ import {
 import { PageHeader } from "../components/ui/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { api } from "../lib/api";
+import type { LocalPatient } from "../lib/db/local-db";
 import { patientRepo } from "../lib/db/repositories";
 import { eddFromLmp, gestationalAgeLabel } from "../lib/hrp";
 import { useUnsavedChangesGuard } from "../lib/native";
@@ -60,6 +61,7 @@ export default function AddPatientPage() {
   const role = useUserRole();
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
+  const [duplicate, setDuplicate] = useState<LocalPatient | null>(null);
 
   // Android's back button must not silently throw away a half-typed form.
   useUnsavedChangesGuard(JSON.stringify(form) !== JSON.stringify(INITIAL_FORM));
@@ -146,6 +148,26 @@ export default function AddPatientPage() {
   const update = <K extends keyof FormState>(field: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
+    if (field === "name") setDuplicate(null);
+  };
+
+  /**
+   * Exact-name lookup through the encrypted index. Two women can share a name,
+   * so this is a prompt to check the existing case, not a block.
+   */
+  const checkForDuplicate = async (name: string) => {
+    const facilityId = getCachedSession()?.user.facilityId;
+    if (!facilityId || name.trim().length < 3) {
+      setDuplicate(null);
+      return;
+    }
+    try {
+      const matches = await patientRepo.findByExactName(facilityId, name);
+      setDuplicate(matches[0] ?? null);
+    } catch {
+      // A locked or unavailable cache must not stop a registration.
+      setDuplicate(null);
+    }
   };
 
   const lmpDate = form.lmp ? new Date(`${form.lmp}T00:00:00`) : null;
@@ -255,9 +277,20 @@ export default function AddPatientPage() {
                     autoComplete="name"
                     value={form.name}
                     onChange={(e) => update("name", e.target.value)}
+                    onBlur={(e) => void checkForDuplicate(e.target.value)}
                     placeholder="Full name"
                   />
                 </FormField>
+                {duplicate && (
+                  <output className="mt-1.5 block text-xs text-triage-amber">
+                    A woman named{" "}
+                    <Link to={`/patients/${duplicate.id}`} className="font-semibold underline">
+                      {duplicate.name}
+                    </Link>{" "}
+                    is already registered at this facility. Open that case before adding a
+                    duplicate.
+                  </output>
+                )}
               </div>
 
               <div className="space-y-1.5">

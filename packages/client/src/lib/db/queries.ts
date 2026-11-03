@@ -2,8 +2,8 @@ import type { Patient, Visit } from "@hrp/shared";
 import type { FollowUpListItem } from "@hrp/shared/schemas";
 import { useLiveQuery } from "dexie-react-hooks";
 import { getCachedSession } from "../session-cache";
-import { db } from "./local-db";
 import type { LocalFollowUp, LocalPatient, LocalVisit } from "./local-db";
+import { followUpRepo, patientRepo, visitRepo } from "./repositories";
 
 export function toPatient(lp: LocalPatient): Patient {
   return {
@@ -63,14 +63,14 @@ export function toVisit(lv: LocalVisit): Visit {
 
 export function useLocalPatients() {
   return useLiveQuery(async () => {
-    const rows = await db.patients.toArray();
+    const rows = await patientRepo.list();
     return rows.map(toPatient);
   }, []);
 }
 
 export function useLocalVisits() {
   return useLiveQuery(async () => {
-    const rows = await db.visits.toArray();
+    const rows = await visitRepo.list();
     return rows.map(toVisit);
   }, []);
 }
@@ -121,10 +121,7 @@ export function toFollowUpListItem(
 
 export function useLocalFollowUpItems() {
   return useLiveQuery(async () => {
-    const [followUps, patients] = await Promise.all([
-      db.followUps.toArray(),
-      db.patients.toArray(),
-    ]);
+    const [followUps, patients] = await Promise.all([followUpRepo.list(), patientRepo.list()]);
     const byId = new Map(patients.map((patient) => [patient.id, patient]));
     return followUps.map((followUp) => toFollowUpListItem(followUp, byId.get(followUp.patientId)));
   }, []);

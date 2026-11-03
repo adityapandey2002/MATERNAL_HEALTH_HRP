@@ -37,6 +37,15 @@ describe("loadClientConfig", () => {
     );
   });
 
+  it("rejects a demo bundle for the Android app", () => {
+    expect(() =>
+      loadClientConfig({
+        VITE_API_URL: "https://pilot-api.example.gov.in/api",
+        VITE_NATIVE_APP: "true",
+      })
+    ).toThrow(/VITE_DEMO_MODE/);
+  });
+
   it("rejects a flag that is neither true nor false", () => {
     expect(() => loadClientConfig({ VITE_NATIVE_APP: "yes" })).toThrow(/VITE_NATIVE_APP/);
   });

@@ -1,16 +1,18 @@
 import { useEffect, useState } from "react";
+import { isEncryptionRequired } from "../lib/crypto";
+import { migrateLocalData } from "../lib/db/repositories";
 import { isLocked, isPinSet, onLockChange, registerAutoLock } from "../lib/lock";
 import LockScreen from "../pages/LockScreen";
-
-const IS_DEMO = import.meta.env.VITE_DEMO_MODE !== "false";
 
 /**
  * Gates the entire app behind the device PIN.
  *
- * - First run (no PIN set): shows setup screen. In demo mode a "Skip" option
- *   is available; in a pilot build the PIN is mandatory.
- * - PIN set and locked: shows the lock screen.
- * - Unlocked: renders children.
+ * - Pilot build, first run: PIN setup is mandatory before any screen renders.
+ * - PIN set and locked: the lock screen covers the app.
+ * - Unlocked: children render, and any rows written before encryption are
+ *   rewritten under the data key in the background.
+ * - Demo build: synthetic data only, so the gate stays out of the way and the
+ *   public demo does not ask every visitor to invent a PIN.
  */
 export function LockGate({ children }: { children: React.ReactNode }) {
   const [pinSet, setPinSet] = useState<boolean | null>(null);
@@ -26,45 +28,28 @@ export function LockGate({ children }: { children: React.ReactNode }) {
     return unsub;
   }, []);
 
-  // Still loading
+  // Encrypt legacy rows once the key is in memory. Repositories read plaintext
+  // transparently, so a device that upgrades mid-shift keeps working while the
+  // rewrite runs.
+  useEffect(() => {
+    if (!pinSet || locked) return;
+    void migrateLocalData().catch((error: unknown) => {
+      console.warn(
+        "[lock] local data migration failed:",
+        error instanceof Error ? error.message : error
+      );
+    });
+  }, [pinSet, locked]);
+
   if (pinSet === null) return null;
 
-  // No PIN set yet
   if (!pinSet) {
-    if (IS_DEMO) {
-      // Demo mode: allow skipping PIN setup
-      return (
-        <>
-          <LockScreen
-            setupMode
-            onUnlock={() => {}}
-            onWiped={() => {}}
-            onSetupComplete={() => {
-              setPinSet(true);
-              setLocked(false);
-            }}
-          />
-          <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => {
-                setPinSet(true);
-                setLocked(false);
-              }}
-            >
-              Skip (demo only)
-            </button>
-          </div>
-        </>
-      );
-    }
-    // Pilot mode: PIN is mandatory
+    if (!isEncryptionRequired()) return <>{children}</>;
     return (
       <LockScreen
         setupMode
         onUnlock={() => {}}
-        onWiped={() => {}}
+        onWiped={() => setPinSet(false)}
         onSetupComplete={() => {
           setPinSet(true);
           setLocked(false);
@@ -73,19 +58,17 @@ export function LockGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // PIN set but locked
   if (locked) {
     return (
       <LockScreen
         onUnlock={() => setLocked(false)}
         onWiped={() => {
           setPinSet(false);
-          setLocked(false);
+          setLocked(true);
         }}
       />
     );
   }
 
-  // Unlocked
   return <>{children}</>;
 }

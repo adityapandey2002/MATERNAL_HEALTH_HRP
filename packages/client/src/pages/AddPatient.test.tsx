@@ -4,6 +4,8 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../lib/api";
+import type { LocalPatient } from "../lib/db/local-db";
+import { clearAllLocalData, patientRepo } from "../lib/db/repositories";
 import AddPatientPage from "./AddPatient";
 
 vi.mock("../lib/api", () => ({
@@ -63,7 +65,8 @@ const createWrapper = () => {
 };
 
 describe("AddPatientPage", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
+    await clearAllLocalData();
     vi.clearAllMocks();
     vi.mocked(api.auth.me).mockResolvedValue({
       id: "111",
@@ -147,6 +150,73 @@ describe("AddPatientPage", () => {
     await vi.waitFor(() => {
       expect(screen.getByText("Follow-ups page")).toBeInTheDocument();
     });
+  });
+
+  it("warns when the same name is already registered at the facility", async () => {
+    localStorage.getItem = vi.fn((key: string) => {
+      if (key !== "hrp-cached-session") return null;
+      return JSON.stringify({
+        user: {
+          id: "111",
+          name: "Radha",
+          employeeId: "ANM001",
+          phone: "9988776655",
+          role: "ANM",
+          facilityId: "fac1",
+          language: "en",
+          isActive: true,
+        },
+        cachedAt: Date.now(),
+      });
+    });
+
+    const existing: LocalPatient = {
+      id: "existing-1",
+      abhaId: null,
+      facilityId: "fac1",
+      registeredBy: "111",
+      anmName: "Radha",
+      name: "Sita Devi",
+      age: 24,
+      phone: "9988776655",
+      address: null,
+      hrpComplication: "PIH",
+      hrpReason: "HYPERTENSION",
+      ashaName: null,
+      ashaPhone: null,
+      referred: false,
+      isHrp: true,
+      followUpTrack: null,
+      followUpScheduledDate: null,
+      followUpStatus: "PENDING",
+      lmp: null,
+      edd: null,
+      gravida: 0,
+      para: 0,
+      abortions: 0,
+      riskFactors: [],
+      riskLevel: "AMBER",
+      riskScore: 40,
+      isHighRisk: true,
+      createdAt: "2026-10-31T00:00:00Z",
+      updatedAt: "2026-10-31T00:00:00Z",
+      syncStatus: "synced",
+    };
+    await patientRepo.upsert(existing);
+
+    render(<AddPatientPage />, { wrapper: createWrapper() });
+
+    const nameInput = screen.getByLabelText(/^Mother's full name/);
+    fireEvent.change(nameInput, { target: { value: "  sita   devi " } });
+    fireEvent.blur(nameInput);
+
+    expect(await screen.findByText(/already registered at this facility/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sita Devi" })).toHaveAttribute(
+      "href",
+      "/patients/existing-1"
+    );
+
+    await clearAllLocalData();
   });
 
   it("shows Refer to Sadar hospital and Not needed for block level staff", async () => {

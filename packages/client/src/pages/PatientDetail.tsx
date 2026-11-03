@@ -43,9 +43,9 @@ import {
   toneTextClass,
   villageLabel,
 } from "../lib/clinical";
-import { type LocalPatient, type LocalVisit, db } from "../lib/db/local-db";
+import type { LocalPatient, LocalVisit } from "../lib/db/local-db";
 import { toPatient, toVisit } from "../lib/db/queries";
-import { patientRepo } from "../lib/db/repositories";
+import { patientRepo, visitRepo } from "../lib/db/repositories";
 import { useCanWriteClinical } from "../lib/session";
 import { getCachedSession } from "../lib/session-cache";
 import { enqueueOp } from "../lib/sync/queue";
@@ -153,7 +153,7 @@ export default function PatientDetailPage() {
   });
 
   const localPatient = useLiveQuery(
-    () => (id && !isNew ? db.patients.get(id) : undefined),
+    () => (id && !isNew ? patientRepo.get(id) : undefined),
     [id, isNew]
   );
 
@@ -166,7 +166,7 @@ export default function PatientDetailPage() {
   });
 
   const localVisits = useLiveQuery(
-    () => (id && !isNew ? db.visits.where("patientId").equals(id).toArray() : []),
+    () => (id && !isNew ? visitRepo.byPatient(id) : []),
     [id, isNew]
   );
   const visits: Visit[] = resolveVisits(visitsData, localVisits);

@@ -1,4 +1,5 @@
 import { api } from "../api";
+import { canUseLocalData } from "../crypto";
 import type { LocalFollowUp, LocalPatient, LocalVisit } from "../db/local-db";
 import { followUpRepo, metaRepo, patientRepo, visitRepo } from "../db/repositories";
 
@@ -82,6 +83,7 @@ function toLocalFollowUp(f: Record<string, unknown>): LocalFollowUp {
 }
 
 export async function pullCohort(): Promise<void> {
+  if (!canUseLocalData()) return;
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
   try {
     const sinceRaw = await metaRepo.get("lastPulledAt");

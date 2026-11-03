@@ -23,6 +23,9 @@ import type {
   VisitFilter,
 } from "@hrp/shared";
 
+import { clearCachedSession } from "./session-cache";
+import { clearRefreshToken, readRefreshToken, storeRefreshToken } from "./token-store";
+
 const API_BASE = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
 
 /**
@@ -31,7 +34,6 @@ const API_BASE = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
  * for the refresh token in the response body and keep it on the device.
  */
 export const IS_NATIVE_APP = import.meta.env.VITE_NATIVE_APP === "true";
-const NATIVE_REFRESH_KEY = "hrp-native-refresh-token";
 
 function nativeHeaders(): Record<string, string> {
   return IS_NATIVE_APP ? { "X-Client-Platform": "native" } : {};
@@ -85,8 +87,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     }
     // A refresh failure caused by "no network" must NOT wipe the session or
     // redirect to /login — the user may be offline and still needs cached data.
+    // Clear session keys only: `localStorage.clear()` would also destroy the
+    // wrapped data key and leave every encrypted record unreadable.
     if (navigator.onLine) {
-      localStorage.clear();
+      localStorage.removeItem("accessToken");
+      clearRefreshToken();
+      clearCachedSession();
       window.location.href = "/login";
     }
     throw new ApiError(401, null, "Unauthorized");
@@ -105,7 +111,7 @@ async function refreshToken(): Promise<boolean> {
   // On the web the refresh token lives in an httpOnly cookie the browser sends
   // automatically. The bundled Android app has no such cookie, so it presents
   // the token the server returned at login.
-  const nativeToken = IS_NATIVE_APP ? localStorage.getItem(NATIVE_REFRESH_KEY) : null;
+  const nativeToken = IS_NATIVE_APP ? await readRefreshToken() : null;
   try {
     const response = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
@@ -119,7 +125,7 @@ async function refreshToken(): Promise<boolean> {
       if (data.accessToken) {
         localStorage.setItem("accessToken", data.accessToken);
         if (IS_NATIVE_APP && data.refreshToken) {
-          localStorage.setItem(NATIVE_REFRESH_KEY, data.refreshToken);
+          await storeRefreshToken(data.refreshToken);
         }
         return true;
       }
@@ -143,14 +149,14 @@ export const api = {
         body: JSON.stringify(data),
       });
       if (IS_NATIVE_APP && result.refreshToken) {
-        localStorage.setItem(NATIVE_REFRESH_KEY, result.refreshToken);
+        await storeRefreshToken(result.refreshToken);
       }
       return result;
     },
     refresh: () => request<{ accessToken: string }>("/auth/refresh", { method: "POST" }),
     me: () => request<User>("/auth/me"),
     logout: () => {
-      localStorage.removeItem(NATIVE_REFRESH_KEY);
+      clearRefreshToken();
       return request<void>("/auth/logout", { method: "POST" });
     },
   },

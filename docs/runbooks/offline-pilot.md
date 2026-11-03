@@ -120,11 +120,22 @@ Notes:
   5A is required before any real record is entered: app PIN with PBKDF2 key
   derivation, AES-256-GCM field encryption, blind index for name search, remote
   wipe, `FLAG_SECURE`, and `allowBackup=false`.
+- Shipped in 5A.1/5A.2: the PIN derives a KEK that wraps a random data key;
+  patient name, phone, ABHA, address, ASHA name/phone, visit and follow-up notes,
+  queued sync payloads and conflict copies are AES-256-GCM ciphertext in
+  IndexedDB. Exact-name lookup uses an HMAC blind index scoped by facility.
+  Changing the PIN re-wraps the data key, so existing records stay readable.
+- Still plaintext locally by design: coded clinical fields (risk level, BP,
+  haemoglobin, LMP/EDD, gravidity) so dashboards and follow-up queries work.
+  The residual risk below covers that trade-off.
 - Real records must live on a **separate, non-shared pilot backend**. The free
   Render/Neon demo is shared infrastructure with synthetic seeds only; it must
   never receive patient data.
-- Residual risk until 5A ships: IndexedDB in a WebView is not encrypted at rest,
-  so a lost, unlocked phone exposes its local records.
+- APK builds must set `VITE_DEMO_MODE=false`. `build.config.ts` now fails the
+  build if a native bundle is left in demo mode, because demo mode skips the PIN.
+- Residual risk: a rooted or forensically examined *unlocked* device can bypass
+  app-level controls; coded clinical fields and the server copy stay readable to
+  anyone with database access. This is a closed-pilot bar, not DPDP certification.
 
 ## 7. Device matrix sign-off (to be completed)
 

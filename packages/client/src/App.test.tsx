@@ -32,7 +32,7 @@ describe("App", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.getItem = vi.fn().mockReturnValue("test-token");
+    localStorage.getItem = vi.fn((key: string) => (key === "accessToken" ? "test-token" : null));
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
       const url = String(input);
       let body: unknown = {};
