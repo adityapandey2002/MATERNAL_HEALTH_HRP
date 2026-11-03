@@ -14,7 +14,7 @@ const dialect = new PostgresDialect({
       ? { ca: readFileSync(config.dbSslCa), rejectUnauthorized: true }
       : config.databaseUrl.includes("sslmode=require") ||
           config.databaseUrl.includes("sslmode=verify")
-        ? { rejectUnauthorized: false }
+        ? { rejectUnauthorized: true }
         : undefined,
   }),
 });
