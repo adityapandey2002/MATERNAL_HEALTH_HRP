@@ -96,6 +96,9 @@ jobs:
           echo "file=matru-suraksha-${name}.apk" >> "$GITHUB_OUTPUT"
           echo "Building version $name ($code)"
 
+      - name: Build shared package
+        run: npm run build --workspace=packages/shared
+
       - name: Build web bundle for the device
         working-directory: packages/client
         env:
