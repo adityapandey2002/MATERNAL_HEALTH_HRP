@@ -2,9 +2,6 @@
 # You can control the set of applied configuration files using the
 # proguardFiles setting in build.gradle.
 #
-# For more details, see
-#   http://developer.android.com/guide/developing/tools/proguard.html
-
 # If your project uses WebView with JS, uncomment the following
 # and specify the fully qualified class name to the JavaScript interface
 # class:
@@ -12,10 +9,12 @@
 #   public *;
 #}
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep Capacitor's bridge and plugin entry points, which are reached by
+# reflection from the web side.
+-keep class com.getcapacitor.** { *; }
+-keep class in.gov.araria.matrusuraksha.** { *; }
+-dontwarn com.getcapacitor.**
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep the line number information for debugging stack traces from the field.
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile

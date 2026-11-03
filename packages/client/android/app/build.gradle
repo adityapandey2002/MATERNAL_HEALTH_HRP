@@ -50,8 +50,12 @@ android {
             if (hasReleaseKey) {
                 signingConfig signingConfigs.release
             }
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // R8 shrinks and obfuscates the wrapper; the web bundle itself is
+            // already minified by Vite. Keep the rules file in sync if a
+            // Capacitor plugin needs reflection.
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
 }
