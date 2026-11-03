@@ -7,7 +7,8 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { api } from "../lib/api";
-import { changePin, isPinSet } from "../lib/lock";
+import { changePin, isPinSet, wipeDevice } from "../lib/lock";
+import { copyDiagnostics } from "../lib/diagnostics";
 import { initialsFor } from "../lib/nav";
 import { ROLE_LABEL } from "../lib/session";
 import { syncNow, useSyncStatus } from "../lib/sync/engine";
@@ -205,6 +206,8 @@ export default function SettingsPage() {
   const [prefs, setPrefs] = useState<Record<NotificationId, boolean>>(DEFAULT_PREFS);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [diagnosticsMessage, setDiagnosticsMessage] = useState<string | null>(null);
+  const [wiping, setWiping] = useState(false);
 
   useEffect(() => {
     setPrefs(readPrefs());
@@ -225,6 +228,33 @@ export default function SettingsPage() {
     await syncNow();
     setSyncMessage("Sync finished. Anything rejected stays here until you resend it.");
     setSyncing(false);
+  };
+
+  const copySupportDiagnostics = async () => {
+    setDiagnosticsMessage(null);
+    const text = await copyDiagnostics({
+      pendingChanges,
+      conflicts,
+      lastSync: sync?.lastSync ?? null,
+      lastError: sync?.lastError ?? null,
+    });
+    setDiagnosticsMessage("Copied. Paste it into the support ticket — no patient data is included.");
+    // Keep the text around for environments without a clipboard API.
+    try {
+      localStorage.setItem("hrp.lastDiagnostics", text);
+    } catch {
+      // ignore
+    }
+  };
+
+  const wipeThisDevice = async () => {
+    if (!window.confirm("Erase all records on this device? The server keeps its copy.")) return;
+    setWiping(true);
+    try {
+      await wipeDevice();
+    } finally {
+      setWiping(false);
+    }
   };
 
   const facilityList = Array.isArray(facilities) ? facilities : [];
@@ -516,6 +546,28 @@ export default function SettingsPage() {
                     <dd>Background / manual</dd>
                   </div>
                 </dl>
+
+                <div className="flex flex-wrap gap-2 border-t border-line-soft pt-4">
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => void copySupportDiagnostics()}
+                  >
+                    Copy diagnostics
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => void wipeThisDevice()}
+                    disabled={wiping}
+                  >
+                    {wiping ? "Erasing..." : "Erase this device"}
+                  </button>
+                </div>
+
+                {diagnosticsMessage ? (
+                  <output className="block text-xs text-triage-green">{diagnosticsMessage}</output>
+                ) : null}
 
                 <p className="border-t border-line-soft pt-4 text-xs leading-relaxed text-ink-subtle">
                   Built for India's National Health Mission. This deployment carries synthetic demo
