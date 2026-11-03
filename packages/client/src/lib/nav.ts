@@ -47,6 +47,17 @@ export function canProvisionStaff(role: UserRole): boolean {
   return role === "BHM" || role === "DHS";
 }
 
+/**
+ * Roles that can see and revoke the installs holding field data.
+ *
+ * A lost phone is a data-loss event, so this follows the same bar as
+ * provisioning: the block manager and the district officer, never the ANM
+ * whose own device may have been taken.
+ */
+export function canManageDevices(role: UserRole): boolean {
+  return role === "BHM" || role === "DHS";
+}
+
 const addCase: NavItem = {
   path: "/",
   label: "Add case",
@@ -141,6 +152,14 @@ const settings: NavItem = {
   section: "Account",
 };
 
+const devices: NavItem = {
+  path: "/devices",
+  label: "Devices",
+  shortLabel: "Devices",
+  icon: UsersIcon,
+  section: "Account",
+};
+
 const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   // Field app, in the order a field worker uses it: register first, then the
   // triage dashboard, then the assigned follow-up list.
@@ -152,14 +171,14 @@ const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   HRP_HELPDESK_BLOCK: [blockDashboard, blockFollowUps, hrpIntake, allPeople, settings],
 
   // Block Nodal Officer: the helpdesk screens plus account provisioning.
-  BHM: [blockDashboard, blockFollowUps, hrpIntake, team, allPeople, supervision, settings],
+  BHM: [blockDashboard, blockFollowUps, hrpIntake, team, devices, allPeople, supervision, settings],
 
   // District helpdesk: district roll-up, the shared line list, and the people
   // register. No intake — district staff do not register women.
   HRP_HELPDESK_DISTRICT: [districtDashboard, blockFollowUps, allPeople, settings],
 
   // District officer: the district dashboard plus account provisioning.
-  DHS: [districtDashboard, blockFollowUps, team, allPeople, supervision, settings],
+  DHS: [districtDashboard, blockFollowUps, team, devices, allPeople, supervision, settings],
 };
 
 export function navFor(role: UserRole): NavItem[] {

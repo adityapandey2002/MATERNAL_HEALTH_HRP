@@ -2,6 +2,7 @@ import type {
   CreatePatient,
   CreateStaff,
   CreateVisit,
+  Device,
   DispatchFollowUp,
   Facility,
   FollowUpFilter,
@@ -23,6 +24,7 @@ import type {
   VisitFilter,
 } from "@hrp/shared";
 
+import { getDeviceId } from "./device-id";
 import { clearCachedSession } from "./session-cache";
 import { clearRefreshToken, readRefreshToken, storeRefreshToken } from "./token-store";
 
@@ -37,6 +39,38 @@ export const IS_NATIVE_APP = import.meta.env.VITE_NATIVE_APP === "true";
 
 function nativeHeaders(): Record<string, string> {
   return IS_NATIVE_APP ? { "X-Client-Platform": "native" } : {};
+}
+
+/** Identifies this install so the district can revoke it remotely. */
+function deviceHeaders(): Record<string, string> {
+  const id = getDeviceId();
+  return id ? { "X-Device-Id": id } : {};
+}
+
+function isDeviceRevokedBody(body: unknown): boolean {
+  return (
+    typeof body === "object" &&
+    body !== null &&
+    (body as { code?: unknown }).code === "DEVICE_REVOKED"
+  );
+}
+
+/**
+ * The server has cut this install off.
+ *
+ * Erase the local database and the wrapped data key before leaving, otherwise
+ * the phone would keep a readable copy of the cohort after losing access. A
+ * failed wipe must not trap the user on a dead screen, so navigation happens
+ * regardless.
+ */
+async function handleRevokedDevice(): Promise<void> {
+  try {
+    const { wipeDevice } = await import("./lock");
+    await wipeDevice();
+  } catch {
+    // Best effort: the device is already locked out server-side.
+  }
+  window.location.href = "/login";
 }
 
 class ApiError extends Error {
@@ -61,6 +95,7 @@ function toSearch(params?: Record<string, unknown>): string {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
+    ...deviceHeaders(),
     ...(options.headers as Record<string, string>),
   };
 
@@ -80,11 +115,25 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     credentials: "include",
   });
 
+  const data = await response.json().catch(() => null);
+
   if (response.status === 401) {
-    const refreshed = await refreshToken();
-    if (refreshed) {
+    if (isDeviceRevokedBody(data)) {
+      await handleRevokedDevice();
+      throw new ApiError(401, data, "This device has been revoked");
+    }
+
+    const outcome = await refreshToken();
+
+    if (outcome === "revoked") {
+      await handleRevokedDevice();
+      throw new ApiError(401, null, "This device has been revoked");
+    }
+
+    if (outcome === "refreshed") {
       return request(path, options);
     }
+
     // A refresh failure caused by "no network" must NOT wipe the session or
     // redirect to /login — the user may be offline and still needs cached data.
     // Clear session keys only: `localStorage.clear()` would also destroy the
@@ -98,8 +147,6 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     throw new ApiError(401, null, "Unauthorized");
   }
 
-  const data = await response.json().catch(() => null);
-
   if (!response.ok) {
     throw new ApiError(response.status, data, data?.message ?? "Request failed");
   }
@@ -107,7 +154,9 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return data as T;
 }
 
-async function refreshToken(): Promise<boolean> {
+type RefreshOutcome = "refreshed" | "failed" | "revoked";
+
+async function refreshToken(): Promise<RefreshOutcome> {
   // On the web the refresh token lives in an httpOnly cookie the browser sends
   // automatically. The bundled Android app has no such cookie, so it presents
   // the token the server returned at login.
@@ -115,10 +164,15 @@ async function refreshToken(): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/auth/refresh`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", ...nativeHeaders() },
+      headers: { "Content-Type": "application/json", ...nativeHeaders(), ...deviceHeaders() },
       credentials: "include",
       body: nativeToken ? JSON.stringify({ refreshToken: nativeToken }) : undefined,
     });
+
+    if (response.status === 401) {
+      const body = await response.json().catch(() => null);
+      return isDeviceRevokedBody(body) ? "revoked" : "failed";
+    }
 
     if (response.ok) {
       const data = await response.json();
@@ -127,13 +181,13 @@ async function refreshToken(): Promise<boolean> {
         if (IS_NATIVE_APP && data.refreshToken) {
           await storeRefreshToken(data.refreshToken);
         }
-        return true;
+        return "refreshed";
       }
     }
   } catch {
     // Network failure during refresh is treated as "not refreshed".
   }
-  return false;
+  return "failed";
 }
 
 export const api = {
@@ -253,6 +307,14 @@ export const api = {
     update: (id: string, data: Partial<CreateVisit>) =>
       request<Visit>(`/visits/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
     byPatient: (patientId: string) => request<Visit[]>(`/visits/by-patient/${patientId}`),
+  },
+
+  devices: {
+    list: (userId?: string) =>
+      request<{ data: Device[]; total: number }>(
+        `/devices${userId ? `?userId=${encodeURIComponent(userId)}` : ""}`
+      ),
+    revoke: (id: string) => request<Device>(`/devices/${id}/revoke`, { method: "POST" }),
   },
 
   facilities: {

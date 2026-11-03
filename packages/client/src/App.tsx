@@ -8,6 +8,7 @@ import { isFieldRole } from "./lib/nav";
 import { clearCachedSession, getCachedSession, setCachedSession } from "./lib/session-cache";
 import AddPatient from "./pages/AddPatient";
 import Dashboard from "./pages/Dashboard";
+import Devices from "./pages/Devices";
 import FollowUps from "./pages/FollowUps";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -143,6 +144,7 @@ export default function App() {
             <Route path="/patients/:id/visit" element={<NewVisit />} />
             <Route path="/supervision" element={<Supervision />} />
             <Route path="/settings" element={<Settings />} />
+            <Route path="/devices" element={<Devices />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

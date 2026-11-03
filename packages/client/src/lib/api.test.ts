@@ -158,7 +158,7 @@ describe("request", () => {
       .mockResolvedValueOnce(jsonResponse({}, 401));
 
     await expect(api.patients.get("p1")).rejects.toBeInstanceOf(ApiError);
-    expect(store.size).toBe(0);
+    expect(store.has("accessToken")).toBe(false);
   });
 });
 
