@@ -259,10 +259,14 @@ export default function AddPatientPage() {
 
       <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <Panel>
+          <Panel className="!border-0">
             <PanelHeader
               title="Woman and household"
-              action={<UserPlusIcon className="h-4 w-4 text-ink-subtle" />}
+              action={
+                <span className="inline-flex">
+                  <UserPlusIcon className="h-8 w-8 text-primary" />
+                </span>
+              }
             />
             <PanelBody className="grid gap-4 sm:grid-cols-2">
               <div className="sm:col-span-2">
@@ -361,7 +365,7 @@ export default function AddPatientPage() {
             </PanelBody>
           </Panel>
 
-          <Panel>
+          <Panel className="!border-0">
             <PanelHeader
               title="Pregnancy"
               action={<CalendarIcon className="h-4 w-4 text-ink-subtle" />}
