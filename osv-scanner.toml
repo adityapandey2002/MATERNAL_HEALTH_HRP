@@ -83,3 +83,9 @@ name = "zod"
 ecosystem = "npm"
 ignore = true
 reason = "Payload sizes strictly bounded by Fastify 2MB body limit preventing oversized collection exhaustion"
+
+[[PackageOverrides]]
+name = "tar"
+ecosystem = "npm"
+ignore = true
+reason = "Transitive dependency of @capacitor/cli (build tooling); not shipped in production runtime"

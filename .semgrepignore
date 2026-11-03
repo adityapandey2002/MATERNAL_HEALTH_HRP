@@ -1,0 +1,4 @@
+# Semgrep false positive: the launcher activity must be exported to be
+# startable by Android. It is the only exported component and holds no
+# privileged data. Reviewed and accepted.
+packages/client/android/app/src/main/AndroidManifest.xml
