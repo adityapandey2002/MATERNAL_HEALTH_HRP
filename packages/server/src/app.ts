@@ -159,6 +159,24 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   app.get("/health", async () => ({ status: "ok", timestamp: new Date().toISOString() }));
 
+  // Public version endpoint used by the field app to detect an available update.
+  // The APK cannot auto-install, but it can prompt the user to download one.
+  // When APK_DOWNLOAD_URL is not configured, derive it from the GitHub release
+  // for this version so only APP_VERSION needs updating per release.
+  app.get("/api/version", async () => {
+    const url =
+      config.apkDownloadUrl ||
+      (config.appVersion && config.appVersion !== "0.0.0"
+        ? `https://github.com/adityapandey2002/MATERNAL_HEALTH_HRP/releases/download/v${config.appVersion}/matru-suraksha-${config.appVersion}.apk`
+        : null);
+    return {
+      version: config.appVersion,
+      gitSha: config.gitSha,
+      apkDownloadUrl: url,
+      apkSha256: config.apkSha256 || null,
+    };
+  });
+
   app.get("/ready", async (_request, reply) => {
     try {
       const result = await sql<{ migration: string | null }>`

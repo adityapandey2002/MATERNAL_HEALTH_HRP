@@ -31,6 +31,8 @@ const RawConfigSchema = z.object({
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   APP_VERSION: z.string().default("0.0.0"),
   GIT_SHA: z.string().default("unknown"),
+  APK_DOWNLOAD_URL: z.string().default(""),
+  APK_SHA256: z.string().default(""),
 });
 
 export interface AppConfig {
@@ -56,6 +58,8 @@ export interface AppConfig {
   logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace" | "silent";
   appVersion: string;
   gitSha: string;
+  apkDownloadUrl: string;
+  apkSha256: string;
 }
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): AppConfig {
@@ -129,6 +133,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     logLevel: raw.LOG_LEVEL,
     appVersion: raw.APP_VERSION,
     gitSha: raw.GIT_SHA,
+    apkDownloadUrl: raw.APK_DOWNLOAD_URL,
+    apkSha256: raw.APK_SHA256,
   };
 }
 
