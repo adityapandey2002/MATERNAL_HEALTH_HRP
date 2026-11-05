@@ -264,7 +264,7 @@ export default function AddPatientPage() {
               title="Woman and household"
               action={
                 <span className="inline-flex">
-                  <UserPlusIcon className="h-10 w-10 text-primary" />
+                  <UserPlusIcon className="h-12 w-12 text-primary" />
                 </span>
               }
             />
@@ -485,7 +485,7 @@ export default function AddPatientPage() {
         </div>
 
         <aside className="space-y-4">
-          <Panel className="bg-primary-light">
+          <Panel className="bg-primary-light !border-0">
             <PanelBody className="space-y-2">
               <h2 className="text-sm font-semibold text-primary-dark">What happens after saving</h2>
               <ul className="space-y-2 text-sm text-ink-muted">
@@ -516,7 +516,7 @@ export default function AddPatientPage() {
             </PanelBody>
           </Panel>
 
-          <Panel>
+          <Panel className="!border-0">
             <PanelBody className="space-y-2">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
                 <MapPinIcon className="h-4 w-4 text-ink-subtle" />
@@ -529,7 +529,7 @@ export default function AddPatientPage() {
             </PanelBody>
           </Panel>
 
-          <Panel>
+          <Panel className="!border-0">
             <PanelBody className="space-y-2">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
                 <PhoneIcon className="h-4 w-4 text-ink-subtle" />
@@ -542,7 +542,7 @@ export default function AddPatientPage() {
             </PanelBody>
           </Panel>
 
-          <Panel>
+          <Panel className="!border-0">
             <PanelBody className="space-y-2">
               <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
                 <ClipboardIcon className="h-4 w-4 text-ink-subtle" />
