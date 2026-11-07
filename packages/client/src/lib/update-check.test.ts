@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { checkForUpdate } from "./update-check";
+import { checkForUpdate, isNewerVersion } from "./update-check";
 
 const store = new Map<string, string>();
 
@@ -70,5 +70,37 @@ describe("checkForUpdate", () => {
   it("returns null when the response is not ok", async () => {
     fetchMock.mockResolvedValueOnce({ ok: false, json: async () => ({}) } as Response);
     expect(await checkForUpdate()).toBeNull();
+  });
+
+  it("never offers a downgrade when the server advertises an older build", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        version: "0.9.9",
+        apkDownloadUrl: "https://example.com/old.apk",
+        apkSha256: null,
+      }),
+    } as Response);
+
+    expect(await checkForUpdate()).toBeNull();
+  });
+});
+
+describe("isNewerVersion", () => {
+  it("compares numeric segments rather than strings", () => {
+    expect(isNewerVersion("1.0.10", "1.0.9")).toBe(true);
+    expect(isNewerVersion("1.0.9", "1.0.10")).toBe(false);
+    expect(isNewerVersion("2.0.0", "1.9.9")).toBe(true);
+  });
+
+  it("ignores the pilot suffix and treats equal versions as current", () => {
+    expect(isNewerVersion("1.0.5-pilot", "1.0.5-pilot")).toBe(false);
+    expect(isNewerVersion("1.0.5", "1.0.5-pilot")).toBe(false);
+    expect(isNewerVersion("1.0.6-pilot", "1.0.5-pilot")).toBe(true);
+  });
+
+  it("treats a malformed version as zero", () => {
+    expect(isNewerVersion("dev", "1.0.0")).toBe(false);
+    expect(isNewerVersion("1.0.0", "dev")).toBe(true);
   });
 });
