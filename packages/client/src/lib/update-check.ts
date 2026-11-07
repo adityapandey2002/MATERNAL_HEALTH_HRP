@@ -1,5 +1,3 @@
-import { api } from "./api";
-
 export interface UpdateInfo {
   available: boolean;
   version: string;
@@ -17,7 +15,7 @@ export interface UpdateInfo {
  * build (`VITE_APP_VERSION`). Any difference means "update available".
  */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
-  const current = (import.meta.env.VITE_APP_VERSION as string | undefined) ?? "0.0.0";
+  const current = import.meta.env.VITE_APP_VERSION ?? "0.0.0";
   try {
     const response = await fetch(
       `${(import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "")}/version`,

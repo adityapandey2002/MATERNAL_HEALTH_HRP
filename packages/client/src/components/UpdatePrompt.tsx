@@ -3,6 +3,35 @@ import { IS_NATIVE_APP } from "../lib/api";
 import { type UpdateInfo, checkForUpdate } from "../lib/update-check";
 import { applyUpdate, onUpdateReady } from "../utils/sw";
 
+const DISMISSED_KEY = "hrp-update-dismissed";
+
+/** Version the user tapped "Later" on, so a resume does not nag again. */
+function dismissedVersion(): string | null {
+  try {
+    return sessionStorage.getItem(DISMISSED_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberDismissed(version: string): void {
+  try {
+    sessionStorage.setItem(DISMISSED_KEY, version);
+  } catch {
+    // Private mode or a locked-down WebView: dismissing still hides the
+    // banner for this mount, it just may return on the next resume.
+  }
+}
+
+/**
+ * Capacitor maps the `_system` target to the Android browser, which owns the
+ * download and the install prompt. A plain anchor would navigate the WebView
+ * itself and render the APK as a broken page.
+ */
+function openInBrowser(url: string): void {
+  window.open(url, "_system", "noopener,noreferrer");
+}
+
 /**
  * Non-blocking update notice.
  *
@@ -15,17 +44,38 @@ export function UpdatePrompt() {
   const [appUpdate, setAppUpdate] = useState<UpdateInfo | null>(null);
 
   useEffect(() => {
-    if (IS_NATIVE_APP) {
+    if (!IS_NATIVE_APP) return onUpdateReady(() => setSwReady(true));
+
+    let cancelled = false;
+
+    const check = () => {
       void checkForUpdate().then((info) => {
-        if (info) setAppUpdate(info);
+        // Without a download URL the banner is a dead end; stay quiet.
+        if (cancelled || !info?.downloadUrl) return;
+        if (dismissedVersion() === info.version) return;
+        setAppUpdate(info);
       });
-      return;
-    }
-    return onUpdateReady(() => setSwReady(true));
+    };
+
+    check();
+
+    // Phones stay open for days in the field; checking only on mount means an
+    // ANM who never closes the app never learns about a release.
+    const onVisible = () => {
+      if (document.visibilityState === "visible") check();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   if (IS_NATIVE_APP) {
-    if (!appUpdate) return null;
+    const downloadUrl = appUpdate?.downloadUrl;
+    if (!appUpdate || !downloadUrl) return null;
+
     return (
       <output className="fixed inset-x-4 bottom-16 z-50 mx-auto block max-w-md rounded-lg border border-info-line bg-info-bg px-4 py-3 shadow-lg lg:bottom-4">
         <p className="text-sm font-semibold text-ink">Update available (v{appUpdate.version})</p>
@@ -34,20 +84,20 @@ export function UpdatePrompt() {
           are kept.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
-          {appUpdate.downloadUrl ? (
-            <a
-              href={appUpdate.downloadUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-primary btn-sm"
-            >
-              Download update
-            </a>
-          ) : null}
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => openInBrowser(downloadUrl)}
+          >
+            Download update
+          </button>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
-            onClick={() => setAppUpdate(null)}
+            onClick={() => {
+              rememberDismissed(appUpdate.version);
+              setAppUpdate(null);
+            }}
           >
             Later
           </button>

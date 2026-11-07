@@ -7,4 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_NATIVE_APP?: string;
   /** "false" hides the shared demo logins in a pilot APK. */
   readonly VITE_DEMO_MODE?: string;
+  /** Version baked into the bundle by the release workflow. */
+  readonly VITE_APP_VERSION?: string;
+  /** Commit the bundle was built from. */
+  readonly VITE_GIT_SHA?: string;
 }

@@ -6,7 +6,7 @@ import { BellIcon, CheckIcon, InfoIcon, SyncIcon, UserIcon } from "../components
 import { PageHeader } from "../components/ui/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
-import { api } from "../lib/api";
+import { IS_NATIVE_APP, api } from "../lib/api";
 import { copyDiagnostics } from "../lib/diagnostics";
 import { changePin, isPinSet, wipeDevice } from "../lib/lock";
 import { initialsFor } from "../lib/nav";
@@ -14,6 +14,10 @@ import { ROLE_LABEL } from "../lib/session";
 import { syncNow, useSyncStatus } from "../lib/sync/engine";
 
 type SettingsTab = "profile" | "sync" | "notifications" | "about";
+
+/** Version baked into the build by the release workflow. */
+const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? "dev";
+const APP_GIT_SHA = import.meta.env.VITE_GIT_SHA;
 
 const NOTIFICATION_PREFS = [
   {
@@ -525,7 +529,7 @@ export default function SettingsPage() {
                   <div>
                     <h2 className="text-sm font-semibold text-ink">Matru Suraksha</h2>
                     <p className="text-xs text-ink-subtle">
-                      High-risk pregnancy care · Araria · Version 0.1.0 (MVP)
+                      High-risk pregnancy care · Araria · Version {APP_VERSION}
                     </p>
                   </div>
                 </div>
@@ -533,11 +537,14 @@ export default function SettingsPage() {
                 <dl className="grid gap-x-6 sm:grid-cols-2">
                   <div className="field-row">
                     <dt>Build</dt>
-                    <dd>Development</dd>
+                    <dd>
+                      {APP_VERSION}
+                      {APP_GIT_SHA ? ` (${APP_GIT_SHA.slice(0, 7)})` : ""}
+                    </dd>
                   </div>
                   <div className="field-row">
                     <dt>Platform</dt>
-                    <dd>PWA (offline-first)</dd>
+                    <dd>{IS_NATIVE_APP ? "Android APK (offline-first)" : "PWA (offline-first)"}</dd>
                   </div>
                   <div className="field-row">
                     <dt>Database</dt>
