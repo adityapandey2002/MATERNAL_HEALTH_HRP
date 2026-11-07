@@ -52,3 +52,12 @@ export function clearRefreshToken(): void {
     // ignore
   }
 }
+
+/** Drop the short-lived access token without touching the refresh token. */
+export function clearAccessToken(): void {
+  try {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+  } catch {
+    // Storage unavailable: the reload after sign-out still ends the session.
+  }
+}

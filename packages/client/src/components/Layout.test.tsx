@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../lib/api";
@@ -89,5 +89,24 @@ describe("Layout", () => {
     expect(addCaseLink).toHaveAttribute("aria-current", "page");
     expect(allPeopleLink).toHaveAttribute("href", "/patients");
     expect(allPeopleLink).not.toHaveAttribute("aria-current");
+  });
+
+  it("clears the access token when the user signs out", async () => {
+    Object.defineProperty(window, "location", {
+      value: { pathname: "/", href: "/" },
+      writable: true,
+      configurable: true,
+    });
+
+    renderLayout();
+    await screen.findByText("Asha Ben");
+
+    const [signOut] = screen.getAllByRole("button", { name: "Sign out" });
+    if (!signOut) throw new Error("Sign out control not rendered");
+    fireEvent.click(signOut);
+
+    await waitFor(() =>
+      expect(vi.mocked(localStorage.removeItem)).toHaveBeenCalledWith("accessToken")
+    );
   });
 });

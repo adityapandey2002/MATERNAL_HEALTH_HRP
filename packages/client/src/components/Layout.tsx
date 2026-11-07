@@ -17,6 +17,7 @@ import {
 } from "../lib/nav";
 import { ROLE_LABEL } from "../lib/session";
 import { clearCachedSession } from "../lib/session-cache";
+import { clearAccessToken } from "../lib/token-store";
 import { isOnline, onOnlineChange } from "../utils/sw";
 import { BrandLockup, BrandMark } from "./ui/BrandMark";
 import { LogoutIcon, MoreHorizontalIcon } from "./ui/Icons";
@@ -74,6 +75,10 @@ export default function Layout() {
     try {
       await api.auth.logout();
     } finally {
+      // The server cleared the refresh cookie; the short-lived access token
+      // must go too, otherwise reloading /login would sign the user straight
+      // back in.
+      clearAccessToken();
       clearCachedSession();
       try {
         await clearAllLocalData();

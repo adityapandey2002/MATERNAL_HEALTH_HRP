@@ -28,6 +28,7 @@ import { getDeviceId } from "./device-id";
 import { clearCachedSession } from "./session-cache";
 import {
   ACCESS_TOKEN_KEY,
+  clearAccessToken,
   clearRefreshToken,
   hasAccessToken,
   readRefreshToken,
@@ -176,7 +177,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     // Clear session keys only: `localStorage.clear()` would also destroy the
     // wrapped data key and leave every encrypted record unreadable.
     if (navigator.onLine) {
-      localStorage.removeItem(ACCESS_TOKEN_KEY);
+      clearAccessToken();
       clearRefreshToken();
       clearCachedSession();
       goToLogin();
