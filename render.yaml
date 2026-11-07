@@ -15,8 +15,6 @@ services:
         value: production
       - key: SEED_DEMO_DATA
         value: "true"
-      - key: APP_VERSION
-        value: "0.1.0"
       - key: DATABASE_URL
         sync: false
       - key: JWT_SECRET

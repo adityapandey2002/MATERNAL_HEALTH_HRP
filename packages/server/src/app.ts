@@ -28,6 +28,7 @@ import { supervisionRoutes } from "./routes/supervision.js";
 import { syncRoutes } from "./routes/sync.js";
 import { visitRoutes } from "./routes/visits.js";
 import { DEVICE_HEADER, isDeviceRevoked, parseDeviceId } from "./services/devices.js";
+import { getLatestRelease } from "./services/releases.js";
 
 export interface LoggerOptions {
   enabled?: boolean;
@@ -161,14 +162,28 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
 
   // Public version endpoint used by the field app to detect an available update.
   // The APK cannot auto-install, but it can prompt the user to download one.
-  // When APK_DOWNLOAD_URL is not configured, derive it from the GitHub release
-  // for this version so only APP_VERSION needs updating per release.
+  //
+  // GitHub is the source of truth: the newest release tag and its APK asset are
+  // what a phone should install, so a server environment variable cannot drift
+  // away from the builds that actually exist. The environment fallback only
+  // covers a GitHub outage and is empty by default.
   app.get("/api/version", async () => {
+    const release = await getLatestRelease();
+    if (release) {
+      return {
+        version: release.version,
+        gitSha: config.gitSha,
+        apkDownloadUrl: release.apkDownloadUrl,
+        apkSha256: null,
+      };
+    }
+
     const url =
       config.apkDownloadUrl ||
       (config.appVersion && config.appVersion !== "0.0.0"
         ? `https://github.com/adityapandey2002/MATERNAL_HEALTH_HRP/releases/download/v${config.appVersion}/matru-suraksha-${config.appVersion}.apk`
         : null);
+
     return {
       version: config.appVersion,
       gitSha: config.gitSha,
