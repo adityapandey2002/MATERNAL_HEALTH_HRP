@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { applyUpdate, onUpdateReady } from "../utils/sw";
 import { IS_NATIVE_APP } from "../lib/api";
-import { checkForUpdate, type UpdateInfo } from "../lib/update-check";
+import { type UpdateInfo, checkForUpdate } from "../lib/update-check";
+import { applyUpdate, onUpdateReady } from "../utils/sw";
 
 /**
  * Non-blocking update notice.
@@ -30,8 +30,8 @@ export function UpdatePrompt() {
       <output className="fixed inset-x-4 bottom-16 z-50 mx-auto block max-w-md rounded-lg border border-info-line bg-info-bg px-4 py-3 shadow-lg lg:bottom-4">
         <p className="text-sm font-semibold text-ink">Update available (v{appUpdate.version})</p>
         <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
-          A newer version is ready. Tap to download, then install the APK. Records on
-          this device are kept.
+          A newer version is ready. Tap to download, then install the APK. Records on this device
+          are kept.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {appUpdate.downloadUrl ? (
@@ -44,7 +44,11 @@ export function UpdatePrompt() {
               Download update
             </a>
           ) : null}
-          <button type="button" className="btn btn-secondary btn-sm" onClick={() => setAppUpdate(null)}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setAppUpdate(null)}
+          >
             Later
           </button>
         </div>
@@ -64,7 +68,11 @@ export function UpdatePrompt() {
         <button type="button" className="btn btn-primary btn-sm" onClick={() => applyUpdate()}>
           Reload now
         </button>
-        <button type="button" className="btn btn-secondary btn-sm" onClick={() => setSwReady(false)}>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => setSwReady(false)}
+        >
           Later
         </button>
       </div>
