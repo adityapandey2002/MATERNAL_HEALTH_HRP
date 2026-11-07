@@ -11,6 +11,18 @@ import { decryptString, encryptString, hasDataKey, isEncryptionRequired } from "
 
 const KEY = "hrp-native-refresh-token";
 
+/** Key for the short-lived access token; shared with the API client. */
+export const ACCESS_TOKEN_KEY = "accessToken";
+
+/** True when this install holds a session that can be refreshed. */
+export function hasAccessToken(): boolean {
+  try {
+    return Boolean(localStorage.getItem(ACCESS_TOKEN_KEY));
+  } catch {
+    return false;
+  }
+}
+
 export async function storeRefreshToken(token: string): Promise<void> {
   if (hasDataKey()) {
     localStorage.setItem(KEY, await encryptString(token));

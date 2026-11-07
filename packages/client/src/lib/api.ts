@@ -26,7 +26,13 @@ import type {
 
 import { getDeviceId } from "./device-id";
 import { clearCachedSession } from "./session-cache";
-import { clearRefreshToken, readRefreshToken, storeRefreshToken } from "./token-store";
+import {
+  ACCESS_TOKEN_KEY,
+  clearRefreshToken,
+  hasAccessToken,
+  readRefreshToken,
+  storeRefreshToken,
+} from "./token-store";
 
 const API_BASE = (import.meta.env.VITE_API_URL ?? "/api").replace(/\/$/, "");
 
@@ -45,6 +51,24 @@ function nativeHeaders(): Record<string, string> {
 function deviceHeaders(): Record<string, string> {
   const id = getDeviceId();
   return id ? { "X-Device-Id": id } : {};
+}
+
+/** Sign-in and refresh answers are not "session expired" events. */
+function isAuthPath(path: string): boolean {
+  return path.startsWith("/auth/");
+}
+
+/**
+ * Leaves for the sign-in screen without reloading it when it is already open.
+ *
+ * Assigning `location.href` to the URL you are on reloads the document, which
+ * would erase whatever the ANM has typed. Background sync calls 401 all the
+ * time before sign-in, so this guard is what keeps the form stable.
+ */
+function goToLogin(): void {
+  if (typeof window === "undefined") return;
+  if (window.location.pathname === "/login") return;
+  window.location.href = "/login";
 }
 
 function isDeviceRevokedBody(body: unknown): boolean {
@@ -70,7 +94,7 @@ async function handleRevokedDevice(): Promise<void> {
   } catch {
     // Best effort: the device is already locked out server-side.
   }
-  window.location.href = "/login";
+  goToLogin();
 }
 
 class ApiError extends Error {
@@ -106,7 +130,7 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     headers["Content-Type"] = "application/json";
   }
 
-  const token = localStorage.getItem("accessToken");
+  const token = localStorage.getItem(ACCESS_TOKEN_KEY);
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const response = await fetch(`${API_BASE}${path}`, {
@@ -121,6 +145,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (isDeviceRevokedBody(data)) {
       await handleRevokedDevice();
       throw new ApiError(401, data, "This device has been revoked");
+    }
+
+    // A rejected sign-in (or refresh) is an expected answer, not an expired
+    // session. Trying to refresh here would recurse forever, and redirecting
+    // would throw away the form the user is filling in.
+    if (isAuthPath(path)) {
+      throw new ApiError(401, data, data?.message ?? "Invalid credentials");
+    }
+
+    // No token was sent, so there is no session to refresh: an unauthenticated
+    // caller (background sync on the sign-in screen) must simply fail.
+    if (!token) {
+      throw new ApiError(401, data, data?.message ?? "Unauthorized");
     }
 
     const outcome = await refreshToken();
@@ -139,10 +176,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     // Clear session keys only: `localStorage.clear()` would also destroy the
     // wrapped data key and leave every encrypted record unreadable.
     if (navigator.onLine) {
-      localStorage.removeItem("accessToken");
+      localStorage.removeItem(ACCESS_TOKEN_KEY);
       clearRefreshToken();
       clearCachedSession();
-      window.location.href = "/login";
+      goToLogin();
     }
     throw new ApiError(401, null, "Unauthorized");
   }
@@ -156,7 +193,21 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
 type RefreshOutcome = "refreshed" | "failed" | "revoked";
 
+let refreshInFlight: Promise<RefreshOutcome> | null = null;
+
+/**
+ * Single-flight refresh: several queries can 401 at once on a cold start, and
+ * rotating the token twice in parallel would invalidate one of the results (or
+ * trip device checks). Everyone waits on the same attempt.
+ */
 async function refreshToken(): Promise<RefreshOutcome> {
+  refreshInFlight ??= performRefresh().finally(() => {
+    refreshInFlight = null;
+  });
+  return refreshInFlight;
+}
+
+async function performRefresh(): Promise<RefreshOutcome> {
   // On the web the refresh token lives in an httpOnly cookie the browser sends
   // automatically. The bundled Android app has no such cookie, so it presents
   // the token the server returned at login.

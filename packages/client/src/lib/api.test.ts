@@ -38,18 +38,39 @@ function emptyResponse(status = 204) {
 
 const fetchMock = vi.fn();
 
+let currentHref = "/";
+let navigations: string[] = [];
+
+/**
+ * jsdom does not implement navigation. A stub with a real `href` setter lets a
+ * test observe whether the app tried to leave the current screen.
+ */
+function stubLocation(pathname: string): void {
+  currentHref = pathname;
+  navigations = [];
+  Object.defineProperty(window, "location", {
+    value: {
+      get pathname() {
+        return pathname;
+      },
+      get href() {
+        return currentHref;
+      },
+      set href(value: string) {
+        currentHref = value;
+        navigations.push(value);
+      },
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+
 beforeEach(() => {
   store.clear();
   fetchMock.mockReset();
   globalThis.fetch = fetchMock as unknown as typeof fetch;
-
-  // jsdom does not implement navigation; replace it so the logout redirect is
-  // observable without printing "Not implemented: navigation" noise.
-  Object.defineProperty(window, "location", {
-    value: { href: "/", pathname: "/" },
-    writable: true,
-    configurable: true,
-  });
+  stubLocation("/");
 });
 
 describe("request", () => {
@@ -160,6 +181,67 @@ describe("request", () => {
     await expect(api.patients.get("p1")).rejects.toBeInstanceOf(ApiError);
     expect(store.has("accessToken")).toBe(false);
   });
+
+  it("surfaces a rejected sign-in instead of refreshing or navigating", async () => {
+    stubLocation("/login");
+    fetchMock.mockResolvedValueOnce(jsonResponse({ message: "Invalid credentials" }, 401));
+
+    const error = await api.auth
+      .login({ employeeId: "ARR_RANIGANJ_X_01", password: "wrong" })
+      .catch((e: unknown) => e);
+
+    expect(error).toMatchObject({ status: 401, message: "Invalid credentials" });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(navigations).toEqual([]);
+  });
+
+  it("does not try to refresh a request made before sign-in", async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({}, 401));
+
+    await expect(api.patients.get("p1")).rejects.toBeInstanceOf(ApiError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not reload the sign-in page when a stale session expires on it", async () => {
+    stubLocation("/login");
+    store.set("accessToken", "expired");
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({}, 401))
+      .mockResolvedValueOnce(jsonResponse({}, 401));
+
+    await expect(api.patients.get("p1")).rejects.toBeInstanceOf(ApiError);
+    expect(store.has("accessToken")).toBe(false);
+    expect(navigations).toEqual([]);
+  });
+
+  it("refreshes once when several requests expire together", async () => {
+    store.set("accessToken", "expired");
+    let patientCalls = 0;
+    let releaseRefresh: (() => void) | undefined;
+
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url === "/api/auth/refresh") {
+        await new Promise<void>((resolve) => {
+          releaseRefresh = resolve;
+        });
+        return jsonResponse({ accessToken: "fresh-token" });
+      }
+      patientCalls += 1;
+      return patientCalls <= 2 ? jsonResponse({}, 401) : jsonResponse({ id: `p${patientCalls}` });
+    });
+
+    const first = api.patients.get("p1");
+    const second = api.patients.get("p2");
+
+    await vi.waitFor(() => expect(releaseRefresh).toBeDefined());
+    // Let the second 401 join the in-flight refresh before it resolves.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    releaseRefresh?.();
+
+    await expect(first).resolves.toMatchObject({ id: expect.any(String) });
+    await expect(second).resolves.toMatchObject({ id: expect.any(String) });
+    expect(fetchMock.mock.calls.filter(([url]) => url === "/api/auth/refresh")).toHaveLength(1);
+  });
 });
 
 describe("native client auth", () => {
@@ -181,6 +263,8 @@ describe("native client auth", () => {
       .mockResolvedValueOnce(jsonResponse({ id: "p1" }));
 
     await nativeApi.auth.login({ employeeId: "ANM001", password: "password123" });
+    // The login screen stores the access token after a successful sign-in.
+    store.set("accessToken", "a1");
 
     expect(store.get("hrp-native-refresh-token")).toBe("r1");
     expect(fetchMock.mock.calls[0][1].headers).toMatchObject({

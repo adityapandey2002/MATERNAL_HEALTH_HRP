@@ -9,6 +9,7 @@ import {
   patientRepo,
   visitRepo,
 } from "../db/repositories";
+import { hasAccessToken } from "../token-store";
 
 export type SyncStatusSummary = {
   pending: number;
@@ -124,6 +125,9 @@ async function applyServerResponse(res: {
 
 export async function drain(): Promise<void> {
   if (draining) return;
+  // Before sign-in there is nothing to authenticate with; a queued push would
+  // only 401. The queue survives and syncs right after the next login.
+  if (!hasAccessToken()) return;
   // A locked pilot build has no data key: reading a queued payload would throw
   // and writing it back would leave plaintext. Resume after unlock.
   if (!canUseLocalData()) return;

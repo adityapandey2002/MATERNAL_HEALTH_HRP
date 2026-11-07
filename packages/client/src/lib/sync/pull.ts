@@ -2,6 +2,7 @@ import { api } from "../api";
 import { canUseLocalData } from "../crypto";
 import type { LocalFollowUp, LocalPatient, LocalVisit } from "../db/local-db";
 import { followUpRepo, metaRepo, patientRepo, visitRepo } from "../db/repositories";
+import { hasAccessToken } from "../token-store";
 
 function toLocalPatient(p: Record<string, unknown>): LocalPatient {
   return {
@@ -83,6 +84,7 @@ function toLocalFollowUp(f: Record<string, unknown>): LocalFollowUp {
 }
 
 export async function pullCohort(): Promise<void> {
+  if (!hasAccessToken()) return;
   if (!canUseLocalData()) return;
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
   try {
