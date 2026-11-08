@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import Layout from "./components/Layout";
 import { LockGate } from "./components/LockGate";
 import { UpdatePrompt } from "./components/UpdatePrompt";
@@ -118,36 +119,38 @@ export default function App() {
     <OfflineGate>
       <LockGate>
         <UpdatePrompt />
-        <Routes>
-          <Route
-            path="/login"
-            element={
-              <PublicRoute>
-                <Login />
-              </PublicRoute>
-            }
-          />
-          <Route
-            element={
-              <ProtectedRoute>
-                <Layout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="/" element={<Home />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/follow-ups" element={<FollowUps />} />
-            <Route path="/team" element={<TeamAccess />} />
-            <Route path="/patients" element={<Patients />} />
-            <Route path="/patients/new" element={<AddPatient />} />
-            <Route path="/patients/:id" element={<PatientDetail />} />
-            <Route path="/patients/:id/visit" element={<NewVisit />} />
-            <Route path="/supervision" element={<Supervision />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/devices" element={<Devices />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <ErrorBoundary label="app">
+          <Routes>
+            <Route
+              path="/login"
+              element={
+                <PublicRoute>
+                  <Login />
+                </PublicRoute>
+              }
+            />
+            <Route
+              element={
+                <ProtectedRoute>
+                  <Layout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="/" element={<Home />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/follow-ups" element={<FollowUps />} />
+              <Route path="/team" element={<TeamAccess />} />
+              <Route path="/patients" element={<Patients />} />
+              <Route path="/patients/new" element={<AddPatient />} />
+              <Route path="/patients/:id" element={<PatientDetail />} />
+              <Route path="/patients/:id/visit" element={<NewVisit />} />
+              <Route path="/supervision" element={<Supervision />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/devices" element={<Devices />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </ErrorBoundary>
       </LockGate>
     </OfflineGate>
   );

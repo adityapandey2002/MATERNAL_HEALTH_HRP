@@ -3,6 +3,7 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { isNativeApp, registerNativeLifecycle } from "./lib/native";
 import { getCachedSession } from "./lib/session-cache";
 import { registerSW } from "./utils/sw";
@@ -43,7 +44,9 @@ ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <App />
+        <ErrorBoundary label="root">
+          <App />
+        </ErrorBoundary>
       </BrowserRouter>
     </QueryClientProvider>
   </React.StrictMode>

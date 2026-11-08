@@ -23,6 +23,9 @@ let draining = false;
 let lastError: string | null = null;
 const listeners = new Set<(s: SyncStatusSummary) => void>();
 
+/** A rejected row waits this long before the next attempt. */
+const REJECTED_RETRY_MS = 5 * 60 * 1000;
+
 function nowIso(): string {
   return new Date().toISOString();
 }
@@ -177,15 +180,40 @@ export async function drain(): Promise<void> {
       });
       await applyServerResponse(res as never);
 
-      // Remove acked ops (those we sent and that did not become conflicts).
+      // The server answers item by item: a conflict keeps the local version,
+      // and a rejection means the row was NOT stored (a validation failure, a
+      // missing parent record, a permission gap). Dropping a rejected op would
+      // leave the change visible only on this phone, forever, with no error —
+      // exactly how an ANM's registration went missing at block level. Keep it
+      // queued, record why, and show the reason on the device.
+      const rejected = res.rejected ?? [];
+      const rejectionFor = (op: (typeof sentOps)[number]): string | undefined => {
+        const wanted = op.entityType.toUpperCase();
+        const match = rejected.find(
+          (item) =>
+            item.entityType.toUpperCase() === wanted &&
+            (item.entityId === undefined || item.entityId === op.entityId)
+        );
+        return match?.reason;
+      };
+
       const conflictIds = new Set(
         (res.conflicts ?? []).map((c: { entityId: string }) => c.entityId)
       );
+      let firstRejection: string | null = null;
       for (const op of sentOps) {
         if (conflictIds.has(op.entityId)) continue;
+        const reason = rejectionFor(op);
+        if (reason) {
+          firstRejection ??= reason;
+          if (op.seq !== undefined) {
+            await opRepo.markFailed(op.seq, reason, Date.now() + REJECTED_RETRY_MS);
+          }
+          continue;
+        }
         if (op.seq !== undefined) await opRepo.remove(op.seq);
       }
-      lastError = null;
+      lastError = firstRejection;
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       // Exponential backoff per op.

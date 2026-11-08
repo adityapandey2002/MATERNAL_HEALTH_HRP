@@ -28,6 +28,12 @@
     min-height: 100vh;
   }
 
+  /* The mobile More menu is a modal <dialog>; the UA backdrop is transparent,
+     which left the page behind legible through the sheet. */
+  dialog::backdrop {
+    background-color: rgb(15 23 42 / 0.4);
+  }
+
   h1,
   h2,
   h3,

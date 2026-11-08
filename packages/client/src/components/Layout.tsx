@@ -18,6 +18,7 @@ import {
 import { ROLE_LABEL } from "../lib/session";
 import { clearCachedSession } from "../lib/session-cache";
 import { clearAccessToken } from "../lib/token-store";
+import { buildLabel } from "../lib/version";
 import { isOnline, onOnlineChange } from "../utils/sw";
 import { BrandLockup, BrandMark } from "./ui/BrandMark";
 import { LogoutIcon, MoreHorizontalIcon } from "./ui/Icons";
@@ -277,15 +278,16 @@ export default function Layout() {
         onClose={() => setMoreOpen(false)}
         title="More"
         description={`${user?.name ?? "Health worker"} · ${ROLE_LABEL[role]}`}
+        footer={<>Matru Suraksha {buildLabel()}</>}
       >
-        <ul className="space-y-0.5">
+        <ul className="space-y-1">
           {overflow.map((item) => (
             <li key={`${item.path}-${item.label}`}>
               <NavLink
                 to={item.path}
                 end={item.path === "/" || item.path === "/patients"}
                 onClick={() => setMoreOpen(false)}
-                className="flex min-h-touch items-center gap-3 rounded px-3 text-sm font-medium text-ink hover:bg-canvas"
+                className="flex min-h-[3.25rem] items-center gap-3 rounded px-3 text-base font-medium text-ink hover:bg-canvas"
               >
                 <item.icon className="h-5 w-5 text-ink-subtle" />
                 {item.label}
@@ -297,7 +299,7 @@ export default function Layout() {
         <button
           type="button"
           onClick={handleLogout}
-          className="flex min-h-touch w-full items-center gap-3 rounded px-3 text-sm font-medium text-triage-red hover:bg-triage-red-bg"
+          className="flex min-h-[3.25rem] w-full items-center gap-3 rounded px-3 text-base font-medium text-triage-red hover:bg-triage-red-bg"
         >
           <LogoutIcon className="h-5 w-5" />
           Sign out

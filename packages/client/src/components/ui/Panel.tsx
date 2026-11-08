@@ -41,11 +41,10 @@ export function PanelHeader({
         {description ? <p className="mt-0.5 text-xs text-ink-subtle">{description}</p> : null}
       </div>
       {/* max-w-full lets chip rows wrap inside the panel instead of
-          overflowing the viewport at 320 px. */}
+          overflowing the viewport at 320 px. Icon-only actions stay visible:
+          hiding them on small screens removes the only "add" affordance. */}
       {action ? (
-        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2 max-sm:has-[>svg:only-child]:hidden">
-          {action}
-        </div>
+        <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">{action}</div>
       ) : null}
     </div>
   );

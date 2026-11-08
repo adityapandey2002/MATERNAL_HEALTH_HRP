@@ -263,8 +263,11 @@ export default function AddPatientPage() {
             <PanelHeader
               title="Woman and household"
               action={
-                <span className="inline-flex">
-                  <UserPlusIcon className="h-12 w-12 text-primary" />
+                <span
+                  aria-hidden="true"
+                  className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-light sm:h-14 sm:w-14"
+                >
+                  <UserPlusIcon className="h-6 w-6 text-primary sm:h-7 sm:w-7" />
                 </span>
               }
             />

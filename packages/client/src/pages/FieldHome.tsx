@@ -23,11 +23,13 @@ function describeSyncStrip({
   online,
   pendingChanges,
   pendingContacts,
+  lastError,
 }: {
   online: boolean;
   pendingChanges: number;
   pendingContacts: number;
-}): { title: string; detail: string } {
+  lastError: string | null;
+}): { title: string; detail: string; failed: boolean } {
   const pluralChanges = pendingChanges === 1 ? "change" : "changes";
   if (!online) {
     const title = "Offline — records are saved on this device";
@@ -35,17 +37,31 @@ function describeSyncStrip({
       pendingChanges > 0
         ? `${pendingChanges} ${pluralChanges} will sync when the connection returns.`
         : "Everything recorded here stays on this device until the connection returns.";
-    return { title, detail };
+    return { title, detail, failed: false };
+  }
+  // A rejection is not the same as "waiting": the server refused the row, so
+  // it will never appear at block level until the worker sees why.
+  if (lastError) {
+    return {
+      title:
+        pendingChanges > 0
+          ? `${pendingChanges} ${pluralChanges} could not be sent`
+          : "A change could not be sent",
+      detail: lastError,
+      failed: true,
+    };
   }
   if (pendingChanges > 0) {
     return {
       title: `${pendingChanges} ${pluralChanges} waiting to sync`,
       detail: "They will be sent automatically. You can also send them now.",
+      failed: false,
     };
   }
   return {
     title: "All follow-ups on track",
     detail: `${pendingContacts} pending contact${pendingContacts === 1 ? "" : "s"} in your village list.`,
+    failed: false,
   };
 }
 
@@ -85,7 +101,12 @@ export default function FieldHome() {
   const pendingChanges = sync?.pending ?? 0;
 
   const lastSync = sync?.lastSync ? new Date(sync.lastSync) : null;
-  const strip = describeSyncStrip({ online, pendingChanges, pendingContacts: pending });
+  const strip = describeSyncStrip({
+    online,
+    pendingChanges,
+    pendingContacts: pending,
+    lastError: sync?.lastError ?? null,
+  });
 
   const runSync = async () => {
     setSyncing(true);

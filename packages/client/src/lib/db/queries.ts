@@ -61,16 +61,34 @@ export function toVisit(lv: LocalVisit): Visit {
   } as unknown as Visit;
 }
 
+/**
+ * Local reads must never take a screen down.
+ *
+ * `useLiveQuery` re-throws a rejected querier during render, and a render
+ * throw unmounts the whole React tree — on a phone that is the blank white
+ * screen the field team reported. A closed database or a row that cannot be
+ * decrypted should degrade to "no cached rows yet", not a dead app; the sync
+ * strip then tells the worker whether anything is waiting to upload.
+ */
+async function readOrEmpty<T>(what: string, read: () => Promise<T[]>): Promise<T[]> {
+  try {
+    return await read();
+  } catch (error) {
+    console.warn(`[db] could not read ${what}; showing an empty list`, error);
+    return [];
+  }
+}
+
 export function useLocalPatients() {
   return useLiveQuery(async () => {
-    const rows = await patientRepo.list();
+    const rows = await readOrEmpty("patients", () => patientRepo.list());
     return rows.map(toPatient);
   }, []);
 }
 
 export function useLocalVisits() {
   return useLiveQuery(async () => {
-    const rows = await visitRepo.list();
+    const rows = await readOrEmpty("visits", () => visitRepo.list());
     return rows.map(toVisit);
   }, []);
 }
@@ -121,7 +139,10 @@ export function toFollowUpListItem(
 
 export function useLocalFollowUpItems() {
   return useLiveQuery(async () => {
-    const [followUps, patients] = await Promise.all([followUpRepo.list(), patientRepo.list()]);
+    const [followUps, patients] = await Promise.all([
+      readOrEmpty("follow-ups", () => followUpRepo.list()),
+      readOrEmpty("patients", () => patientRepo.list()),
+    ]);
     const byId = new Map(patients.map((patient) => [patient.id, patient]));
     return followUps.map((followUp) => toFollowUpListItem(followUp, byId.get(followUp.patientId)));
   }, []);
