@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { db } from "./client.js";
+import { facilityPathFor } from "./facility-path.js";
 
 // Auto-generated from HR_DATA_RANIGANJ.xlsx
 // Raniganj block, Araria district - real ANM + CHO accounts
@@ -458,6 +459,7 @@ export async function seedRaniganj() {
   await db.deleteFrom("facilities").execute();
 
   const facilityIds = new Map<string, string>();
+  const facilityPaths = new Map<string, string>();
   const insertFacility = async (
     code: string,
     name: string,
@@ -468,6 +470,9 @@ export async function seedRaniganj() {
     block: string
   ) => {
     const parentId = parentCode ? facilityIds.get(parentCode) : undefined;
+    // Authorization scopes the block/district by this prefix, so it must be
+    // the full chain (`BIHAR.ARARIA.ARR_RANIGANJ.<HSC>`), never the bare code.
+    const path = facilityPathFor(parentCode ? facilityPaths.get(parentCode) : null, code);
     const inserted = await db
       .insertInto("facilities")
       .values({
@@ -475,7 +480,7 @@ export async function seedRaniganj() {
         name,
         level: level as "STATE" | "DISTRICT" | "BLOCK" | "HSC",
         parent_id: parentId ?? null,
-        path: code,
+        path,
         state,
         district,
         block,
@@ -483,6 +488,7 @@ export async function seedRaniganj() {
       .returning("id")
       .executeTakeFirstOrThrow();
     facilityIds.set(code, inserted.id);
+    facilityPaths.set(code, path);
     return inserted.id;
   };
 
