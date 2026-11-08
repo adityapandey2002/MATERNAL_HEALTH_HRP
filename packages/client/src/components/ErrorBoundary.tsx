@@ -29,7 +29,13 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
   }
 
   override componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error(`[ui] ${this.props.label ?? "screen"} crashed`, error, info.componentStack);
+    // Keep the first argument a literal: semgrep flags interpolated console
+    // format strings because a value can forge the message.
+    console.error("[ui] screen crashed", {
+      label: this.props.label ?? "screen",
+      error,
+      componentStack: info.componentStack,
+    });
   }
 
   private reload = (): void => {

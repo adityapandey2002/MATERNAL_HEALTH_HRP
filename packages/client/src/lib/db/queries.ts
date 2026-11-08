@@ -74,7 +74,9 @@ async function readOrEmpty<T>(what: string, read: () => Promise<T[]>): Promise<T
   try {
     return await read();
   } catch (error) {
-    console.warn(`[db] could not read ${what}; showing an empty list`, error);
+    // Literal format string, details as an argument: see the semgrep
+    // unsafe-formatstring rule.
+    console.warn("[db] local read failed; showing an empty list", { what, error });
     return [];
   }
 }
