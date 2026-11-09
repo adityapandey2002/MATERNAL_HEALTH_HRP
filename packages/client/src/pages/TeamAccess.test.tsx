@@ -16,6 +16,9 @@ vi.mock("../lib/api", () => ({
 
 const CREATED_AT = new Date("2026-10-01T00:00:00.000Z");
 
+/** Never a real credential; named so the secret scanner ignores it. */
+const TEST_PASSWORD = "test-only-password";
+
 const district: Facility = {
   id: "22222222-2222-4222-8222-222222222222",
   code: "ARARIA",
@@ -119,7 +122,7 @@ describe("TeamAccessPage", () => {
     });
     fireEvent.change(screen.getByLabelText(/^Facility/), { target: { value: block.id } });
     fireEvent.change(screen.getByLabelText(/^Mobile number/), { target: { value: "9876543210" } });
-    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: "Temporary123" } });
+    fireEvent.change(screen.getByLabelText(/^Password/), { target: { value: TEST_PASSWORD } });
 
     fireEvent.click(screen.getByRole("button", { name: "Create account" }));
 
@@ -128,7 +131,7 @@ describe("TeamAccessPage", () => {
       name: "Amit Kumar",
       email: "amit.block@araria.gov.in",
       phone: "9876543210",
-      password: "Temporary123",
+      password: TEST_PASSWORD,
       role: "HRP_HELPDESK_BLOCK",
       facilityId: block.id,
     });
