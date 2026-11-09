@@ -61,7 +61,32 @@ Required repository secrets for a signed build:
 Losing the keystore means no future build can install over the pilot APK, so
 keep an offline copy with district IT.
 
-## 2. First login (must be online)
+## 2. Deploy the pilot server (manual)
+
+The pilot service (`hrp-pilot-api`) is **not** wired to auto-deploy; only the
+shared synthetic demo is. A merged fix therefore does nothing for the pilot
+until someone redeploys:
+
+1. Render dashboard → `hrp-pilot-api` → **Manual Deploy → Deploy latest commit**.
+2. Wait for the health check to pass. `docker-entrypoint.sh` runs
+   `node packages/server/dist/db/migrate.js` first, so pending migrations (for
+   example `009_repair_facility_paths.sql`) apply on the same deploy.
+3. Confirm the deployed build:
+
+   ```bash
+   curl -s https://hrp-pilot-api.onrender.com/api/version
+   ```
+
+   The `version` must match the tag that was just merged. If it still shows an
+   older build, the deploy did not pick up the commit.
+
+4. Sign in as DHS and open **Team**, then sign in as BHM and create one block
+   helpdesk account. Both are the smoke test for a fresh deploy.
+
+Phones pick the new APK up through the in-app update banner, which reads the
+same endpoint, so redeploy the server **before** sharing a new APK.
+
+## 3. First login (must be online)
 
 1. Connect to the network.
 2. Sign in with the issued credentials.
@@ -69,7 +94,7 @@ keep an offline copy with district IT.
    follow-ups are cached locally).
 4. Confirm the sync status shows "Synced" before going offline.
 
-## 3. Offline workflow
+## 4. Offline workflow
 
 1. Enable airplane mode (or lose connectivity).
 2. Open the app; it loads from the cached shell using the cached session.
@@ -93,7 +118,7 @@ Notes:
   screen (it backgrounds it), and a form with unsaved input asks before
   discarding.
 
-## 4. Sync troubleshooting
+## 5. Sync troubleshooting
 
 | Symptom | Likely cause | Action |
 |---------|--------------|--------|
@@ -104,17 +129,17 @@ Notes:
 | APK update wiped local data | Different signing key used | Reinstall using an APK signed with the original key |
 | Storage full / IndexedDB evicted | Device storage pressure | Export data (Settings -> Export my data), free storage, re-sync |
 
-## 5. Export, wipe, and update (planned)
+## 6. Export, wipe, and update (planned)
 
 - **Export my data:** Settings exports patients/visits/follow-ups/pending ops
   as JSON via the Android share sheet.
 - **Clear local data:** requires confirmation and re-authentication; wipes
   IndexedDB and caches.
-- **Update available:** banner driven by `version.json` / `/api/app/version`
-  names the new version and the install steps. APK updates require installing
-  the new signed APK over the old one.
+- **Update available:** banner driven by `/api/version` names the new version
+  and the install steps. APK updates require installing the new signed APK over
+  the old one.
 
-## 6. Privacy decision
+## 7. Privacy decision
 
 - D1 is decided: the pilot carries **real patient data**, so Conditional Phase
   5A is required before any real record is entered: app PIN with PBKDF2 key
@@ -137,7 +162,7 @@ Notes:
   app-level controls; coded clinical fields and the server copy stay readable to
   anyone with database access. This is a closed-pilot bar, not DPDP certification.
 
-## 7. Device matrix sign-off (to be completed)
+## 8. Device matrix sign-off (to be completed)
 
 Record test results for Android versions available, airplane mode, throttled
 2G, low storage, clock skew (+/- 1 day), app kill, reboot, and APK upgrade.
@@ -146,7 +171,7 @@ Record test results for Android versions available, airplane mode, throttled
 |------------------|---------------|----------------|-------------------|------------------------|--------|
 | _TBD_ | | | | | |
 
-## 8. Diagnostics (planned)
+## 9. Diagnostics (planned)
 
 A diagnostics panel (device ID, app version, queue depth, last sync, last
 error, storage) with "Copy diagnostics" that contains no patient identifiers.
