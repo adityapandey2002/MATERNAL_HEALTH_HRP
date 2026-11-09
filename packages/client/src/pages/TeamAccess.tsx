@@ -16,14 +16,17 @@ type ProvisionableRole = CreateStaff["role"];
  * Facility levels each provisionable role may be attached to.
  *
  * Mirrors `ROLE_FACILITY_LEVELS` on the server. The server is the authority;
- * this only keeps impossible options out of the dropdown.
+ * this only keeps impossible options out of the dropdown. `DHS` is here even
+ * though nobody provisions a DHS: the district officer's own row appears in
+ * the team list, and looking it up used to crash the whole page.
  */
-const ROLE_FACILITY_LEVELS: Record<ProvisionableRole, string[]> = {
+const ROLE_FACILITY_LEVELS: Record<string, string[]> = {
   ANM: ["VILLAGE", "HSC", "HWC"],
   CHO: ["HWC", "PHC", "CHC"],
   HRP_HELPDESK_BLOCK: ["BLOCK", "CHC"],
   BHM: ["BLOCK", "CHC"],
   HRP_HELPDESK_DISTRICT: ["DISTRICT"],
+  DHS: ["DISTRICT"],
 };
 
 const PROVISIONABLE_BY_ACTOR: Record<string, ProvisionableRole[]> = {
@@ -66,8 +69,8 @@ function validate(form: FormState): Partial<Record<keyof FormState, string>> {
   return errors;
 }
 
-function facilitiesForRole(facilities: Facility[], role: ProvisionableRole): Facility[] {
-  const levels = ROLE_FACILITY_LEVELS[role];
+function facilitiesForRole(facilities: Facility[], role: string): Facility[] {
+  const levels = ROLE_FACILITY_LEVELS[role] ?? [];
   return facilities.filter((facility) => levels.includes(facility.level));
 }
 
@@ -433,7 +436,7 @@ export default function TeamAccessPage() {
 
               <div className="sm:col-span-2">
                 <button
-                  type="button"
+                  type="submit"
                   className="btn btn-primary"
                   disabled={createMutation.isPending}
                 >
@@ -573,7 +576,7 @@ function TeamTable({
                   editing={editingId === member.id}
                   editForm={editForm}
                   editError={editError}
-                  editFacilities={facilitiesForRole(facilities, member.role as ProvisionableRole)}
+                  editFacilities={facilitiesForRole(facilities, member.role)}
                   updatePending={updatePending}
                   deactivatePending={deactivatePending}
                   onEditFormChange={onEditFormChange}
