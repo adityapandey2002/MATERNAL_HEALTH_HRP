@@ -88,9 +88,10 @@ export async function getLatestRelease(
     const value = toRelease((await response.json()) as GitHubRelease, repo);
     cache = { expiresAt: now + CACHE_TTL_MS, value };
     return value;
-  } catch {
+  } catch (error) {
     // Offline, DNS failure or timeout: remember the miss briefly so a launch
     // burst does not hammer GitHub, then try again.
+    console.warn("[releases] GitHub lookup failed", error instanceof Error ? error.message : error);
     cache = { expiresAt: now + FAILURE_TTL_MS, value: null };
     return null;
   }

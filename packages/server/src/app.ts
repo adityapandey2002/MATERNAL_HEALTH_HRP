@@ -178,14 +178,18 @@ export function buildApp(options: BuildAppOptions = {}): FastifyInstance {
       };
     }
 
+    // Fall back to the configured version when GitHub is unreachable. Normalise
+    // a leading "v" so a misconfigured APP_VERSION ("v1.0.9-pilot") still
+    // produces a usable version and a download URL without a doubled "vv".
+    const version = (config.appVersion ?? "").replace(/^v/i, "").trim();
     const url =
       config.apkDownloadUrl ||
-      (config.appVersion && config.appVersion !== "0.0.0"
-        ? `https://github.com/adityapandey2002/MATERNAL_HEALTH_HRP/releases/download/v${config.appVersion}/matru-suraksha-${config.appVersion}.apk`
+      (version && version !== "0.0.0"
+        ? `https://github.com/adityapandey2002/MATERNAL_HEALTH_HRP/releases/download/v${version}/matru-suraksha-${version}.apk`
         : null);
 
     return {
-      version: config.appVersion,
+      version: version || config.appVersion,
       gitSha: config.gitSha,
       apkDownloadUrl: url,
       apkSha256: config.apkSha256 || null,
