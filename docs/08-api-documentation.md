@@ -106,7 +106,7 @@ If the server finds that this device identifier is revoked in the `devices` tabl
 - **Response (200 OK):**
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsIn...",
+  "accessToken": "<signed JWT>",
   "user": {
     "id": "11111111-1111-4111-8111-111111111111",
     "employeeId": "ANM001",
@@ -127,7 +127,7 @@ If the server finds that this device identifier is revoked in the `devices` tabl
 - **Response (200 OK):**
 ```json
 {
-  "accessToken": "eyJhbGciOiJIUzI1NiIsIn..."
+  "accessToken": "<signed JWT>"
 }
 ```
 
