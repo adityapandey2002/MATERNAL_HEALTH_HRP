@@ -257,8 +257,8 @@ export default function AddPatientPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="grid gap-4 lg:grid-cols-3">
-        <div className="space-y-4 lg:col-span-2">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-4">
           <Panel className="!border-0">
             <PanelHeader
               title="Woman and household"
@@ -432,7 +432,7 @@ export default function AddPatientPage() {
                     />
                     <span>
                       <span className="block text-sm font-semibold text-ink">
-                        {isBlockRole ? "Refer to Sadar hospital" : "Yes — Refer to CHC/FRU"}
+                        {isBlockRole ? "Refer to Sadar hospital" : "Yes â€” Refer to CHC/FRU"}
                       </span>
                       <span className="block text-xs text-ink-subtle">
                         {isBlockRole
@@ -459,7 +459,7 @@ export default function AddPatientPage() {
                     />
                     <span>
                       <span className="block text-sm font-semibold text-ink">
-                        {isBlockRole ? "Not needed" : "No — Routine Field Management"}
+                        {isBlockRole ? "Not needed" : "No â€” Routine Field Management"}
                       </span>
                       <span className="block text-xs text-ink-subtle">
                         {isBlockRole
@@ -482,82 +482,10 @@ export default function AddPatientPage() {
               className="btn btn-primary btn-lg"
               disabled={createMutation.isPending}
             >
-              {createMutation.isPending ? "Saving…" : "Add to HRP register"}
+              {createMutation.isPending ? "Savingâ€¦" : "Add to HRP register"}
             </button>
           </div>
         </div>
-
-        <aside className="space-y-4">
-          <Panel className="bg-primary-light !border-0">
-            <PanelBody className="space-y-2">
-              <h2 className="text-sm font-semibold text-primary-dark">What happens after saving</h2>
-              <ul className="space-y-2 text-sm text-ink-muted">
-                <li className="flex gap-2">
-                  <span
-                    aria-hidden="true"
-                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-                  />
-                  She joins the HRP register for your village cluster.
-                </li>
-                <li className="flex gap-2">
-                  <span
-                    aria-hidden="true"
-                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-                  />
-                  The earliest track — 7-day MO review, next PMSMA, or VHSND — is scheduled for her.
-                </li>
-                <li className="flex gap-2">
-                  <span
-                    aria-hidden="true"
-                    className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary"
-                  />
-                  {isBlockRole
-                    ? "Referred cases are recorded against the district hospital panel."
-                    : "Referred cases start with the Block HRP Helpdesk's 15-day window."}
-                </li>
-              </ul>
-            </PanelBody>
-          </Panel>
-
-          <Panel className="!border-0">
-            <PanelBody className="space-y-2">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <MapPinIcon className="h-4 w-4 text-ink-subtle" />
-                Village mapping
-              </h2>
-              <p className="text-xs leading-relaxed text-ink-subtle">
-                The village you pick maps the woman to her Health & Wellness Sub-Center, so
-                follow-up lists reach the right ANM.
-              </p>
-            </PanelBody>
-          </Panel>
-
-          <Panel className="!border-0">
-            <PanelBody className="space-y-2">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <PhoneIcon className="h-4 w-4 text-ink-subtle" />
-                Call-back number
-              </h2>
-              <p className="text-xs leading-relaxed text-ink-subtle">
-                The mobile number is what the ANM and HRP Helpdesk dial when a contact is not
-                reachable.
-              </p>
-            </PanelBody>
-          </Panel>
-
-          <Panel className="!border-0">
-            <PanelBody className="space-y-2">
-              <h2 className="flex items-center gap-2 text-sm font-semibold text-ink">
-                <ClipboardIcon className="h-4 w-4 text-ink-subtle" />
-                Complication drives risk
-              </h2>
-              <p className="text-xs leading-relaxed text-ink-subtle">
-                Every complication scores her AMBER or above, so no HRP registration is silently
-                marked low risk.
-              </p>
-            </PanelBody>
-          </Panel>
-        </aside>
       </form>
     </div>
   );

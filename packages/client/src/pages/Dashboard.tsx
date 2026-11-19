@@ -57,7 +57,8 @@ function mergePatients(server: Patient[] | undefined, local: Patient[] | undefin
   const byId = new Map<string, Patient>((server ?? []).map((patient) => [patient.id, patient]));
   for (const row of local ?? []) {
     const current = byId.get(row.id);
-    if (!current || row.updatedAt.getTime() > current.updatedAt.getTime()) byId.set(row.id, row);
+    if (!current || new Date(row.updatedAt).getTime() > new Date(current.updatedAt).getTime())
+      byId.set(row.id, row);
   }
   return [...byId.values()];
 }
@@ -66,7 +67,8 @@ function mergeVisits(server: Visit[] | undefined, local: Visit[] | undefined): V
   const byId = new Map<string, Visit>((server ?? []).map((visit) => [visit.id, visit]));
   for (const row of local ?? []) {
     const current = byId.get(row.id);
-    if (!current || row.updatedAt.getTime() > current.updatedAt.getTime()) byId.set(row.id, row);
+    if (!current || new Date(row.updatedAt).getTime() > new Date(current.updatedAt).getTime())
+      byId.set(row.id, row);
   }
   return [...byId.values()];
 }

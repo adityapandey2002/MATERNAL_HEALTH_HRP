@@ -2,8 +2,7 @@ import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import { Network } from "@capacitor/network";
 import { useEffect } from "react";
-import { pullCohort } from "./sync/pull";
-import { drain } from "./sync/queue";
+import { runAutoSync } from "./sync/auto";
 
 /**
  * A page can claim the hardware back button. Returning `true` means the page
@@ -43,14 +42,12 @@ export async function registerNativeLifecycle(): Promise<void> {
   try {
     await App.addListener("appStateChange", ({ isActive }) => {
       if (!isActive) return;
-      void drain();
-      void pullCohort();
+      void runAutoSync();
     });
 
     await Network.addListener("networkStatusChange", (status) => {
       if (!status.connected) return;
-      void drain();
-      void pullCohort();
+      void runAutoSync();
     });
 
     await App.addListener("backButton", () => {

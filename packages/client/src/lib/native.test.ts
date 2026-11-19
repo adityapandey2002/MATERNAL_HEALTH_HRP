@@ -3,15 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
  * `lib/native.ts` talks to the Android bridge. In tests the bridge is mocked so
- * the lifecycle rules (drain on resume, guard a dirty form) can be asserted
+ * the lifecycle rules (sync on resume, guard a dirty form) can be asserted
  * without a device.
  */
 const bridge = vi.hoisted(() => ({
   native: true,
   handlers: new Map<string, (payload: unknown) => void>(),
   minimizeApp: vi.fn(),
-  drain: vi.fn(async () => {}),
-  pullCohort: vi.fn(async () => {}),
+  runAutoSync: vi.fn(async () => {}),
 }));
 
 vi.mock("@capacitor/core", () => ({
@@ -37,8 +36,7 @@ vi.mock("@capacitor/network", () => ({
   },
 }));
 
-vi.mock("./sync/queue", () => ({ drain: bridge.drain }));
-vi.mock("./sync/pull", () => ({ pullCohort: bridge.pullCohort }));
+vi.mock("./sync/auto", () => ({ runAutoSync: bridge.runAutoSync }));
 
 async function loadNative() {
   vi.resetModules();
@@ -54,8 +52,7 @@ describe("native lifecycle", () => {
     bridge.native = true;
     bridge.handlers.clear();
     bridge.minimizeApp.mockReset();
-    bridge.drain.mockClear();
-    bridge.pullCohort.mockClear();
+    bridge.runAutoSync.mockClear();
   });
 
   afterEach(() => {
@@ -72,16 +69,15 @@ describe("native lifecycle", () => {
     expect(bridge.handlers.size).toBe(0);
   });
 
-  it("drains the queue and refreshes the cohort when the app resumes", async () => {
+  it("pushes and refreshes the cohort when the app resumes", async () => {
     const native = await loadNative();
     await native.registerNativeLifecycle();
 
     bridge.handlers.get("appStateChange")?.({ isActive: false });
-    expect(bridge.drain).not.toHaveBeenCalled();
+    expect(bridge.runAutoSync).not.toHaveBeenCalled();
 
     bridge.handlers.get("appStateChange")?.({ isActive: true });
-    expect(bridge.drain).toHaveBeenCalledTimes(1);
-    expect(bridge.pullCohort).toHaveBeenCalledTimes(1);
+    expect(bridge.runAutoSync).toHaveBeenCalledTimes(1);
   });
 
   it("syncs when the phone regains a connection", async () => {
@@ -89,10 +85,10 @@ describe("native lifecycle", () => {
     await native.registerNativeLifecycle();
 
     bridge.handlers.get("networkStatusChange")?.({ connected: false });
-    expect(bridge.drain).not.toHaveBeenCalled();
+    expect(bridge.runAutoSync).not.toHaveBeenCalled();
 
     bridge.handlers.get("networkStatusChange")?.({ connected: true });
-    expect(bridge.drain).toHaveBeenCalledTimes(1);
+    expect(bridge.runAutoSync).toHaveBeenCalledTimes(1);
   });
 
   it("registers the bridge only once", async () => {

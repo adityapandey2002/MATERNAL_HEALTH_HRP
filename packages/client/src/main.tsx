@@ -6,6 +6,7 @@ import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { isNativeApp, registerNativeLifecycle } from "./lib/native";
 import { getCachedSession } from "./lib/session-cache";
+import { startAutoSync } from "./lib/sync/auto";
 import { registerSW } from "./utils/sw";
 import "./styles/index.css";
 
@@ -32,6 +33,10 @@ if ("serviceWorker" in navigator && !isNativeApp()) {
 }
 
 void registerNativeLifecycle();
+
+// One automatic sync path for the web and the APK: reconnect, app resume and a
+// slow retry tick all push the queue and refresh the cohort without a tap.
+startAutoSync();
 
 // A field device must not lose unsynced records to cache eviction.
 if (navigator.storage?.persist) {

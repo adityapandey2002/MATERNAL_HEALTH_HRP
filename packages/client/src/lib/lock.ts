@@ -13,6 +13,18 @@
  *
  * Ten consecutive wrong PINs wipe the device. The app also locks after three
  * minutes in the background.
+ *
+ * ---------------------------------------------------------------------------
+ * Pilot build: the PIN is currently switched off
+ * ---------------------------------------------------------------------------
+ * The block/district pilot asked for no lock screen on the shared phones, so a
+ * device without a PIN keeps its data key in app-private storage and loads it
+ * at startup (`unlockWithDeviceKey`). Field names stay encrypted at rest, but
+ * there is no user secret in front of the key: this is a deliberate, temporary
+ * pilot posture, not the Phase 5A design. A device that still has a PIN is
+ * asked for it once, then `removePin()` drops the PIN and keeps the same data
+ * key, so records already written stay readable. Re-enable the PIN gate before
+ * any real patient data lands on a device.
  */
 
 import { getDataKey, setDataKey } from "./crypto";
@@ -27,6 +39,8 @@ const SALT_KEY = "hrp-pin-salt";
 const VERIFY_KEY = "hrp-pin-verify";
 const ATTEMPTS_KEY = "hrp-pin-attempts";
 const DEK_KEY = "hrp-dek-wrapped";
+/** Device-held data key, used while the PIN is switched off for the pilot. */
+const DEVICE_KEY = "hrp-dek-device";
 
 let locked = true;
 let lastHiddenAt = 0;
@@ -166,6 +180,64 @@ export function isLocked(): boolean {
   return isPinSet() && locked;
 }
 
+/**
+ * Load the device-held data key, creating one on first run.
+ *
+ * Used while the PIN is switched off for the pilot. The key still encrypts
+ * identifiers in IndexedDB; it just is not gated behind a user secret.
+ */
+export async function unlockWithDeviceKey(): Promise<CryptoKey> {
+  let raw: Uint8Array;
+  try {
+    const stored = localStorage.getItem(DEVICE_KEY);
+    raw = stored ? fromBase64(stored) : crypto.getRandomValues(new Uint8Array(32));
+    if (!stored) localStorage.setItem(DEVICE_KEY, toBase64(raw));
+  } catch {
+    // Storage unavailable: keep this session working with an ephemeral key
+    // rather than refusing to open the app.
+    raw = crypto.getRandomValues(new Uint8Array(32));
+  }
+  const key = await importDataKey(raw);
+  setDataKey(key);
+  locked = false;
+  notify();
+  return key;
+}
+
+/** True when this device already holds its key without a PIN. */
+export function hasDeviceKey(): boolean {
+  try {
+    return localStorage.getItem(DEVICE_KEY) !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Drop the PIN but keep the data key.
+ *
+ * Called once the user has verified the existing PIN (or when the session is
+ * already unlocked), so records written under the old key stay readable.
+ */
+export async function removePin(): Promise<void> {
+  const current = getDataKey();
+  if (!current) throw new Error("Unlock the device before removing the PIN");
+
+  const raw = new Uint8Array(await crypto.subtle.exportKey("raw", current));
+  try {
+    localStorage.setItem(DEVICE_KEY, toBase64(raw));
+    localStorage.removeItem(SALT_KEY);
+    localStorage.removeItem(VERIFY_KEY);
+    localStorage.removeItem(ATTEMPTS_KEY);
+    localStorage.removeItem(DEK_KEY);
+  } catch {
+    throw new Error("Could not update the device key");
+  }
+
+  locked = false;
+  notify();
+}
+
 export function getDerivedKey(): CryptoKey | null {
   return getDataKey();
 }
@@ -281,8 +353,12 @@ export async function changePin(oldPin: string, newPin: string): Promise<boolean
 
 /**
  * Lock the device. Clears the data key from memory.
+ *
+ * With the PIN switched off for the pilot there is no way to derive the key
+ * again, so this is a no-op instead of a one-way trip into an empty app.
  */
 export function lock(): void {
+  if (!isPinSet()) return;
   setDataKey(null);
   locked = true;
   notify();
@@ -324,6 +400,10 @@ export async function wipeDevice(): Promise<void> {
   setDataKey(null);
   locked = true;
   notify();
+
+  // localStorage.clear() also removed the device-held key. Without a PIN the
+  // app would have no key at all, so replace it for the next session.
+  if (!isPinSet()) await unlockWithDeviceKey();
 }
 
 /**
@@ -334,6 +414,8 @@ export function registerAutoLock(): void {
   registered = true;
 
   document.addEventListener("visibilitychange", () => {
+    // Pilot build: no PIN means no lock state to restore.
+    if (!isPinSet()) return;
     if (document.visibilityState === "hidden") {
       lastHiddenAt = Date.now();
     } else if (document.visibilityState === "visible") {

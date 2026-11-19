@@ -9,9 +9,11 @@ vi.mock("../lib/lock", () => ({
   registerAutoLock: vi.fn(),
   verifyPin: vi.fn(),
   getFailedAttempts: vi.fn(() => 0),
+  unlockWithDeviceKey: vi.fn(async () => {}),
+  removePin: vi.fn(async () => {}),
 }));
 
-import { isLocked, isPinSet, verifyPin } from "../lib/lock";
+import { isLocked, isPinSet, removePin, unlockWithDeviceKey, verifyPin } from "../lib/lock";
 
 describe("LockGate", () => {
   beforeEach(() => {
@@ -19,6 +21,8 @@ describe("LockGate", () => {
     vi.mocked(isPinSet).mockReturnValue(false);
     vi.mocked(isLocked).mockReturnValue(false);
     vi.mocked(verifyPin).mockResolvedValue(true);
+    vi.mocked(unlockWithDeviceKey).mockResolvedValue(undefined as never);
+    vi.mocked(removePin).mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -36,7 +40,7 @@ describe("LockGate", () => {
     expect(screen.queryByText("Create your PIN")).not.toBeInTheDocument();
   });
 
-  it("forces PIN setup in a pilot build", () => {
+  it("loads a device key and renders straight away in a pilot build", async () => {
     vi.stubEnv("VITE_DEMO_MODE", "false");
 
     render(
@@ -45,11 +49,13 @@ describe("LockGate", () => {
       </LockGate>
     );
 
-    expect(screen.getByText("Create your PIN")).toBeInTheDocument();
-    expect(screen.queryByText("Field home")).not.toBeInTheDocument();
+    expect(await screen.findByText("Field home")).toBeInTheDocument();
+    expect(unlockWithDeviceKey).toHaveBeenCalled();
+    expect(screen.queryByText("Create your PIN")).not.toBeInTheDocument();
   });
 
-  it("covers the app while locked and opens after the PIN verifies", async () => {
+  it("asks for the old PIN once on a device that still has one, then drops it", async () => {
+    vi.stubEnv("VITE_DEMO_MODE", "false");
     vi.mocked(isPinSet).mockReturnValue(true);
     vi.mocked(isLocked).mockReturnValue(true);
 
@@ -68,5 +74,6 @@ describe("LockGate", () => {
 
     expect(await screen.findByText("Field home")).toBeInTheDocument();
     expect(verifyPin).toHaveBeenCalledWith("123456");
+    expect(removePin).toHaveBeenCalled();
   });
 });

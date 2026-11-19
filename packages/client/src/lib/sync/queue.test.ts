@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   remove: vi.fn(),
   markFailed: vi.fn(),
+  nextAttemptAt: vi.fn(),
   pendingCount: vi.fn(),
   conflictCount: vi.fn(),
   conflictAdd: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock("../db/repositories", () => ({
     list: mocks.list,
     remove: mocks.remove,
     markFailed: mocks.markFailed,
+    nextAttemptAt: mocks.nextAttemptAt,
     count: mocks.pendingCount,
   },
   conflictRepo: { count: mocks.conflictCount, add: mocks.conflictAdd },
@@ -53,6 +55,7 @@ const pendingPatient = {
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.list.mockResolvedValue([pendingPatient]);
+  mocks.nextAttemptAt.mockResolvedValue(null);
   mocks.pendingCount.mockResolvedValue(0);
   mocks.conflictCount.mockResolvedValue(0);
   mocks.metaGet.mockResolvedValue(null);

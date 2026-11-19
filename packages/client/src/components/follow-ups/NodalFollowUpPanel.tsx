@@ -21,6 +21,7 @@ import {
   summariseFollowUps,
 } from "../../lib/hrp";
 import { useIsDistrictRole } from "../../lib/session";
+import { getCachedSession } from "../../lib/session-cache";
 import { EmptyState } from "../ui/EmptyState";
 import { SearchIcon } from "../ui/Icons";
 import { PageHeader } from "../ui/PageHeader";
@@ -106,7 +107,42 @@ export default function NodalFollowUpPanel() {
   const statusMutation = useMutation({
     mutationFn: ({ followUpId, status }: UpdateStatusVariables) =>
       api.hrp.followUps.update(followUpId, { status }),
-    onSuccess: () => {
+    onMutate: async ({ followUpId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["hrp", "follow-ups", "nodal-panel"] });
+      const previous = queryClient.getQueryData(["hrp", "follow-ups", "nodal-panel"]);
+      const me = getCachedSession()?.user ?? null;
+      const now = new Date().toISOString();
+      queryClient.setQueryData(["hrp", "follow-ups", "nodal-panel"], (old: unknown) => {
+        if (!old || typeof old !== "object") return old;
+        const previousData = (old as { data?: unknown[] }).data;
+        if (!Array.isArray(previousData)) return old;
+        return {
+          ...old,
+          data: previousData.map((row) => {
+            if (!row || typeof row !== "object" || (row as { id?: unknown }).id !== followUpId) {
+              return row;
+            }
+            const record = row as Record<string, unknown>;
+            return {
+              ...record,
+              status,
+              completedAt: status === "COMPLETE" ? now : null,
+              completedByUserId: status === "COMPLETE" ? (me?.id ?? null) : null,
+              completedByName: status === "COMPLETE" ? (me?.name ?? null) : null,
+              completedByRole: status === "COMPLETE" ? (me?.role ?? null) : null,
+              updatedAt: now,
+            };
+          }),
+        };
+      });
+      return { previous };
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(["hrp", "follow-ups", "nodal-panel"], context.previous);
+      }
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["hrp", "follow-ups"] });
       queryClient.invalidateQueries({ queryKey: ["patients"] });
     },
@@ -278,6 +314,13 @@ export default function NodalFollowUpPanel() {
                     </p>
                   ) : null}
                   <p className="mt-2 text-2xs text-ink-subtle">{attributionLabel(row)}</p>
+                  {row.lastCompletedAt && row.status !== "COMPLETE" ? (
+                    <p className="mt-1 text-2xs font-medium text-triage-green">
+                      Completed {format(row.lastCompletedAt, "d MMM")}
+                      {row.lastCompletedByName ? ` by ${row.lastCompletedByName}` : ""} · next due{" "}
+                      {format(row.scheduledDate, "d MMM")}
+                    </p>
+                  ) : null}
                   <div className="mt-2 flex items-center gap-2">
                     <label className="flex-1">
                       <span className="sr-only">Status for {row.patientName}</span>
@@ -339,7 +382,14 @@ export default function NodalFollowUpPanel() {
                         <td className="text-ink-muted">{row.blockName ?? "—"}</td>
                       ) : null}
                       <td className="text-ink-muted">{getHrpTrackLabel(row.track)}</td>
-                      <td className="max-w-64 text-2xs text-ink-muted">{attributionLabel(row)}</td>
+                      <td className="max-w-64 text-2xs text-ink-muted">
+                        {attributionLabel(row)}
+                        {row.lastCompletedAt && row.status !== "COMPLETE" ? (
+                          <span className="ml-1 font-medium text-triage-green">
+                            · completed {format(row.lastCompletedAt, "d MMM")}
+                          </span>
+                        ) : null}
+                      </td>
                       <td className="tnum whitespace-nowrap text-ink-muted">
                         {format(row.scheduledDate, "d MMM yyyy")}
                         {isEscalated(row) ? (

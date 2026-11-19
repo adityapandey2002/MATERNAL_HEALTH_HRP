@@ -208,6 +208,15 @@ export const opRepo = {
   async count(): Promise<number> {
     return db.pendingOps.count();
   },
+  /** When the earliest backed-off op may run again, or null when none wait. */
+  async nextAttemptAt(): Promise<number | null> {
+    const rows = await db.pendingOps.toArray();
+    if (rows.length === 0) return null;
+    return rows.reduce(
+      (earliest, row) => Math.min(earliest, row.nextAttemptAt ?? 0),
+      Number.POSITIVE_INFINITY
+    );
+  },
 };
 
 export const conflictRepo = {

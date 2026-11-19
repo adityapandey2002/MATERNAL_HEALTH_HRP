@@ -131,10 +131,13 @@ export async function drain(): Promise<void> {
   // Before sign-in there is nothing to authenticate with; a queued push would
   // only 401. The queue survives and syncs right after the next login.
   if (!hasAccessToken()) return;
-  // A locked pilot build has no data key: reading a queued payload would throw
-  // and writing it back would leave plaintext. Resume after unlock.
+  // A locked device has no data key: reading a queued payload would throw and
+  // writing it back would leave plaintext. Resume after unlock.
   if (!canUseLocalData()) return;
-  if (typeof navigator !== "undefined" && !navigator.onLine) return;
+  // No `navigator.onLine` gate here: the Android WebView can report the wrong
+  // value right after a phone wakes up, which used to leave a queue that only
+  // the manual Sync button could move. A dead network fails the request and
+  // lands in the backoff path below instead.
   draining = true;
   try {
     // Retry any ops whose backoff window has passed.
@@ -228,12 +231,35 @@ export async function drain(): Promise<void> {
   } finally {
     draining = false;
     await notify();
-    // If more ops remain, schedule another drain.
-    const remaining = await opRepo.count();
-    if (remaining > 0 && (typeof navigator === "undefined" || navigator.onLine)) {
-      setTimeout(() => void drain(), 100);
-    }
+    // If more ops remain, retry when the earliest one is allowed to run again.
+    void scheduleRetry();
   }
+}
+
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Schedule the next drain from the queue's own backoff clock.
+ *
+ * The old code re-armed a 100 ms timer whenever anything was still queued, so a
+ * rejected row in a five-minute backoff woke the thread four hundred times a
+ * minute for nothing. Ask the queue when the earliest op is due instead.
+ */
+async function scheduleRetry(): Promise<void> {
+  if (retryTimer !== null) return;
+  let next: number | null = null;
+  try {
+    next = await opRepo.nextAttemptAt();
+  } catch {
+    return;
+  }
+  if (next === null) return;
+
+  const delay = Math.max(1_000, Math.min(next - Date.now(), 60_000));
+  retryTimer = setTimeout(() => {
+    retryTimer = null;
+    void drain();
+  }, delay);
 }
 
 // Triggers

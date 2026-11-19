@@ -77,6 +77,10 @@ export interface FollowUpRow {
   completedByName: string | null;
   completedByRole: string | null;
   notes: string | null;
+  /** When the most recent 15-day cycle was closed, if any. */
+  lastCompletedAt: Date | null;
+  lastCompletedByName: string | null;
+  lastCompletedByRole: string | null;
 }
 
 const STATUS_ORDER: Record<HrpFollowUpStatus, number> = {
@@ -135,7 +139,19 @@ export function buildFollowUpLineList(
   const rows: FollowUpRow[] = [];
   for (const patientId of patientIds) {
     const patient = patientById.get(patientId);
-    const record = pickRecord(recordsByPatient.get(patientId) ?? []);
+    const recordsForPatient = recordsByPatient.get(patientId) ?? [];
+    const record = pickRecord(recordsForPatient);
+
+    const completedRecords = recordsForPatient.filter((r) => r.status === "COMPLETE");
+    const latestCompleted = completedRecords.reduce<FollowUpListItem | undefined>(
+      (best, candidate) => {
+        if (!best) return candidate;
+        const candidateTime = new Date(candidate.completedAt ?? candidate.updatedAt).getTime();
+        const bestTime = new Date(best.completedAt ?? best.updatedAt).getTime();
+        return candidateTime > bestTime ? candidate : best;
+      },
+      undefined
+    );
 
     const track =
       record?.track ??
@@ -170,6 +186,11 @@ export function buildFollowUpLineList(
       completedByName: record?.completedByName ?? null,
       completedByRole: record?.completedByRole ?? null,
       notes: record?.notes ?? null,
+      lastCompletedAt: latestCompleted
+        ? new Date(latestCompleted.completedAt ?? latestCompleted.updatedAt)
+        : null,
+      lastCompletedByName: latestCompleted?.completedByName ?? null,
+      lastCompletedByRole: latestCompleted?.completedByRole ?? null,
     });
   }
 

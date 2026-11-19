@@ -125,7 +125,7 @@ export default function FieldHome() {
     <div className="flex min-h-[calc(100vh-11rem)] flex-col gap-4">
       <Link
         to="/patients/new"
-        className="group flex flex-1 flex-col items-center justify-center gap-4 rounded-lg border-2 border-primary bg-primary-light px-6 py-14 text-center transition-colors hover:bg-primary/10 focus-visible:bg-primary/10"
+        className="group flex flex-1 flex-col items-center justify-center gap-4 rounded-lg bg-primary-light px-6 py-14 text-center transition-colors hover:bg-primary/10 focus-visible:bg-primary/10"
         aria-label="Add HRP case — open the registration form"
       >
         <span

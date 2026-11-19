@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { type FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { BrandMark } from "../components/ui/BrandMark";
 import { BellIcon, CheckIcon, InfoIcon, SyncIcon, UserIcon } from "../components/ui/Icons";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -8,7 +8,7 @@ import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { SegmentedControl } from "../components/ui/SegmentedControl";
 import { IS_NATIVE_APP, api } from "../lib/api";
 import { copyDiagnostics } from "../lib/diagnostics";
-import { changePin, isPinSet, wipeDevice } from "../lib/lock";
+import { wipeDevice } from "../lib/lock";
 import { initialsFor } from "../lib/nav";
 import { ROLE_LABEL } from "../lib/session";
 import { syncNow, useSyncStatus } from "../lib/sync/engine";
@@ -78,13 +78,13 @@ function describeSyncState({
     return {
       title: "Some changes need your review",
       detail:
-        "The server kept a newer version of these records. Your copy is still on this device — open the patient, check the details, and re-enter anything that is still missing.",
+        "The server kept a newer version of these records. Your copy is still on this device â€” open the patient, check the details, and re-enter anything that is still missing.",
       tone: "red",
     };
   }
   if (!online) {
     return {
-      title: "Offline — records are saved on this device",
+      title: "Offline â€” records are saved on this device",
       detail:
         pendingChanges > 0
           ? `${pluralChanges(pendingChanges)} will be sent automatically when the connection returns.`
@@ -104,105 +104,6 @@ function describeSyncState({
     detail: "No records are waiting on this device.",
     tone: "green",
   };
-}
-
-function ChangePinForm() {
-  const [oldPin, setOldPin] = useState("");
-  const [newPin, setNewPin] = useState("");
-  const [confirmPin, setConfirmPin] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
-  const [saving, setSaving] = useState(false);
-
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setMessage("");
-
-    if (newPin.length !== 6 || !/^\d+$/.test(newPin)) {
-      setError("New PIN must be exactly 6 digits.");
-      return;
-    }
-    if (newPin !== confirmPin) {
-      setError("New PINs don't match.");
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const ok = await changePin(oldPin, newPin);
-      if (ok) {
-        setMessage("PIN changed successfully.");
-        setOldPin("");
-        setNewPin("");
-        setConfirmPin("");
-      } else {
-        setError("Current PIN is incorrect.");
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to change PIN.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label htmlFor="old-pin" className="label">
-          Current PIN
-        </label>
-        <input
-          id="old-pin"
-          type="password"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={6}
-          value={oldPin}
-          onChange={(e) => setOldPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          className="input"
-          autoComplete="current-password"
-        />
-      </div>
-      <div>
-        <label htmlFor="new-pin" className="label">
-          New PIN (6 digits)
-        </label>
-        <input
-          id="new-pin"
-          type="password"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={6}
-          value={newPin}
-          onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          className="input"
-          autoComplete="new-password"
-        />
-      </div>
-      <div>
-        <label htmlFor="confirm-pin" className="label">
-          Confirm new PIN
-        </label>
-        <input
-          id="confirm-pin"
-          type="password"
-          inputMode="numeric"
-          pattern="[0-9]*"
-          maxLength={6}
-          value={confirmPin}
-          onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 6))}
-          className="input"
-          autoComplete="new-password"
-        />
-      </div>
-      {error && <p className="text-sm font-medium text-triage-red">{error}</p>}
-      {message && <p className="text-sm font-medium text-triage-green">{message}</p>}
-      <button type="submit" className="btn btn-primary btn-block" disabled={saving}>
-        {saving ? "Changing…" : "Change PIN"}
-      </button>
-    </form>
-  );
 }
 
 export default function SettingsPage() {
@@ -243,7 +144,7 @@ export default function SettingsPage() {
       lastError: sync?.lastError ?? null,
     });
     setDiagnosticsMessage(
-      "Copied. Paste it into the support ticket — no patient data is included."
+      "Copied. Paste it into the support ticket â€” no patient data is included."
     );
     // Keep the text around for environments without a clipboard API.
     try {
@@ -353,7 +254,7 @@ export default function SettingsPage() {
                       {user ? ROLE_LABEL[user.role] : "Field worker"}
                     </p>
                     <p className="mt-0.5 text-xs text-ink-subtle">
-                      Employee ID: {user?.employeeId ?? "—"}
+                      Employee ID: {user?.employeeId ?? "â€”"}
                     </p>
                   </div>
                 </div>
@@ -382,18 +283,6 @@ export default function SettingsPage() {
                     </dd>
                   </div>
                 </dl>
-              </PanelBody>
-            </Panel>
-          )}
-
-          {activeTab === "profile" && isPinSet() && (
-            <Panel>
-              <PanelHeader
-                title="Device PIN"
-                description="Change the PIN that protects this device"
-              />
-              <PanelBody className="space-y-4">
-                <ChangePinForm />
               </PanelBody>
             </Panel>
           )}
@@ -461,7 +350,7 @@ export default function SettingsPage() {
                         aria-hidden="true"
                         className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"
                       />
-                      Sending…
+                      Sendingâ€¦
                     </>
                   ) : (
                     <>
@@ -529,7 +418,7 @@ export default function SettingsPage() {
                   <div>
                     <h2 className="text-sm font-semibold text-ink">Matru Suraksha</h2>
                     <p className="text-xs text-ink-subtle">
-                      High-risk pregnancy care · Araria · Version {APP_VERSION}
+                      High-risk pregnancy care Â· Araria Â· Version {APP_VERSION}
                     </p>
                   </div>
                 </div>
