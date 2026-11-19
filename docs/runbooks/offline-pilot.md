@@ -86,6 +86,40 @@ until someone redeploys:
 Phones pick the new APK up through the in-app update banner, which reads the
 same endpoint, so redeploy the server **before** sharing a new APK.
 
+### If the database console won't load
+
+"Error connecting to database: Failed to fetch" in the Neon (or Render) console
+is that page failing to reach its **own** API from your browser. It does not
+mean the database is down: the app talks to Postgres through the API, never from
+the browser. Check the app first, and use the read-only inspector to see the
+data directly:
+
+```bash
+DATABASE_URL='postgresql://...' npm run db:inspect
+DATABASE_URL='postgresql://...' npm run db:inspect -- --table=users --limit=20
+DATABASE_URL='postgresql://...' npm run db:inspect -- --json
+```
+
+`DATABASE_URL` is the same value as the pilot service's environment (Render →
+`hrp-pilot-api` → Environment), or **Connect** in the Neon dashboard. The script
+opens a `READ ONLY` transaction, never prints the connection string, and masks
+names, phone numbers and free text unless `--show-pii` is passed.
+
+It prints table counts, facilities with their staff/patient counts, accounts by
+role, recent activity, and the applied migrations. Two quick verdicts:
+
+- **"All facility paths are hierarchical (migration 009 applied)"** — the
+  BHM/DHS visibility fix is live.
+- **"N facilities still have a flat path"** — the deploy ran an old image; the
+  fix is not live yet.
+
+If the script also fails, the hint names the cause: `ENOTFOUND` and `EAI_AGAIN`
+are DNS/VPN problems, `ECONNREFUSED`/`ETIMEDOUT` are a stopped or shielded
+server, `57P03` means the Neon project is suspended and needs one request to
+wake up, and `28P01` is a stale password. Retry the console on another network
+(mobile hotspot, no VPN), and in a private window with extensions disabled —
+the failure is almost always between the browser and the provider.
+
 ## 3. First login (must be online)
 
 1. Connect to the network.

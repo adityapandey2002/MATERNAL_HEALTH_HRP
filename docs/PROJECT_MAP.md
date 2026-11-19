@@ -25,7 +25,7 @@ Hierarchical index for agents and contributors. Load only the section you need.
 - `src/config.ts` — typed env config (secrets, CORS, JWT, cookie).
 - `src/authz/` — policy (`assertCan`) and facility scope.
 - `src/db/` — Kysely client, migration runner, types, seed.
-- `src/migrations/` — numbered SQL migrations (001–007).
+- `migrations/` — numbered SQL migrations (001–009).
 - `src/routes/` — `auth`, `patients`, `visits`, `follow-ups`, `referrals`, `sync`, `hrp`, `nodal`, `supervision`, `staff`, `facilities`.
 - `src/services/` — `risk.ts`, `hrp-follow-up.ts` (15-day cycle ownership).
 - `src/lib/` — mappers, serializers, validators, static-client (SPA fallback).
