@@ -1,0 +1,31 @@
+name: Keep pilot awake
+
+# Render's free web tier sleeps after ~15 minutes of inactivity, which makes the
+# field app's first request of the day wait 30-60 seconds for a cold start and
+# silently breaks the in-app update check. Pinging the health endpoint every
+# five minutes keeps the container (and the Neon database behind /ready) warm
+# without spending a paid plan.
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Ping pilot health
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Hit /ready
+        env:
+          API_URL: ${{ vars.PILOT_API_URL }}
+        run: |
+          set -eu
+          base="${API_URL%/api}"
+          echo "Pinging ${base}/ready"
+          # /ready runs a database query, so it keeps Neon warm as well as Render.
+          curl --fail --silent --show-error --max-time 30 "${base}/ready" | head -c 200
+          echo

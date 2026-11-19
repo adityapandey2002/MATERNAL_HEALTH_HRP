@@ -47,13 +47,33 @@ export function UpdatePrompt() {
     if (!IS_NATIVE_APP) return onUpdateReady(() => setSwReady(true));
 
     let cancelled = false;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let attempts = 0;
+
+    const clearRetry = () => {
+      if (retryTimer) {
+        clearTimeout(retryTimer);
+        retryTimer = null;
+      }
+    };
 
     const check = () => {
       void checkForUpdate().then((info) => {
-        // Without a download URL the banner is a dead end; stay quiet.
-        if (cancelled || !info?.downloadUrl) return;
-        if (dismissedVersion() === info.version) return;
-        setAppUpdate(info);
+        if (cancelled) return;
+        if (info?.downloadUrl && dismissedVersion() !== info.version) {
+          setAppUpdate(info);
+          attempts = 0;
+          return;
+        }
+        // No answer yet (server asleep, no network, or no newer release).
+        // Retry a few times with backoff so a phone that opened while Render
+        // was cold still learns about the update once it wakes up.
+        if (attempts < 5) {
+          attempts += 1;
+          const delay = Math.min(30_000 * attempts, 120_000);
+          clearRetry();
+          retryTimer = setTimeout(check, delay);
+        }
       });
     };
 
@@ -62,12 +82,16 @@ export function UpdatePrompt() {
     // Phones stay open for days in the field; checking only on mount means an
     // ANM who never closes the app never learns about a release.
     const onVisible = () => {
-      if (document.visibilityState === "visible") check();
+      if (document.visibilityState === "visible") {
+        attempts = 0;
+        check();
+      }
     };
     document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       cancelled = true;
+      clearRetry();
       document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
