@@ -1,4 +1,6 @@
 import {
+  ANEMIA_GRADE_BADGE,
+  ANEMIA_GRADE_LABEL,
   HRP_FOLLOW_UP_STATUSES,
   type HrpFollowUpStatus,
   type HrpFollowUpTrack,
@@ -6,6 +8,8 @@ import {
   getHrpStatusBadge,
   getHrpStatusLabel,
   getHrpTrackLabel,
+  getPatientDisplayId,
+  isFcmIndicated,
 } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -35,6 +39,7 @@ type StageFilter = HrpFollowUpTrack | "ALL";
 interface UpdateStatusVariables {
   followUpId: string;
   status: HrpFollowUpStatus;
+  fcmAdministered?: boolean;
 }
 
 /**
@@ -105,9 +110,9 @@ export default function NodalFollowUpPanel() {
   const loading = recordsLoading || patientsLoading;
 
   const statusMutation = useMutation({
-    mutationFn: ({ followUpId, status }: UpdateStatusVariables) =>
-      api.hrp.followUps.update(followUpId, { status }),
-    onMutate: async ({ followUpId, status }) => {
+    mutationFn: ({ followUpId, status, fcmAdministered }: UpdateStatusVariables) =>
+      api.hrp.followUps.update(followUpId, { status, fcmAdministered }),
+    onMutate: async ({ followUpId, status, fcmAdministered }) => {
       await queryClient.cancelQueries({ queryKey: ["hrp", "follow-ups", "nodal-panel"] });
       const previous = queryClient.getQueryData(["hrp", "follow-ups", "nodal-panel"]);
       const me = getCachedSession()?.user ?? null;
@@ -126,6 +131,7 @@ export default function NodalFollowUpPanel() {
             return {
               ...record,
               status,
+              ...(fcmAdministered !== undefined ? { fcmAdministered } : {}),
               completedAt: status === "COMPLETE" ? now : null,
               completedByUserId: status === "COMPLETE" ? (me?.id ?? null) : null,
               completedByName: status === "COMPLETE" ? (me?.name ?? null) : null,
@@ -151,6 +157,15 @@ export default function NodalFollowUpPanel() {
   const setStatus = (row: FollowUpRow, status: HrpFollowUpStatus) => {
     if (!row.followUpId) return;
     statusMutation.mutate({ followUpId: row.followUpId, status });
+  };
+
+  const toggleFcm = (row: FollowUpRow, fcmAdministered: boolean) => {
+    if (!row.followUpId) return;
+    statusMutation.mutate({
+      followUpId: row.followUpId,
+      status: row.status,
+      fcmAdministered,
+    });
   };
 
   return (
@@ -284,70 +299,14 @@ export default function NodalFollowUpPanel() {
           <>
             <ul className="divide-y divide-line-soft xl:hidden">
               {visible.map((row) => (
-                <li key={row.key} className="px-4 py-3 sm:px-5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <Link
-                        to={`/patients/${row.patientId}`}
-                        className="block truncate text-sm font-semibold text-ink hover:text-primary hover:underline"
-                      >
-                        {row.patientName}
-                      </Link>
-                      <p className="tnum mt-0.5 text-2xs text-ink-subtle">
-                        {row.age} yrs · {row.village ?? "Village not recorded"}
-                        {showBlockColumn && row.blockName ? ` · ${row.blockName}` : ""}
-                      </p>
-                      <p className="mt-0.5 text-2xs text-ink-muted">
-                        {getHrpTrackLabel(row.track)} · due {formatShortDate(row.scheduledDate)}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      <span className={`badge ${getHrpStatusBadge(row.status)}`}>
-                        {getHrpStatusLabel(row.status)}
-                      </span>
-                      {isEscalated(row) ? <span className="badge badge-red">Escalated</span> : null}
-                    </div>
-                  </div>
-                  {row.complication ? (
-                    <p className="mt-1 text-2xs font-medium text-triage-red">
-                      {getHrpComplicationLabel(row.complication)}
-                    </p>
-                  ) : null}
-                  <p className="mt-2 text-2xs text-ink-subtle">{attributionLabel(row)}</p>
-                  {row.lastCompletedAt && row.status !== "COMPLETE" ? (
-                    <p className="mt-1 text-2xs font-medium text-triage-green">
-                      Completed {format(row.lastCompletedAt, "d MMM")}
-                      {row.lastCompletedByName ? ` by ${row.lastCompletedByName}` : ""} · next due{" "}
-                      {format(row.scheduledDate, "d MMM")}
-                    </p>
-                  ) : null}
-                  <div className="mt-2 flex items-center gap-2">
-                    <label className="flex-1">
-                      <span className="sr-only">Status for {row.patientName}</span>
-                      <select
-                        className="input min-h-control py-1.5"
-                        value={row.status}
-                        disabled={!row.followUpId || statusMutation.isPending}
-                        onChange={(event) =>
-                          setStatus(row, event.target.value as HrpFollowUpStatus)
-                        }
-                      >
-                        {HRP_FOLLOW_UP_STATUSES.map((status) => (
-                          <option key={status.value} value={status.value}>
-                            {status.label}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <Link
-                      to={`/patients/${row.patientId}`}
-                      className="btn btn-secondary btn-sm"
-                      aria-label={`Open record for ${row.patientName}`}
-                    >
-                      Open
-                    </Link>
-                  </div>
-                </li>
+                <NodalMobileCard
+                  key={row.key}
+                  row={row}
+                  showBlockColumn={showBlockColumn}
+                  isPending={statusMutation.isPending}
+                  onSetStatus={setStatus}
+                  onToggleFcm={toggleFcm}
+                />
               ))}
             </ul>
 
@@ -367,56 +326,14 @@ export default function NodalFollowUpPanel() {
                 </thead>
                 <tbody>
                   {visible.map((row) => (
-                    <tr key={row.key}>
-                      <td>
-                        <Link
-                          to={`/patients/${row.patientId}`}
-                          className="font-medium text-ink hover:text-primary hover:underline"
-                        >
-                          {row.patientName}
-                        </Link>
-                        <p className="tnum text-2xs text-ink-subtle">{row.age} yrs</p>
-                      </td>
-                      <td className="text-ink-muted">{row.village ?? "—"}</td>
-                      {showBlockColumn ? (
-                        <td className="text-ink-muted">{row.blockName ?? "—"}</td>
-                      ) : null}
-                      <td className="text-ink-muted">{getHrpTrackLabel(row.track)}</td>
-                      <td className="max-w-64 text-2xs text-ink-muted">
-                        {attributionLabel(row)}
-                        {row.lastCompletedAt && row.status !== "COMPLETE" ? (
-                          <span className="ml-1 font-medium text-triage-green">
-                            · completed {format(row.lastCompletedAt, "d MMM")}
-                          </span>
-                        ) : null}
-                      </td>
-                      <td className="tnum whitespace-nowrap text-ink-muted">
-                        {format(row.scheduledDate, "d MMM yyyy")}
-                        {isEscalated(row) ? (
-                          <span className="badge badge-red ml-2">Escalated</span>
-                        ) : null}
-                      </td>
-                      <td className="tnum whitespace-nowrap text-2xs text-ink-subtle">
-                        {row.lastAttemptAt ? format(row.lastAttemptAt, "d MMM, HH:mm") : "—"}
-                      </td>
-                      <td>
-                        <select
-                          className="input min-h-control w-auto py-1.5"
-                          aria-label={`Follow-up status for ${row.patientName}`}
-                          value={row.status}
-                          disabled={!row.followUpId || statusMutation.isPending}
-                          onChange={(event) =>
-                            setStatus(row, event.target.value as HrpFollowUpStatus)
-                          }
-                        >
-                          {HRP_FOLLOW_UP_STATUSES.map((status) => (
-                            <option key={status.value} value={status.value}>
-                              {status.label}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
+                    <NodalDesktopRow
+                      key={row.key}
+                      row={row}
+                      showBlockColumn={showBlockColumn}
+                      isPending={statusMutation.isPending}
+                      onSetStatus={setStatus}
+                      onToggleFcm={toggleFcm}
+                    />
                   ))}
                 </tbody>
               </table>
@@ -425,5 +342,200 @@ export default function NodalFollowUpPanel() {
         )}
       </Panel>
     </div>
+  );
+}
+
+function NodalMobileCard({
+  row,
+  showBlockColumn,
+  isPending,
+  onSetStatus,
+  onToggleFcm,
+}: {
+  row: FollowUpRow;
+  showBlockColumn: boolean;
+  isPending: boolean;
+  onSetStatus: (row: FollowUpRow, status: HrpFollowUpStatus) => void;
+  onToggleFcm: (row: FollowUpRow, fcm: boolean) => void;
+}) {
+  return (
+    <li className="px-4 py-3 sm:px-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <Link
+              to={`/patients/${row.patientId}`}
+              className="block truncate text-sm font-semibold text-ink hover:text-primary hover:underline"
+            >
+              {row.patientName}
+            </Link>
+            <span className="badge badge-gray font-mono text-2xs">
+              {getPatientDisplayId(row.patientId)}
+            </span>
+          </div>
+          <p className="tnum mt-0.5 text-2xs text-ink-subtle">
+            {row.age} yrs · {row.village ?? "Village not recorded"}
+            {showBlockColumn && row.blockName ? ` · ${row.blockName}` : ""}
+          </p>
+          <p className="mt-0.5 text-2xs text-ink-muted">
+            {getHrpTrackLabel(row.track)} · due {formatShortDate(row.scheduledDate)}
+          </p>
+        </div>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <span className={`badge ${getHrpStatusBadge(row.status)}`}>
+            {getHrpStatusLabel(row.status)}
+          </span>
+          {isEscalated(row) ? <span className="badge badge-red">Escalated</span> : null}
+        </div>
+      </div>
+      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+        {row.complication ? (
+          <span className="text-2xs font-medium text-triage-red">
+            {getHrpComplicationLabel(row.complication)}
+          </span>
+        ) : null}
+        {row.anemiaGrade ? (
+          <span className={`badge ${ANEMIA_GRADE_BADGE[row.anemiaGrade]} text-2xs`}>
+            {ANEMIA_GRADE_LABEL[row.anemiaGrade]}
+          </span>
+        ) : null}
+      </div>
+      {isFcmIndicated(row.anemiaGrade) && (
+        <div className="mt-2 flex items-center justify-between rounded border border-primary-ring bg-primary-light px-3 py-1.5">
+          <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-ink">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-line text-primary focus:ring-primary-ring"
+              checked={row.fcmAdministered === true}
+              disabled={!row.followUpId || isPending}
+              onChange={(e) => onToggleFcm(row, e.target.checked)}
+            />
+            <span>FCM Administered</span>
+          </label>
+          {row.fcmAdministered ? (
+            <span className="badge badge-green text-2xs">Administered</span>
+          ) : (
+            <span className="badge badge-amber text-2xs">Required</span>
+          )}
+        </div>
+      )}
+      <p className="mt-2 text-2xs text-ink-subtle">{attributionLabel(row)}</p>
+      {row.lastCompletedAt && row.status !== "COMPLETE" ? (
+        <p className="mt-1 text-2xs font-medium text-triage-green">
+          Completed {format(row.lastCompletedAt, "d MMM")}
+          {row.lastCompletedByName ? ` by ${row.lastCompletedByName}` : ""} · next due{" "}
+          {format(row.scheduledDate, "d MMM")}
+        </p>
+      ) : null}
+      <div className="mt-2 flex items-center gap-2">
+        <label className="flex-1">
+          <span className="sr-only">Status for {row.patientName}</span>
+          <select
+            className="input min-h-control py-1.5"
+            value={row.status}
+            disabled={!row.followUpId || isPending}
+            onChange={(event) => onSetStatus(row, event.target.value as HrpFollowUpStatus)}
+          >
+            {HRP_FOLLOW_UP_STATUSES.map((status) => (
+              <option key={status.value} value={status.value}>
+                {status.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Link
+          to={`/patients/${row.patientId}`}
+          className="btn btn-secondary btn-sm"
+          aria-label={`Open record for ${row.patientName}`}
+        >
+          Open
+        </Link>
+      </div>
+    </li>
+  );
+}
+
+function NodalDesktopRow({
+  row,
+  showBlockColumn,
+  isPending,
+  onSetStatus,
+  onToggleFcm,
+}: {
+  row: FollowUpRow;
+  showBlockColumn: boolean;
+  isPending: boolean;
+  onSetStatus: (row: FollowUpRow, status: HrpFollowUpStatus) => void;
+  onToggleFcm: (row: FollowUpRow, fcm: boolean) => void;
+}) {
+  return (
+    <tr>
+      <td>
+        <div className="flex items-center gap-1.5">
+          <Link
+            to={`/patients/${row.patientId}`}
+            className="font-medium text-ink hover:text-primary hover:underline"
+          >
+            {row.patientName}
+          </Link>
+          <span className="badge badge-gray font-mono text-2xs">
+            {getPatientDisplayId(row.patientId)}
+          </span>
+        </div>
+        <p className="tnum text-2xs text-ink-subtle">{row.age} yrs</p>
+        {row.anemiaGrade && (
+          <span className={`badge ${ANEMIA_GRADE_BADGE[row.anemiaGrade]} mt-1 text-2xs`}>
+            {ANEMIA_GRADE_LABEL[row.anemiaGrade]}
+          </span>
+        )}
+      </td>
+      <td className="text-ink-muted">{row.village ?? "—"}</td>
+      {showBlockColumn ? <td className="text-ink-muted">{row.blockName ?? "—"}</td> : null}
+      <td className="text-ink-muted">{getHrpTrackLabel(row.track)}</td>
+      <td className="max-w-64 text-2xs text-ink-muted">
+        {attributionLabel(row)}
+        {row.lastCompletedAt && row.status !== "COMPLETE" ? (
+          <span className="ml-1 font-medium text-triage-green">
+            · completed {format(row.lastCompletedAt, "d MMM")}
+          </span>
+        ) : null}
+      </td>
+      <td className="tnum whitespace-nowrap text-ink-muted">
+        {format(row.scheduledDate, "d MMM yyyy")}
+        {isEscalated(row) ? <span className="badge badge-red ml-2">Escalated</span> : null}
+      </td>
+      <td className="tnum whitespace-nowrap text-2xs text-ink-subtle">
+        {row.lastAttemptAt ? format(row.lastAttemptAt, "d MMM, HH:mm") : "—"}
+      </td>
+      <td>
+        <div className="space-y-1.5">
+          <select
+            className="input min-h-control w-auto py-1.5"
+            aria-label={`Follow-up status for ${row.patientName}`}
+            value={row.status}
+            disabled={!row.followUpId || isPending}
+            onChange={(event) => onSetStatus(row, event.target.value as HrpFollowUpStatus)}
+          >
+            {HRP_FOLLOW_UP_STATUSES.map((status) => (
+              <option key={status.value} value={status.value}>
+                {status.label}
+              </option>
+            ))}
+          </select>
+          {isFcmIndicated(row.anemiaGrade) && (
+            <label className="flex items-center gap-1.5 cursor-pointer text-2xs font-medium text-ink bg-primary-light border border-primary-ring rounded px-2 py-0.5">
+              <input
+                type="checkbox"
+                className="h-3.5 w-3.5 rounded border-line text-primary focus:ring-primary-ring"
+                checked={row.fcmAdministered === true}
+                disabled={!row.followUpId || isPending}
+                onChange={(e) => onToggleFcm(row, e.target.checked)}
+              />
+              <span>FCM Administered</span>
+            </label>
+          )}
+        </div>
+      </td>
+    </tr>
   );
 }
