@@ -182,6 +182,8 @@ describe("AddPatientPage", () => {
       address: null,
       hrpComplication: "PIH",
       hrpReason: "HYPERTENSION",
+      registrationHb: null,
+      anemiaGrade: null,
       ashaName: null,
       ashaPhone: null,
       referred: false,
@@ -238,5 +240,86 @@ describe("AddPatientPage", () => {
     expect(await screen.findByRole("heading", { name: "Add HRP case" })).toBeInTheDocument();
     expect(screen.getByText("Refer to Sadar hospital")).toBeInTheDocument();
     expect(screen.getByText("Not needed")).toBeInTheDocument();
+  });
+
+  it("displays the generated unique patient ID on the intake form", () => {
+    render(<AddPatientPage />, { wrapper: createWrapper() });
+    expect(screen.getByText(/Unique Patient ID:/i)).toBeInTheDocument();
+    expect(screen.getByText(/MS-2026-/i)).toBeInTheDocument();
+  });
+
+  it("shows Hb input and validates anemia grade when complication is ANEMIA", () => {
+    render(<AddPatientPage />, { wrapper: createWrapper() });
+
+    expect(screen.queryByLabelText(/Haemoglobin \(Hb\)/i)).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/^Complication/), {
+      target: { value: "ANEMIA" },
+    });
+
+    const hbInput = screen.getByLabelText(/Haemoglobin \(Hb\)/i);
+    expect(hbInput).toBeInTheDocument();
+
+    fireEvent.change(hbInput, { target: { value: "6.5" } });
+    expect(screen.getByText("Severe Anemia (Hb < 7 g/dL)")).toBeInTheDocument();
+    expect(
+      screen.getByText("FCM follow-up required at block / district level")
+    ).toBeInTheDocument();
+
+    fireEvent.change(hbInput, { target: { value: "7.8" } });
+    expect(screen.getByText("Moderate Anemia (Hb 7–8.9 g/dL)")).toBeInTheDocument();
+    expect(
+      screen.getByText("FCM follow-up required at block / district level")
+    ).toBeInTheDocument();
+
+    fireEvent.change(hbInput, { target: { value: "9.5" } });
+    expect(screen.getByText("Mild Anemia (Hb 9–10.9 g/dL)")).toBeInTheDocument();
+    expect(
+      screen.queryByText("FCM follow-up required at block / district level")
+    ).not.toBeInTheDocument();
+
+    fireEvent.change(hbInput, { target: { value: "12.0" } });
+    expect(screen.getByText("Normal (Hb ≥ 11 g/dL)")).toBeInTheDocument();
+  });
+
+  it("submits registrationHb and anemiaGrade when registering an anemic patient", async () => {
+    render(<AddPatientPage />, { wrapper: createWrapper() });
+
+    fireEvent.change(screen.getByLabelText(/^Mother's full name/), {
+      target: { value: "Anjali Kumari" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Mobile number/), {
+      target: { value: "9876543210" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Age \(completed years\)/), {
+      target: { value: "22" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Village \/ HWC/), {
+      target: { value: "fac-1" },
+    });
+    fireEvent.change(screen.getByLabelText(/^LMP/), {
+      target: { value: "2026-08-01" },
+    });
+    fireEvent.change(screen.getByLabelText(/^Complication/), {
+      target: { value: "ANEMIA" },
+    });
+
+    const hbInput = screen.getByLabelText(/Haemoglobin \(Hb\)/i);
+    fireEvent.change(hbInput, { target: { value: "6.8" } });
+
+    fireEvent.click(screen.getByRole("button", { name: "Add to HRP register" }));
+
+    await vi.waitFor(async () => {
+      const all = await patientRepo.list();
+      expect(all).toHaveLength(1);
+      const saved = all[0];
+      if (!saved) {
+        throw new Error("Patient not saved in repository");
+      }
+      expect(saved.name).toBe("Anjali Kumari");
+      expect(saved.hrpComplication).toBe("ANEMIA");
+      expect(saved.registrationHb).toBe(6.8);
+      expect(saved.anemiaGrade).toBe("SEVERE");
+    });
   });
 });

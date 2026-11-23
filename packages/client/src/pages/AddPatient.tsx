@@ -1,22 +1,20 @@
 import {
+  ANEMIA_GRADE_BADGE,
+  ANEMIA_GRADE_LABEL,
   type CreatePatient,
   HRP_COMPLICATIONS,
   type HrpComplication,
+  anemiaGradeFromHb,
+  getPatientDisplayId,
   hrpReasonForComplication,
+  isFcmIndicated,
 } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FormField, Select } from "../components/ui";
-import {
-  ArrowLeftIcon,
-  CalendarIcon,
-  ClipboardIcon,
-  MapPinIcon,
-  PhoneIcon,
-  UserPlusIcon,
-} from "../components/ui/Icons";
+import { ArrowLeftIcon, CalendarIcon, UserPlusIcon } from "../components/ui/Icons";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "../components/ui/Panel";
 import { api } from "../lib/api";
@@ -36,6 +34,8 @@ interface FormState {
   lmp: string;
   complication: HrpComplication | "";
   referred: boolean;
+  /** Haemoglobin reading in g/dL — required when complication is ANEMIA */
+  hb: string;
 }
 
 const INITIAL_FORM: FormState = {
@@ -46,6 +46,7 @@ const INITIAL_FORM: FormState = {
   lmp: "",
   complication: "",
   referred: false,
+  hb: "",
 };
 
 const COMPLICATION_OPTIONS = HRP_COMPLICATIONS.map((option) => ({
@@ -59,6 +60,9 @@ export default function AddPatientPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const role = useUserRole();
+  const [patientId] = useState(() => crypto.randomUUID());
+  const displayId = getPatientDisplayId(patientId);
+
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [duplicate, setDuplicate] = useState<LocalPatient | null>(null);
@@ -81,9 +85,19 @@ export default function AddPatientPage() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [facilities]);
 
+  const isAnemiaSelected = form.complication === "ANEMIA";
+
+  // Live anemia grade badge — computed directly from the Hb input while typing.
+  const hbValue = form.hb.trim() ? Number(form.hb) : null;
+  const liveAnemiaGrade =
+    isAnemiaSelected && hbValue !== null && !Number.isNaN(hbValue)
+      ? anemiaGradeFromHb(hbValue)
+      : null;
+  const fcmWillBeIndicated = isFcmIndicated(liveAnemiaGrade);
+
   const createMutation = useMutation({
-    mutationFn: async (data: CreatePatient) => {
-      const id = crypto.randomUUID();
+    mutationFn: async (data: CreatePatient & { id?: string }) => {
+      const id = data.id || patientId;
       const cached = getCachedSession();
       let user = cached?.user;
       if (!user) {
@@ -96,6 +110,11 @@ export default function AddPatientPage() {
       const facilityId = user?.facilityId ?? "";
       const anmName = user?.name ?? null;
       const now = new Date().toISOString();
+
+      // Derive anemia grade from the Hb entered at registration.
+      const registrationHb = typeof data.registrationHb === "number" ? data.registrationHb : null;
+      const anemiaGrade = anemiaGradeFromHb(registrationHb);
+
       await patientRepo.upsert({
         id,
         abhaId: data.abhaId ?? null,
@@ -108,6 +127,8 @@ export default function AddPatientPage() {
         address: data.address ?? null,
         hrpReason: (data.hrpReason ?? null) as string | null,
         hrpComplication: (data.hrpComplication ?? null) as string | null,
+        registrationHb,
+        anemiaGrade,
         ashaName: data.ashaName ?? null,
         ashaPhone: data.ashaPhone ?? null,
         referred: data.referred,
@@ -149,6 +170,11 @@ export default function AddPatientPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
     if (field === "name") setDuplicate(null);
+    // Reset Hb when switching away from ANEMIA complication.
+    if (field === "complication" && value !== "ANEMIA") {
+      setForm((prev) => ({ ...prev, [field]: value as FormState[K], hb: "" }));
+      setErrors((prev) => ({ ...prev, hb: undefined }));
+    }
   };
 
   /**
@@ -194,6 +220,16 @@ export default function AddPatientPage() {
     else if (validLmp.getTime() > Date.now()) next.lmp = "LMP cannot be in the future";
     if (!form.complication) next.complication = "Select the HRP complication";
 
+    // Hb is required when anemia complication is selected.
+    if (form.complication === "ANEMIA") {
+      const hbNum = Number(form.hb);
+      if (!form.hb.trim() || Number.isNaN(hbNum)) {
+        next.hb = "Enter the Hb value (g/dL) from the MCP card";
+      } else if (hbNum < 1 || hbNum > 20) {
+        next.hb = "Hb must be between 1 and 20 g/dL";
+      }
+    }
+
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -203,14 +239,17 @@ export default function AddPatientPage() {
     if (!validate() || !validLmp || !form.complication) return;
 
     const villageName = villageOptions.find((option) => option.value === form.villageId)?.label;
+    const hbNum = form.hb.trim() ? Number(form.hb) : null;
 
     createMutation.mutate({
+      id: patientId,
       name: form.name.trim(),
       age: Number(form.age),
       phone: form.phone.replace(/\D/g, ""),
       address: villageName ?? null,
       hrpComplication: form.complication,
       hrpReason: hrpReasonForComplication(form.complication),
+      registrationHb: isAnemiaSelected && hbNum !== null && !Number.isNaN(hbNum) ? hbNum : null,
       isHrp: true,
       referred: form.referred,
       followUpStatus: "PENDING",
@@ -237,6 +276,12 @@ export default function AddPatientPage() {
       <PageHeader
         eyebrow="HRP intake"
         title={title}
+        description={
+          <span className="text-sm text-ink-subtle">
+            Unique Patient ID:{" "}
+            <span className="badge badge-gray font-mono font-semibold text-ink">{displayId}</span>
+          </span>
+        }
         actions={
           <Link to="/" className="btn btn-secondary">
             <ArrowLeftIcon className="h-4 w-4" />
@@ -412,6 +457,77 @@ export default function AddPatientPage() {
                 error={errors.complication}
               />
 
+              {/* ── Hb field: appears only when Anemia is selected ──────────── */}
+              {isAnemiaSelected && (
+                <div className="rounded border border-line bg-canvas p-4 space-y-3">
+                  <FormField
+                    label="Haemoglobin (Hb) — g/dL"
+                    id="patient-hb"
+                    required
+                    error={errors.hb}
+                  >
+                    <input
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      min={1}
+                      max={20}
+                      value={form.hb}
+                      onChange={(e) => {
+                        setForm((prev) => ({ ...prev, hb: e.target.value }));
+                        setErrors((prev) => ({ ...prev, hb: undefined }));
+                      }}
+                      placeholder="e.g. 7.2"
+                      aria-describedby="hb-hint"
+                    />
+                  </FormField>
+                  <p id="hb-hint" className="text-xs text-ink-subtle">
+                    Read from the MCP card or latest lab report
+                  </p>
+
+                  {/* Live anemia grade badge */}
+                  {liveAnemiaGrade && (
+                    <div className="flex flex-wrap items-center gap-2" aria-live="polite">
+                      <span className={`badge ${ANEMIA_GRADE_BADGE[liveAnemiaGrade]}`}>
+                        {ANEMIA_GRADE_LABEL[liveAnemiaGrade]}
+                      </span>
+                      {fcmWillBeIndicated && (
+                        <span className="badge badge-amber">
+                          FCM follow-up required at block / district level
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Reference table */}
+                  <div className="rounded border border-line-soft bg-surface p-3 text-xs text-ink-muted space-y-1">
+                    <p className="font-semibold text-ink">
+                      NHM Anemia Classification (Pregnant Women)
+                    </p>
+                    <p>
+                      <span className="inline-block w-32 font-medium text-triage-red">Severe</span>{" "}
+                      Hb &lt; 7 g/dL — Refer to Sadar Hospital, consider FCM / blood transfusion
+                    </p>
+                    <p>
+                      <span className="inline-block w-32 font-medium text-triage-amber">
+                        Moderate
+                      </span>{" "}
+                      Hb 7–8.9 g/dL — Block helpdesk FCM follow-up required
+                    </p>
+                    <p>
+                      <span className="inline-block w-32 font-medium text-triage-amber">Mild</span>{" "}
+                      Hb 9–10.9 g/dL — Intensify IFA, field monitoring
+                    </p>
+                    <p>
+                      <span className="inline-block w-32 font-medium text-triage-green">
+                        Normal
+                      </span>{" "}
+                      Hb ≥ 11 g/dL
+                    </p>
+                  </div>
+                </div>
+              )}
+
               <fieldset>
                 <legend className="label">Referring or not?</legend>
                 <div className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -432,7 +548,7 @@ export default function AddPatientPage() {
                     />
                     <span>
                       <span className="block text-sm font-semibold text-ink">
-                        {isBlockRole ? "Refer to Sadar hospital" : "Yes â€” Refer to CHC/FRU"}
+                        {isBlockRole ? "Refer to Sadar hospital" : "Yes — Refer to CHC/FRU"}
                       </span>
                       <span className="block text-xs text-ink-subtle">
                         {isBlockRole
@@ -459,7 +575,7 @@ export default function AddPatientPage() {
                     />
                     <span>
                       <span className="block text-sm font-semibold text-ink">
-                        {isBlockRole ? "Not needed" : "No â€” Routine Field Management"}
+                        {isBlockRole ? "Not needed" : "No — Routine Field Management"}
                       </span>
                       <span className="block text-xs text-ink-subtle">
                         {isBlockRole
@@ -482,7 +598,7 @@ export default function AddPatientPage() {
               className="btn btn-primary btn-lg"
               disabled={createMutation.isPending}
             >
-              {createMutation.isPending ? "Savingâ€¦" : "Add to HRP register"}
+              {createMutation.isPending ? "Saving…" : "Add to HRP register"}
             </button>
           </div>
         </div>
