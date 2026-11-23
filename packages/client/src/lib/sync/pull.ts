@@ -17,11 +17,20 @@ function toLocalPatient(p: Record<string, unknown>): LocalPatient {
     address: (p.address ?? null) as string | null,
     hrpReason: (p.hrpReason ?? p.hrp_reason ?? null) as string | null,
     hrpComplication: (p.hrpComplication ?? p.hrp_complication ?? null) as string | null,
+    hrpComplications: (Array.isArray(p.hrpComplications)
+      ? p.hrpComplications
+      : p.hrpComplication
+        ? [p.hrpComplication]
+        : []) as string[],
     registrationHb: (p.registrationHb ?? p.registration_hb ?? null) as number | null,
     anemiaGrade: (p.anemiaGrade ?? p.anemia_grade ?? null) as string | null,
     ashaName: (p.ashaName ?? p.asha_name ?? null) as string | null,
     ashaPhone: (p.ashaPhone ?? p.asha_phone ?? null) as string | null,
     referred: Boolean(p.referred),
+    referralFacilityType: (p.referralFacilityType ?? p.referral_facility_type ?? null) as
+      | "CHC_FRU"
+      | "DH"
+      | null,
     isHrp: Boolean(p.isHrp ?? p.is_hrp),
     followUpTrack: (p.followUpTrack ?? p.follow_up_track ?? null) as string | null,
     followUpScheduledDate: (p.followUpScheduledDate ?? p.follow_up_scheduled_date ?? null) as
@@ -82,6 +91,10 @@ function toLocalFollowUp(f: Record<string, unknown>): LocalFollowUp {
     createdAt: String(f.createdAt ?? f.created_at),
     updatedAt: String(f.updatedAt ?? f.updated_at),
     fcmAdministered: (f.fcmAdministered ?? f.fcm_administered ?? null) as boolean | null,
+    referralFacilityType: (f.referralFacilityType ?? f.referral_facility_type ?? null) as
+      | "CHC_FRU"
+      | "DH"
+      | null,
     syncStatus: "synced",
   };
 }

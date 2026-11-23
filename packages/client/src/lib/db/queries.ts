@@ -130,10 +130,17 @@ export function toFollowUpListItem(
     patientPhone: patient?.phone ?? null,
     patientRiskLevel: (patient?.riskLevel ?? "GREEN") as FollowUpListItem["patientRiskLevel"],
     hrpComplication: (patient?.hrpComplication ?? null) as FollowUpListItem["hrpComplication"],
+    hrpComplications: (patient?.hrpComplications ??
+      (patient?.hrpComplication
+        ? [patient.hrpComplication]
+        : [])) as FollowUpListItem["hrpComplications"],
     registrationHb: patient?.registrationHb ?? null,
     anemiaGrade: (patient?.anemiaGrade ?? null) as FollowUpListItem["anemiaGrade"],
     village: patient?.address ?? null,
     blockName: null,
+    referralFacilityType: (patient?.referralFacilityType ??
+      followUp.referralFacilityType ??
+      null) as FollowUpListItem["referralFacilityType"],
     assignedToName: mine?.name ?? null,
     assignedToRole: mine?.role ?? null,
     completedByName: completedByMe?.name ?? null,

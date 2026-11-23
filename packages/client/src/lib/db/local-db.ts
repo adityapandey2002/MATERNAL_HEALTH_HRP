@@ -14,6 +14,8 @@ export interface LocalPatient {
   address: string | null;
   hrpReason: string | null;
   hrpComplication: string | null;
+  /** Multi-select complications recorded at registration. */
+  hrpComplications?: string[] | null;
   /** Haemoglobin recorded at registration (g/dL). Present when complication is ANEMIA. */
   registrationHb: number | null;
   /** NHM anemia grade derived from registrationHb: SEVERE | MODERATE | MILD | NORMAL | null */
@@ -21,6 +23,8 @@ export interface LocalPatient {
   ashaName: string | null;
   ashaPhone: string | null;
   referred: boolean;
+  /** Referral facility type: CHC_FRU or DH when referred is true. */
+  referralFacilityType?: "CHC_FRU" | "DH" | null;
   isHrp: boolean;
   followUpTrack: string | null;
   followUpScheduledDate: string | null;
@@ -76,6 +80,8 @@ export interface LocalFollowUp {
   notes: string | null;
   /** Whether FCM was administered during this follow-up contact. Block/district only. */
   fcmAdministered: boolean | null;
+  /** Referral facility type (CHC_FRU or DH) if referred. */
+  referralFacilityType?: "CHC_FRU" | "DH" | null;
   createdAt: string;
   updatedAt: string;
   syncStatus: SyncStatus;
@@ -135,6 +141,8 @@ export class HrpLocalDb extends Dexie {
     // new columns are stored in the existing row blob) and fcmAdministered to
     // followUps. No index needed — filtering is done in JS on the full table.
     this.version(3).stores({});
+    // Version 4: adds hrpComplications, referralFacilityType.
+    this.version(4).stores({});
   }
 }
 
