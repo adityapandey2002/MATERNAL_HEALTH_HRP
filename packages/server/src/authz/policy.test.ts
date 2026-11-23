@@ -77,7 +77,12 @@ const EXPECTED_ALLOWED: Record<UserRole, ReadonlySet<Action>> = {
     "followup:manage",
     "device:revoke",
   ]),
-  HRP_HELPDESK_DISTRICT: new Set([...BASE_READS, "referral:respond", "followup:manage"]),
+  HRP_HELPDESK_DISTRICT: new Set([
+    ...BASE_READS,
+    ...CLINICAL_WRITE_ACTIONS,
+    "referral:respond",
+    "followup:manage",
+  ]),
   DHS: new Set([
     ...BASE_READS,
     ...SUPERVISION_ACTIONS,
@@ -276,22 +281,26 @@ describe("clinical writes", () => {
     }
   });
 
-  it("denies DHS and district helpdesk clinical writes", () => {
-    for (const role of ["DHS", "HRP_HELPDESK_DISTRICT"] as UserRole[]) {
-      const actor = makeActor(role);
+  it("denies DHS clinical writes", () => {
+    const actor = makeActor("DHS");
 
-      for (const action of CLINICAL_WRITE_ACTIONS) {
-        expect(can(actor, action, facilityTarget(actor.facilityPath))).toEqual({
-          allowed: false,
-          reason: "ROLE_NOT_PERMITTED",
-          httpStatus: 403,
-        });
-      }
+    for (const action of CLINICAL_WRITE_ACTIONS) {
+      expect(can(actor, action, facilityTarget(actor.facilityPath))).toEqual({
+        allowed: false,
+        reason: "ROLE_NOT_PERMITTED",
+        httpStatus: 403,
+      });
     }
   });
 
   it("rejects a clinical write without a target facility", () => {
-    for (const role of ["ANM", "CHO", "HRP_HELPDESK_BLOCK", "BHM"] as UserRole[]) {
+    for (const role of [
+      "ANM",
+      "CHO",
+      "HRP_HELPDESK_BLOCK",
+      "BHM",
+      "HRP_HELPDESK_DISTRICT",
+    ] as UserRole[]) {
       for (const action of CLINICAL_WRITE_ACTIONS) {
         expect(can(makeActor(role), action, facilityTarget(null))).toEqual({
           allowed: false,

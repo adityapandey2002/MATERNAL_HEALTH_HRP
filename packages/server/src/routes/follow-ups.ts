@@ -1,8 +1,9 @@
-import { nextHrpFollowUpDate } from "@hrp/shared";
+import { anemiaGradeFromHb, nextHrpFollowUpDate } from "@hrp/shared";
 import {
   CreateFollowUpSchema,
   DispatchFollowUpSchema,
   FollowUpFilterSchema,
+  RecordFollowUpVisitSchema,
   UpdateFollowUpSchema,
 } from "@hrp/shared/schemas";
 import type {
@@ -10,10 +11,11 @@ import type {
   DispatchFollowUp,
   FollowUpFilter,
   FollowUpListItem,
+  RecordFollowUpVisit,
   UpdateFollowUp,
 } from "@hrp/shared/schemas";
 import type { FastifyPluginAsync } from "fastify";
-import { type Updateable, sql } from "kysely";
+import { type Insertable, type Updateable, sql } from "kysely";
 import { z } from "zod";
 import { assertCan } from "../authz/policy.js";
 import {
@@ -24,9 +26,10 @@ import {
 import { db } from "../db/client.js";
 import type { DB, FollowUpRow } from "../db/types.js";
 import { parsePagination } from "../lib/pagination.js";
-import { serializeFollowUp } from "../lib/serializers.js";
+import { serializeFollowUp, serializeVisit } from "../lib/serializers.js";
 import { validateBody, validateQuery } from "../lib/validate.js";
 import { followUpLevelForRole, nextFieldFollowUpValues } from "../services/hrp-follow-up.js";
+import { recalculatePatientRisk } from "../services/risk.js";
 
 const SORTABLE_COLUMNS = ["scheduled_date", "created_at", "status"] as const;
 const _UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -430,6 +433,195 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
 
     return serializeFollowUp(followUp);
   });
+
+  /* ------------------------------------------------------------------ *
+   *  POST /api/hrp/follow-ups/record-visit                            *
+   *  Records ANC visit vitals and marks the follow-up complete in one  *
+   *  atomic transaction, scheduling the next 15-day field cycle.       *
+   * ------------------------------------------------------------------ */
+  app.post(
+    "/record-visit",
+    { preValidation: validateBody(RecordFollowUpVisitSchema) },
+    async (request, reply) => {
+      const data = request.body as RecordFollowUpVisit;
+      const actor = request.actor;
+
+      const patient = await db
+        .selectFrom("patients")
+        .innerJoin("facilities", "facilities.id", "patients.facility_id")
+        .selectAll("patients")
+        .select("facilities.path as facility_path")
+        .where("patients.id", "=", data.patientId)
+        .executeTakeFirst();
+      if (!patient) return reply.code(404).send({ message: "Patient not found" });
+
+      assertCan(actor, "visit:write", {
+        type: "facility",
+        facilityPath: patient.facility_path,
+      });
+
+      const now = new Date();
+      const visitDate = data.visitDate instanceof Date ? data.visitDate : new Date(data.visitDate);
+
+      const result = await db.transaction().execute(async (trx) => {
+        // 1. Insert the visit with all vitals & danger signs
+        const visitRow: Insertable<DB["visits"]> = {
+          patient_id: data.patientId,
+          facility_id: actor.homeFacilityId,
+          conducted_by: actor.userId,
+          visit_number: data.visitNumber,
+          gestational_weeks: Math.round(data.gestationalWeeks),
+          visit_date: visitDate,
+          bp_systolic: data.bpSystolic ?? null,
+          bp_diastolic: data.bpDiastolic ?? null,
+          hb: data.hb ?? null,
+          weight: data.weight ?? null,
+          fundal_height: data.fundalHeight ?? null,
+          fetal_heart_rate: data.fetalHeartRate ?? null,
+          danger_signs: JSON.stringify(data.dangerSigns ?? []),
+          ifa_given: data.ifaGiven,
+          calcium_given: data.calciumGiven,
+          albendazole_given: data.albendazoleGiven,
+          fcm_administered: data.fcmAdministered,
+          referred: data.referred,
+          referral_facility_type: data.referralFacilityType ?? null,
+          referral_reason: data.referralReason ?? null,
+          notes: data.notes ?? null,
+          created_at: now,
+          updated_at: now,
+        };
+
+        const insertedVisit = await trx
+          .insertInto("visits")
+          .values(visitRow)
+          .returningAll()
+          .executeTakeFirstOrThrow();
+
+        // 2. Update patient referral & Hb/anemia grade if needed
+        const patientUpdates: Updateable<DB["patients"]> = {
+          updated_at: now,
+        };
+        if (data.referred) {
+          patientUpdates.referred = true;
+          if (data.referralFacilityType) {
+            patientUpdates.referral_facility_type = data.referralFacilityType;
+          }
+        }
+        if (typeof data.hb === "number") {
+          patientUpdates.anemia_grade = anemiaGradeFromHb(data.hb);
+        }
+        await trx
+          .updateTable("patients")
+          .set(patientUpdates)
+          .where("id", "=", data.patientId)
+          .execute();
+
+        // 3. Mark the active follow-up as COMPLETE
+        let targetFollowUp = data.followUpId
+          ? await trx
+              .selectFrom("follow_ups")
+              .selectAll("follow_ups")
+              .where("id", "=", data.followUpId)
+              .executeTakeFirst()
+          : null;
+
+        if (!targetFollowUp) {
+          targetFollowUp = await trx
+            .selectFrom("follow_ups")
+            .selectAll("follow_ups")
+            .where("patient_id", "=", data.patientId)
+            .where("status", "!=", "COMPLETE")
+            .orderBy("scheduled_date", "asc")
+            .executeTakeFirst();
+        }
+
+        let completedFollowUpId: string;
+        if (targetFollowUp) {
+          completedFollowUpId = targetFollowUp.id;
+          const finalNotes = computeFollowUpNotes(targetFollowUp.notes, data.fcmAdministered);
+          await trx
+            .updateTable("follow_ups")
+            .set({
+              status: "COMPLETE",
+              completed_at: now,
+              completed_by_user_id: actor.userId,
+              fcm_administered: data.fcmAdministered,
+              notes: finalNotes,
+              updated_at: now,
+            })
+            .where("id", "=", targetFollowUp.id)
+            .execute();
+        } else {
+          completedFollowUpId = crypto.randomUUID();
+          await trx
+            .insertInto("follow_ups")
+            .values({
+              id: completedFollowUpId,
+              patient_id: data.patientId,
+              assigned_to_user_id: actor.userId,
+              assigned_by_user_id: actor.userId,
+              level: followUpLevelForRole(actor.role),
+              status: "COMPLETE",
+              track: "FIELD_15_DAY",
+              scheduled_date: visitDate,
+              completed_at: now,
+              completed_by_user_id: actor.userId,
+              fcm_administered: data.fcmAdministered,
+              notes: data.notes ?? null,
+              created_at: now,
+              updated_at: now,
+            })
+            .execute();
+        }
+
+        // 4. Schedule the next 15-day field cycle for the woman
+        const otherOpen = await trx
+          .selectFrom("follow_ups")
+          .select("id")
+          .where("patient_id", "=", data.patientId)
+          .where("status", "!=", "COMPLETE")
+          .where("id", "!=", completedFollowUpId)
+          .executeTakeFirst();
+
+        if (!otherOpen) {
+          const registrant = await trx
+            .selectFrom("users")
+            .select(["id", "role"])
+            .where("id", "=", patient.registered_by)
+            .executeTakeFirst();
+
+          const next = nextFieldFollowUpValues({
+            patientId: data.patientId,
+            registrantUserId: registrant?.id ?? actor.userId,
+            registrantRole: registrant?.role ?? null,
+            assignedByUserId: actor.userId,
+            completedAt: now,
+          });
+
+          await trx.insertInto("follow_ups").values(next).execute();
+          await trx
+            .updateTable("patients")
+            .set({
+              follow_up_track: next.track,
+              follow_up_scheduled_date: next.scheduled_date,
+              updated_at: now,
+            })
+            .where("id", "=", data.patientId)
+            .execute();
+        }
+
+        return {
+          visit: serializeVisit(insertedVisit),
+          followUpId: completedFollowUpId,
+        };
+      });
+
+      // Recalculate patient clinical risk after visit insertion
+      await recalculatePatientRisk(data.patientId);
+
+      return reply.code(201).send(result);
+    }
+  );
 
   /* ------------------------------------------------------------------ *
    *  PATCH /api/hrp/follow-ups/:id — update follow-up status           *

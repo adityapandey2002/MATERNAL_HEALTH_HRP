@@ -72,7 +72,13 @@ const READ_ACTIONS: ReadonlySet<Action> = new Set<Action>([
   "audit:read",
 ]);
 
-const CLINICAL_WRITE_ROLES: readonly UserRole[] = ["ANM", "CHO", "HRP_HELPDESK_BLOCK", "BHM"];
+const CLINICAL_WRITE_ROLES: readonly UserRole[] = [
+  "ANM",
+  "CHO",
+  "HRP_HELPDESK_BLOCK",
+  "BHM",
+  "HRP_HELPDESK_DISTRICT",
+];
 const SUPERVISION_ROLES: readonly UserRole[] = ["CHO", "BHM", "DHS"];
 const STAFF_ADMIN_ROLES: readonly UserRole[] = ["BHM", "DHS"];
 const STAFF_READ_ROLES: readonly UserRole[] = ["HRP_HELPDESK_BLOCK", "BHM", "DHS"];
