@@ -8,6 +8,9 @@ import {
   RiskLevel,
   UserRole,
   VisitSchema,
+  anemiaGradeFromHb,
+  getPatientDisplayId,
+  isFcmIndicated,
 } from "./types.js";
 
 describe("DateInput", () => {
@@ -131,6 +134,20 @@ describe("PatientSchema", () => {
     expect(parsed.referred).toBe(true);
   });
 
+  it("accepts registrationHb and anemiaGrade", () => {
+    const parsed = PatientSchema.parse({
+      ...valid,
+      registrationHb: 6.8,
+      anemiaGrade: "SEVERE",
+    });
+    expect(parsed.registrationHb).toBe(6.8);
+    expect(parsed.anemiaGrade).toBe("SEVERE");
+  });
+
+  it("rejects an invalid anemiaGrade", () => {
+    expect(PatientSchema.safeParse({ ...valid, anemiaGrade: "CRITICAL" }).success).toBe(false);
+  });
+
   it("rejects an unknown HRP reason", () => {
     expect(PatientSchema.safeParse({ ...valid, hrpReason: "BAD_LUCK" }).success).toBe(false);
   });
@@ -213,5 +230,64 @@ describe("DeviceSchema", () => {
 
   it("rejects an unknown platform", () => {
     expect(DeviceSchema.safeParse({ ...valid, platform: "ios" }).success).toBe(false);
+  });
+});
+
+describe("anemiaGradeFromHb", () => {
+  it("classifies Hb < 7 g/dL as SEVERE", () => {
+    expect(anemiaGradeFromHb(5.5)).toBe("SEVERE");
+    expect(anemiaGradeFromHb(6.9)).toBe("SEVERE");
+    expect(anemiaGradeFromHb(0)).toBe("SEVERE");
+  });
+
+  it("classifies Hb between 7 and 8.9 g/dL as MODERATE", () => {
+    expect(anemiaGradeFromHb(7.0)).toBe("MODERATE");
+    expect(anemiaGradeFromHb(8.0)).toBe("MODERATE");
+    expect(anemiaGradeFromHb(8.9)).toBe("MODERATE");
+  });
+
+  it("classifies Hb between 9 and 10.9 g/dL as MILD", () => {
+    expect(anemiaGradeFromHb(9.0)).toBe("MILD");
+    expect(anemiaGradeFromHb(10.0)).toBe("MILD");
+    expect(anemiaGradeFromHb(10.9)).toBe("MILD");
+  });
+
+  it("classifies Hb >= 11 g/dL as NORMAL", () => {
+    expect(anemiaGradeFromHb(11.0)).toBe("NORMAL");
+    expect(anemiaGradeFromHb(12.5)).toBe("NORMAL");
+    expect(anemiaGradeFromHb(16.0)).toBe("NORMAL");
+  });
+
+  it("returns null for non-numeric or missing values", () => {
+    expect(anemiaGradeFromHb(null)).toBeNull();
+    expect(anemiaGradeFromHb(undefined)).toBeNull();
+    expect(anemiaGradeFromHb(Number.NaN)).toBeNull();
+  });
+});
+
+describe("isFcmIndicated", () => {
+  it("returns true for SEVERE and MODERATE", () => {
+    expect(isFcmIndicated("SEVERE")).toBe(true);
+    expect(isFcmIndicated("MODERATE")).toBe(true);
+  });
+
+  it("returns false for MILD, NORMAL, or unrecorded", () => {
+    expect(isFcmIndicated("MILD")).toBe(false);
+    expect(isFcmIndicated("NORMAL")).toBe(false);
+    expect(isFcmIndicated(null)).toBe(false);
+    expect(isFcmIndicated(undefined)).toBe(false);
+  });
+});
+
+describe("getPatientDisplayId", () => {
+  it("formats standard UUID into MS-2026-<6 HEX>", () => {
+    expect(getPatientDisplayId("11111111-1111-4111-8111-111111111111")).toBe("MS-2026-111111");
+    expect(getPatientDisplayId("a3f9c122-0000-0000-0000-000000000000")).toBe("MS-2026-A3F9C1");
+  });
+
+  it("returns empty string for null, undefined, or empty ID", () => {
+    expect(getPatientDisplayId(null)).toBe("");
+    expect(getPatientDisplayId(undefined)).toBe("");
+    expect(getPatientDisplayId("")).toBe("");
   });
 });

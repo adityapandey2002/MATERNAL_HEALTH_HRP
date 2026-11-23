@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { HrpReason } from "./hrp-reasons.js";
 import {
+  AnemiaGrade,
   BooleanInput,
   DangerSign,
   DateInput,
@@ -213,6 +214,12 @@ export const UpdateFollowUpSchema = z.object({
   status: z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]),
   notes: z.string().nullable().optional(),
   completedAt: DateInput.optional(),
+  /**
+   * FCM (Ferric Carboxymaltose) administered during this follow-up contact.
+   * Only applicable for SEVERE or MODERATE anemia patients.
+   * Block and district helpdesk staff can record this.
+   */
+  fcmAdministered: z.boolean().nullable().optional(),
 });
 
 export const FollowUpFilterSchema = z.object({
@@ -272,6 +279,10 @@ export interface FollowUpListItem extends FollowUp {
   patientPhone: string | null;
   patientRiskLevel: RiskLevel;
   hrpComplication: HrpComplication | null;
+  /** Hb recorded at registration — drives anemia badge and FCM eligibility. */
+  registrationHb: number | null;
+  /** Computed anemia grade for this patient (from registrationHb). */
+  anemiaGrade: AnemiaGrade | null;
   village: string | null;
   /** Block the patient's facility belongs to, for district roll-ups. */
   blockName: string | null;
@@ -279,6 +290,8 @@ export interface FollowUpListItem extends FollowUp {
   assignedToRole: string | null;
   completedByName: string | null;
   completedByRole: string | null;
+  /** Whether FCM was administered in the most recent completed contact. */
+  fcmAdministered: boolean | null;
 }
 
 export const DispatchFollowUpSchema = z.object({

@@ -101,6 +101,19 @@ export const DangerSign = z.enum([
   "EPILEPSY",
 ]);
 
+/**
+ * Programmatic anemia grade derived from the registration-time Hb reading.
+ *
+ * Thresholds follow the Government of India / NHM maternal anaemia protocol:
+ *   SEVERE   — Hb < 7 g/dL  → refers to Sadar Hospital, FCM/blood transfusion
+ *   MODERATE — Hb 7–8.9 g/dL → Block helpdesk FCM follow-up
+ *   MILD     — Hb 9–10.9 g/dL → IFA intensification + field monitoring
+ *   NORMAL   — Hb >= 11 g/dL (recorded but not flagged)
+ *   null     — Hb not yet recorded (non-anaemia complications)
+ */
+export const AnemiaGrade = z.enum(["SEVERE", "MODERATE", "MILD", "NORMAL"]);
+export type AnemiaGrade = "SEVERE" | "MODERATE" | "MILD" | "NORMAL";
+
 export const FacilitySchema = z.object({
   id: z.string().uuid(),
   code: z.string().min(1),
@@ -142,6 +155,10 @@ export const PatientSchema = z.object({
   address: z.string().nullable().optional(),
   hrpReason: HrpReason.nullable().optional(), // why this pregnancy is high-risk
   hrpComplication: HrpComplication.nullable().optional(), // HRP complication dropdown (8 values)
+  /** Haemoglobin recorded at registration (g/dL). Required when hrpComplication === ANEMIA. */
+  registrationHb: z.number().min(1).max(20).nullable().optional(),
+  /** Computed from registrationHb. Null when no Hb was recorded. */
+  anemiaGrade: AnemiaGrade.nullable().optional(),
   ashaName: z.string().nullable().optional(),
   ashaPhone: z.string().nullable().optional(),
   referred: z.boolean().default(false), // first cycle is block-owned when referred
@@ -260,3 +277,55 @@ export type FacilityLevel = z.infer<typeof FacilityLevel>;
 export type UserRole = z.infer<typeof UserRole>;
 export type RiskLevel = z.infer<typeof RiskLevel>;
 export type DangerSign = z.infer<typeof DangerSign>;
+
+/**
+ * Derives the NHM anemia grade from a haemoglobin reading (g/dL).
+ *
+ * Thresholds per MoHFW/NHM maternal anaemia protocol:
+ *   < 7      → SEVERE   (hospital referral + FCM/blood transfusion required)
+ *   7–8.9    → MODERATE (block helpdesk FCM follow-up)
+ *   9–10.9   → MILD     (IFA intensification + field monitoring)
+ *   >= 11    → NORMAL
+ *   null/NaN → null     (Hb not recorded)
+ */
+export function anemiaGradeFromHb(hb: number | null | undefined): AnemiaGrade | null {
+  if (typeof hb !== "number" || Number.isNaN(hb)) return null;
+  if (hb < 7) return "SEVERE";
+  if (hb < 9) return "MODERATE";
+  if (hb < 11) return "MILD";
+  return "NORMAL";
+}
+
+/**
+ * Returns whether FCM (Ferric Carboxymaltose) administration should be
+ * offered at block / district level for the given anemia grade.
+ * FCM is indicated for SEVERE and MODERATE anaemia in pregnancy.
+ */
+export function isFcmIndicated(grade: AnemiaGrade | null | undefined): boolean {
+  return grade === "SEVERE" || grade === "MODERATE";
+}
+
+export const ANEMIA_GRADE_LABEL: Record<AnemiaGrade, string> = {
+  SEVERE: "Severe Anemia (Hb < 7 g/dL)",
+  MODERATE: "Moderate Anemia (Hb 7–8.9 g/dL)",
+  MILD: "Mild Anemia (Hb 9–10.9 g/dL)",
+  NORMAL: "Normal (Hb ≥ 11 g/dL)",
+};
+
+export const ANEMIA_GRADE_BADGE: Record<AnemiaGrade, string> = {
+  SEVERE: "badge-red",
+  MODERATE: "badge-amber",
+  MILD: "badge-amber",
+  NORMAL: "badge-green",
+};
+
+/**
+ * Generates the standardized, human-readable Matru Suraksha Unique Patient ID.
+ * Format: MS-2026-<6 HEX CHARS>, e.g. MS-2026-A3F9C1
+ * Issued at first registration and used across all tiers for data identification.
+ */
+export function getPatientDisplayId(id: string | null | undefined): string {
+  if (!id) return "";
+  const clean = id.replace(/-/g, "").toUpperCase();
+  return `MS-2026-${clean.slice(0, 6)}`;
+}
