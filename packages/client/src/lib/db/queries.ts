@@ -130,12 +130,15 @@ export function toFollowUpListItem(
     patientPhone: patient?.phone ?? null,
     patientRiskLevel: (patient?.riskLevel ?? "GREEN") as FollowUpListItem["patientRiskLevel"],
     hrpComplication: (patient?.hrpComplication ?? null) as FollowUpListItem["hrpComplication"],
+    registrationHb: patient?.registrationHb ?? null,
+    anemiaGrade: (patient?.anemiaGrade ?? null) as FollowUpListItem["anemiaGrade"],
     village: patient?.address ?? null,
     blockName: null,
     assignedToName: mine?.name ?? null,
     assignedToRole: mine?.role ?? null,
     completedByName: completedByMe?.name ?? null,
     completedByRole: completedByMe?.role ?? null,
+    fcmAdministered: followUp.fcmAdministered ?? null,
   };
 }
 

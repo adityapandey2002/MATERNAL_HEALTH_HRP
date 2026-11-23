@@ -17,6 +17,8 @@ function toLocalPatient(p: Record<string, unknown>): LocalPatient {
     address: (p.address ?? null) as string | null,
     hrpReason: (p.hrpReason ?? p.hrp_reason ?? null) as string | null,
     hrpComplication: (p.hrpComplication ?? p.hrp_complication ?? null) as string | null,
+    registrationHb: (p.registrationHb ?? p.registration_hb ?? null) as number | null,
+    anemiaGrade: (p.anemiaGrade ?? p.anemia_grade ?? null) as string | null,
     ashaName: (p.ashaName ?? p.asha_name ?? null) as string | null,
     ashaPhone: (p.ashaPhone ?? p.asha_phone ?? null) as string | null,
     referred: Boolean(p.referred),
@@ -79,6 +81,7 @@ function toLocalFollowUp(f: Record<string, unknown>): LocalFollowUp {
     notes: (f.notes ?? null) as string | null,
     createdAt: String(f.createdAt ?? f.created_at),
     updatedAt: String(f.updatedAt ?? f.updated_at),
+    fcmAdministered: (f.fcmAdministered ?? f.fcm_administered ?? null) as boolean | null,
     syncStatus: "synced",
   };
 }

@@ -14,6 +14,10 @@ export interface LocalPatient {
   address: string | null;
   hrpReason: string | null;
   hrpComplication: string | null;
+  /** Haemoglobin recorded at registration (g/dL). Present when complication is ANEMIA. */
+  registrationHb: number | null;
+  /** NHM anemia grade derived from registrationHb: SEVERE | MODERATE | MILD | NORMAL | null */
+  anemiaGrade: string | null;
   ashaName: string | null;
   ashaPhone: string | null;
   referred: boolean;
@@ -70,6 +74,8 @@ export interface LocalFollowUp {
   completedAt: string | null;
   completedByUserId: string | null;
   notes: string | null;
+  /** Whether FCM was administered during this follow-up contact. Block/district only. */
+  fcmAdministered: boolean | null;
   createdAt: string;
   updatedAt: string;
   syncStatus: SyncStatus;
@@ -125,6 +131,10 @@ export class HrpLocalDb extends Dexie {
     this.version(2).stores({
       patients: "id, facilityId, updatedAt, syncStatus, isHrp, nameIndex",
     });
+    // Version 3: adds registrationHb / anemiaGrade to patients (no-schema-change,
+    // new columns are stored in the existing row blob) and fcmAdministered to
+    // followUps. No index needed — filtering is done in JS on the full table.
+    this.version(3).stores({});
   }
 }
 
