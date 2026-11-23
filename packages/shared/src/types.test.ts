@@ -252,14 +252,15 @@ describe("anemiaGradeFromHb", () => {
     expect(anemiaGradeFromHb(0)).toBe("SEVERE");
   });
 
-  it("classifies Hb between 7 and 8.9 g/dL as MODERATE", () => {
+  it("classifies Hb between 7 and 9.9 g/dL as MODERATE", () => {
     expect(anemiaGradeFromHb(7.0)).toBe("MODERATE");
     expect(anemiaGradeFromHb(8.0)).toBe("MODERATE");
     expect(anemiaGradeFromHb(8.9)).toBe("MODERATE");
+    expect(anemiaGradeFromHb(9.0)).toBe("MODERATE");
+    expect(anemiaGradeFromHb(9.9)).toBe("MODERATE");
   });
 
-  it("classifies Hb between 9 and 10.9 g/dL as MILD", () => {
-    expect(anemiaGradeFromHb(9.0)).toBe("MILD");
+  it("classifies Hb between 10 and 10.9 g/dL as MILD", () => {
     expect(anemiaGradeFromHb(10.0)).toBe("MILD");
     expect(anemiaGradeFromHb(10.9)).toBe("MILD");
   });

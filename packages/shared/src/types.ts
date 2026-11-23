@@ -292,15 +292,15 @@ export type DangerSign = z.infer<typeof DangerSign>;
  *
  * Thresholds per MoHFW/NHM maternal anaemia protocol:
  *   < 7      → SEVERE   (hospital referral + FCM/blood transfusion required)
- *   7–8.9    → MODERATE (block helpdesk FCM follow-up)
- *   9–10.9   → MILD     (IFA intensification + field monitoring)
+ *   7–9.9    → MODERATE (block / district FCM follow-up)
+ *   10–10.9  → MILD     (IFA intensification + field monitoring)
  *   >= 11    → NORMAL
  *   null/NaN → null     (Hb not recorded)
  */
 export function anemiaGradeFromHb(hb: number | null | undefined): AnemiaGrade | null {
   if (typeof hb !== "number" || Number.isNaN(hb)) return null;
   if (hb < 7) return "SEVERE";
-  if (hb < 9) return "MODERATE";
+  if (hb < 10) return "MODERATE";
   if (hb < 11) return "MILD";
   return "NORMAL";
 }
@@ -322,10 +322,10 @@ export function isFcmIndicated(
 }
 
 export const ANEMIA_GRADE_LABEL: Record<AnemiaGrade, string> = {
-  SEVERE: "Severe Anemic (< 7 g/dL)",
-  MODERATE: "Moderate Anemic (7–8.9 g/dL)",
-  MILD: "Mild Anemic (9–10.9 g/dL)",
-  NORMAL: "Normal (≥ 11 g/dL)",
+  SEVERE: "Severe Anemia · < 7 g/dL",
+  MODERATE: "Moderate Anemia · 7–9.9 g/dL",
+  MILD: "Mild Anemia · 10–10.9 g/dL",
+  NORMAL: "Normal · ≥ 11 g/dL",
 };
 
 export const ANEMIA_GRADE_BADGE: Record<AnemiaGrade, string> = {
