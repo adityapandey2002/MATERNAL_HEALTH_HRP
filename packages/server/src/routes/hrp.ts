@@ -149,6 +149,7 @@ export const hrpRoutes: FastifyPluginAsync = async (app) => {
         facilityPath: actor.homeFacilityPath,
         actor: { userId: actor.userId, role: actor.role },
         track,
+        referralFacilityType: data.referralFacilityType,
       });
 
       await trx

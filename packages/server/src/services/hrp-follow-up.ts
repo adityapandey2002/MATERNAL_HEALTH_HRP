@@ -1,5 +1,5 @@
 import { nextHrpFollowUpDate } from "@hrp/shared";
-import type { UserRole } from "@hrp/shared";
+import type { ReferralFacilityType, UserRole } from "@hrp/shared";
 import { type Insertable, type Kysely, sql } from "kysely";
 import type { DB } from "../db/types.js";
 
@@ -86,6 +86,7 @@ export async function resolveInitialFollowUpOwner(
     facilityPath: string;
     actor: { userId: string; role: UserRole };
     track: FollowUpTrack;
+    referralFacilityType?: ReferralFacilityType | null;
   }
 ): Promise<FollowUpOwner> {
   if (input.track === "FIELD_15_DAY") {
@@ -93,6 +94,18 @@ export async function resolveInitialFollowUpOwner(
       userId: input.actor.userId,
       level: followUpLevelForRole(input.actor.role),
     };
+  }
+
+  // If referred to DH (District Sadar Hospital), assign to District HRP Helpdesk.
+  if (input.referralFacilityType === "DH") {
+    const districtHelpdesk = await findActiveUserAtOrAbove(
+      database,
+      input.facilityPath,
+      "HRP_HELPDESK_DISTRICT"
+    );
+    if (districtHelpdesk) {
+      return { userId: districtHelpdesk, level: "BLOCK_NODAL" };
+    }
   }
 
   const helpdeskUserId = await findActiveUserAtOrAbove(

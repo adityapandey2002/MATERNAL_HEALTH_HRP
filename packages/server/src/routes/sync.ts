@@ -177,6 +177,9 @@ async function syncPatients(
           facilityPath: actor.homeFacilityPath,
           actor: { userId: actor.userId, role: actor.role },
           track,
+          referralFacilityType:
+            (p as { referralFacilityType?: import("@hrp/shared").ReferralFacilityType | null })
+              .referralFacilityType ?? null,
         });
 
         await trx

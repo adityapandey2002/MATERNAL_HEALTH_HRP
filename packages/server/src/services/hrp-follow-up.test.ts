@@ -107,6 +107,17 @@ describe("resolveInitialFollowUpOwner", () => {
     expect(owner).toEqual({ userId: "helpdesk-1", level: "BLOCK_NODAL" });
   });
 
+  it("assigns to district helpdesk when referred to DH", async () => {
+    const owner = await resolveInitialFollowUpOwner(makeDatabase(["district-hd-1"]), {
+      facilityPath: "district.block.hwc.village",
+      actor,
+      track: "BLOCK_15_DAY",
+      referralFacilityType: "DH",
+    });
+
+    expect(owner).toEqual({ userId: "district-hd-1", level: "BLOCK_NODAL" });
+  });
+
   it("falls back to the block BHM when no block helpdesk exists", async () => {
     const owner = await resolveInitialFollowUpOwner(makeDatabase([null, "bhm-1"]), {
       facilityPath: "district.block.hwc.village",
