@@ -128,7 +128,7 @@ describe("NodalFollowUpPanel", () => {
 
     expect(await screen.findAllByText("Sunita Devi")).toHaveLength(2); // desktop + mobile
     expect(screen.getAllByText("MS-2026-111111")).toHaveLength(2);
-    expect(screen.getAllByText("Severe Anemic (< 7 g/dL)")).toHaveLength(2);
+    expect(screen.getAllByText("Severe Anemia · < 7 g/dL")).toHaveLength(2);
   });
 
   it("renders FCM Administered checkbox for severe anemia and allows toggling", async () => {

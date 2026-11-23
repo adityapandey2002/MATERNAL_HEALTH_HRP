@@ -250,16 +250,16 @@ describe("AddPatientPage", () => {
     expect(hbInput).toBeInTheDocument();
 
     fireEvent.change(hbInput, { target: { value: "6.5" } });
-    expect(screen.getByText("Severe Anemic (< 7 g/dL)")).toBeInTheDocument();
+    expect(screen.getByText("Severe Anemia · < 7 g/dL")).toBeInTheDocument();
 
     fireEvent.change(hbInput, { target: { value: "7.8" } });
-    expect(screen.getByText("Moderate Anemic (7–8.9 g/dL)")).toBeInTheDocument();
+    expect(screen.getByText("Moderate Anemia · 7–9.9 g/dL")).toBeInTheDocument();
 
-    fireEvent.change(hbInput, { target: { value: "9.5" } });
-    expect(screen.getByText("Mild Anemic (9–10.9 g/dL)")).toBeInTheDocument();
+    fireEvent.change(hbInput, { target: { value: "10.4" } });
+    expect(screen.getByText("Mild Anemia · 10–10.9 g/dL")).toBeInTheDocument();
 
     fireEvent.change(hbInput, { target: { value: "12.0" } });
-    expect(screen.getByText("Normal (≥ 11 g/dL)")).toBeInTheDocument();
+    expect(screen.getByText("Normal · ≥ 11 g/dL")).toBeInTheDocument();
 
     // Verify verbose multi-line reference box is removed
     expect(screen.queryByText(/NHM Anemia Classification/i)).not.toBeInTheDocument();

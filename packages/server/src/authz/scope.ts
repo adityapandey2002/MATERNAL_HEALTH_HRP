@@ -100,15 +100,6 @@ export function isFacilityRoleCompatible(role: UserRole, level: FacilityLevel): 
   return ROLE_FACILITY_LEVELS[role]?.includes(level) ?? false;
 }
 
-/**
- * Returns true for roles that work at field (sub-centre / HWC) level.
- * Field workers only see patients they registered themselves — not all
- * patients at the same HWC registered by a colleague.
- */
-export function isFieldRole(role: UserRole): boolean {
-  return role === "ANM" || role === "CHO";
-}
-
 export function isPathInSubtree(scopePath: string, targetPath: string): boolean {
   if (scopePath.length === 0 || targetPath.length === 0) return false;
   return targetPath === scopePath || targetPath.startsWith(`${scopePath}.`);
