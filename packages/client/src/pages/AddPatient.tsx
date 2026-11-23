@@ -7,7 +7,6 @@ import {
   anemiaGradeFromHb,
   getPatientDisplayId,
   hrpReasonForComplication,
-  isFcmIndicated,
 } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -32,9 +31,10 @@ interface FormState {
   age: string;
   villageId: string;
   lmp: string;
-  complication: HrpComplication | "";
+  complications: HrpComplication[];
   referred: boolean;
-  /** Haemoglobin reading in g/dL — required when complication is ANEMIA */
+  referralFacilityType: "CHC_FRU" | "DH";
+  /** Haemoglobin reading in g/dL — required when complication includes ANEMIA */
   hb: string;
 }
 
@@ -44,17 +44,204 @@ const INITIAL_FORM: FormState = {
   age: "",
   villageId: "",
   lmp: "",
-  complication: "",
+  complications: [],
   referred: false,
+  referralFacilityType: "CHC_FRU",
   hb: "",
 };
 
-const COMPLICATION_OPTIONS = HRP_COMPLICATIONS.map((option) => ({
-  value: option.value,
-  label: option.label,
-}));
-
 const VILLAGE_LEVELS = new Set(["VILLAGE", "HSC", "HWC"]);
+
+function ComplicationsMultiSelect({
+  selected,
+  onToggle,
+  error,
+}: {
+  selected: HrpComplication[];
+  onToggle: (comp: HrpComplication) => void;
+  error?: string;
+}) {
+  return (
+    <fieldset className="space-y-2">
+      <legend className="label">
+        Complications{" "}
+        <span className="ml-0.5 text-triage-red-solid" aria-hidden="true">
+          *
+        </span>
+        <span className="ml-2 text-xs font-normal text-ink-subtle">(Select all that apply)</span>
+      </legend>
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {HRP_COMPLICATIONS.map((option) => {
+          const isChecked = selected.includes(option.value);
+          return (
+            <label
+              key={option.value}
+              className={`flex cursor-pointer items-start gap-2.5 rounded border p-2.5 transition-colors ${
+                isChecked
+                  ? "border-primary bg-primary-light shadow-xs"
+                  : "border-line bg-surface hover:bg-canvas"
+              }`}
+            >
+              <input
+                type="checkbox"
+                value={option.value}
+                checked={isChecked}
+                onChange={() => onToggle(option.value)}
+                className="mt-0.5 h-4 w-4 rounded border-line text-primary focus:ring-primary-ring"
+              />
+              <div className="min-w-0">
+                <span
+                  className={`block text-xs font-semibold ${
+                    isChecked ? "text-primary" : "text-ink"
+                  }`}
+                >
+                  {option.label}
+                </span>
+                <span className="block text-2xs text-ink-subtle leading-tight">{option.hint}</span>
+              </div>
+            </label>
+          );
+        })}
+      </div>
+      {error && (
+        <p className="error-text mt-1" role="alert" aria-live="polite">
+          {error}
+        </p>
+      )}
+    </fieldset>
+  );
+}
+
+function AnemiaHbSection({
+  hb,
+  onChangeHb,
+  error,
+}: {
+  hb: string;
+  onChangeHb: (val: string) => void;
+  error?: string;
+}) {
+  const hbNum = hb.trim() ? Number(hb) : null;
+  const grade = hbNum !== null && !Number.isNaN(hbNum) ? anemiaGradeFromHb(hbNum) : null;
+
+  return (
+    <div className="rounded border border-line bg-canvas p-4 space-y-2">
+      <FormField label="Haemoglobin (Hb) — g/dL" id="patient-hb" required error={error}>
+        <input
+          type="number"
+          inputMode="decimal"
+          step="0.1"
+          min={1}
+          max={20}
+          value={hb}
+          onChange={(e) => onChangeHb(e.target.value)}
+          placeholder="e.g. 7.2"
+          aria-describedby="hb-hint"
+        />
+      </FormField>
+      <p id="hb-hint" className="text-xs text-ink-subtle">
+        Read from the MCP card or latest lab report
+      </p>
+
+      {grade && (
+        <div className="flex items-center gap-2 pt-1" aria-live="polite">
+          <span className={`badge ${ANEMIA_GRADE_BADGE[grade]} text-xs font-semibold`}>
+            {ANEMIA_GRADE_LABEL[grade]}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReferralSection({
+  referred,
+  referralFacilityType,
+  onSetReferred,
+  onSetFacilityType,
+}: {
+  referred: boolean;
+  referralFacilityType: "CHC_FRU" | "DH";
+  onSetReferred: (ref: boolean) => void;
+  onSetFacilityType: (type: "CHC_FRU" | "DH") => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="label">Referring or not?</legend>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <label
+          className={`flex cursor-pointer items-start gap-2.5 rounded border px-3 py-3 transition-colors ${
+            referred
+              ? "border-triage-red-solid bg-triage-red-bg"
+              : "border-line bg-surface hover:bg-canvas"
+          }`}
+        >
+          <input
+            type="radio"
+            name="referred"
+            value="yes"
+            checked={referred}
+            onChange={() => onSetReferred(true)}
+            className="mt-0.5 h-4 w-4 text-triage-red-solid focus:ring-triage-red-line"
+          />
+          <span>
+            <span className="block text-sm font-semibold text-ink">Yes — Refer case</span>
+            <span className="block text-xs text-ink-subtle">
+              Helpdesk will be notified to complete 15-day follow-up
+            </span>
+          </span>
+        </label>
+
+        <label
+          className={`flex cursor-pointer items-start gap-2.5 rounded border px-3 py-3 transition-colors ${
+            !referred ? "border-primary bg-primary-light" : "border-line bg-surface hover:bg-canvas"
+          }`}
+        >
+          <input
+            type="radio"
+            name="referred"
+            value="no"
+            checked={!referred}
+            onChange={() => onSetReferred(false)}
+            className="mt-0.5 h-4 w-4 text-primary focus:ring-primary-ring"
+          />
+          <span>
+            <span className="block text-sm font-semibold text-ink">
+              No — Routine Field Management
+            </span>
+            <span className="block text-xs text-ink-subtle">Managed at local HSC cluster</span>
+          </span>
+        </label>
+      </div>
+
+      {referred && (
+        <div className="mt-3 rounded border border-line bg-canvas p-3 space-y-2">
+          <label
+            htmlFor="patient-referral-facility"
+            className="label text-xs font-semibold text-ink"
+          >
+            Referral destination <span className="text-triage-red-solid">*</span>
+          </label>
+          <select
+            id="patient-referral-facility"
+            aria-label="Referral destination facility"
+            className="input min-h-control"
+            value={referralFacilityType}
+            onChange={(e) => onSetFacilityType(e.target.value as "CHC_FRU" | "DH")}
+          >
+            <option value="CHC_FRU">CHC / FRU (Block HRP Helpdesk follow-up)</option>
+            <option value="DH">DH / Sadar Hospital (District HRP Helpdesk follow-up)</option>
+          </select>
+          <p className="text-2xs text-ink-subtle">
+            {referralFacilityType === "DH"
+              ? "District HRP Helpdesk will be notified to conduct the repeating 15-day contact."
+              : "Block HRP Helpdesk will be notified to conduct the repeating 15-day contact."}
+          </p>
+        </div>
+      )}
+    </fieldset>
+  );
+}
 
 export default function AddPatientPage() {
   const navigate = useNavigate();
@@ -67,7 +254,6 @@ export default function AddPatientPage() {
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [duplicate, setDuplicate] = useState<LocalPatient | null>(null);
 
-  // Android's back button must not silently throw away a half-typed form.
   useUnsavedChangesGuard(JSON.stringify(form) !== JSON.stringify(INITIAL_FORM));
 
   const { data: facilities } = useQuery({
@@ -85,15 +271,7 @@ export default function AddPatientPage() {
       .sort((a, b) => a.label.localeCompare(b.label));
   }, [facilities]);
 
-  const isAnemiaSelected = form.complication === "ANEMIA";
-
-  // Live anemia grade badge — computed directly from the Hb input while typing.
-  const hbValue = form.hb.trim() ? Number(form.hb) : null;
-  const liveAnemiaGrade =
-    isAnemiaSelected && hbValue !== null && !Number.isNaN(hbValue)
-      ? anemiaGradeFromHb(hbValue)
-      : null;
-  const fcmWillBeIndicated = isFcmIndicated(liveAnemiaGrade);
+  const isAnemiaSelected = form.complications.includes("ANEMIA");
 
   const createMutation = useMutation({
     mutationFn: async (data: CreatePatient & { id?: string }) => {
@@ -111,7 +289,6 @@ export default function AddPatientPage() {
       const anmName = user?.name ?? null;
       const now = new Date().toISOString();
 
-      // Derive anemia grade from the Hb entered at registration.
       const registrationHb = typeof data.registrationHb === "number" ? data.registrationHb : null;
       const anemiaGrade = anemiaGradeFromHb(registrationHb);
 
@@ -127,11 +304,13 @@ export default function AddPatientPage() {
         address: data.address ?? null,
         hrpReason: (data.hrpReason ?? null) as string | null,
         hrpComplication: (data.hrpComplication ?? null) as string | null,
+        hrpComplications: form.complications,
         registrationHb,
         anemiaGrade,
         ashaName: data.ashaName ?? null,
         ashaPhone: data.ashaPhone ?? null,
         referred: data.referred,
+        referralFacilityType: form.referred ? form.referralFacilityType : null,
         isHrp: data.isHrp ?? true,
         followUpTrack: null,
         followUpScheduledDate: null,
@@ -153,15 +332,22 @@ export default function AddPatientPage() {
         entityType: "patient",
         entityId: id,
         op: "create",
-        payload: { ...data, id },
+        payload: {
+          ...data,
+          id,
+          hrpComplication: form.complications.includes("ANEMIA")
+            ? "ANEMIA"
+            : (form.complications[0] ?? null),
+          hrpComplications: form.complications,
+          referralFacilityType: form.referred ? form.referralFacilityType : null,
+        },
         clientUpdatedAt: now,
       });
       return id;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["patients"] });
-      queryClient.invalidateQueries({ queryKey: ["hrp", "patients"] });
-      queryClient.invalidateQueries({ queryKey: ["hrp", "follow-ups"] });
+      queryClient.invalidateQueries({ queryKey: ["hrp"] });
       navigate("/follow-ups");
     },
   });
@@ -170,17 +356,19 @@ export default function AddPatientPage() {
     setForm((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => ({ ...prev, [field]: undefined }));
     if (field === "name") setDuplicate(null);
-    // Reset Hb when switching away from ANEMIA complication.
-    if (field === "complication" && value !== "ANEMIA") {
-      setForm((prev) => ({ ...prev, [field]: value as FormState[K], hb: "" }));
-      setErrors((prev) => ({ ...prev, hb: undefined }));
-    }
   };
 
-  /**
-   * Exact-name lookup through the encrypted index. Two women can share a name,
-   * so this is a prompt to check the existing case, not a block.
-   */
+  const toggleComplication = (comp: HrpComplication) => {
+    setForm((prev) => {
+      const next = prev.complications.includes(comp)
+        ? prev.complications.filter((c) => c !== comp)
+        : [...prev.complications, comp];
+      const hb = next.includes("ANEMIA") ? prev.hb : "";
+      return { ...prev, complications: next, hb };
+    });
+    setErrors((prev) => ({ ...prev, complications: undefined, hb: undefined }));
+  };
+
   const checkForDuplicate = async (name: string) => {
     const facilityId = getCachedSession()?.user.facilityId;
     if (!facilityId || name.trim().length < 3) {
@@ -191,7 +379,6 @@ export default function AddPatientPage() {
       const matches = await patientRepo.findByExactName(facilityId, name);
       setDuplicate(matches[0] ?? null);
     } catch {
-      // A locked or unavailable cache must not stop a registration.
       setDuplicate(null);
     }
   };
@@ -218,10 +405,10 @@ export default function AddPatientPage() {
     if (villageOptions.length > 0 && !form.villageId) next.villageId = "Select the village / HWC";
     if (!validLmp) next.lmp = "Enter the last menstrual period date";
     else if (validLmp.getTime() > Date.now()) next.lmp = "LMP cannot be in the future";
-    if (!form.complication) next.complication = "Select the HRP complication";
+    if (form.complications.length === 0)
+      next.complications = "Select at least one HRP complication";
 
-    // Hb is required when anemia complication is selected.
-    if (form.complication === "ANEMIA") {
+    if (isAnemiaSelected) {
       const hbNum = Number(form.hb);
       if (!form.hb.trim() || Number.isNaN(hbNum)) {
         next.hb = "Enter the Hb value (g/dL) from the MCP card";
@@ -236,10 +423,13 @@ export default function AddPatientPage() {
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
-    if (!validate() || !validLmp || !form.complication) return;
+    if (!validate() || !validLmp || form.complications.length === 0) return;
 
     const villageName = villageOptions.find((option) => option.value === form.villageId)?.label;
     const hbNum = form.hb.trim() ? Number(form.hb) : null;
+    const primaryComplication = form.complications.includes("ANEMIA")
+      ? "ANEMIA"
+      : (form.complications[0] ?? null);
 
     createMutation.mutate({
       id: patientId,
@@ -247,11 +437,13 @@ export default function AddPatientPage() {
       age: Number(form.age),
       phone: form.phone.replace(/\D/g, ""),
       address: villageName ?? null,
-      hrpComplication: form.complication,
-      hrpReason: hrpReasonForComplication(form.complication),
+      hrpComplication: primaryComplication,
+      hrpComplications: form.complications,
+      hrpReason: hrpReasonForComplication(primaryComplication),
       registrationHb: isAnemiaSelected && hbNum !== null && !Number.isNaN(hbNum) ? hbNum : null,
       isHrp: true,
       referred: form.referred,
+      referralFacilityType: form.referred ? form.referralFacilityType : null,
       followUpStatus: "PENDING",
       lmp: validLmp,
       edd: eddFromLmp(validLmp),
@@ -294,19 +486,21 @@ export default function AddPatientPage() {
         <div
           className="rounded border border-triage-red-line bg-triage-red-bg px-4 py-3"
           role="alert"
-          aria-live="polite"
         >
-          <p className="text-sm font-medium text-triage-red">
-            Could not save the registration. Check the details and try again.
+          <p className="text-sm font-semibold text-triage-red">Could not save registration</p>
+          <p className="text-xs text-ink-muted">
+            {createMutation.error instanceof Error
+              ? createMutation.error.message
+              : "Check the values and try again"}
           </p>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-4">
+      <form onSubmit={handleSubmit} noValidate>
+        <div className="space-y-5">
           <Panel className="!border-0">
             <PanelHeader
-              title="Woman and household"
+              title="Mother"
               action={
                 <span
                   aria-hidden="true"
@@ -360,13 +554,12 @@ export default function AddPatientPage() {
                     +91
                   </span>
                   <input
-                    id="patient-phone"
                     type="tel"
+                    id="patient-phone"
+                    required
                     inputMode="numeric"
                     autoComplete="tel-national"
-                    className={`input rounded-l-none ${errors.phone ? "input-error" : ""}`}
-                    aria-invalid={errors.phone ? "true" : "false"}
-                    aria-describedby={errors.phone ? "patient-phone-error" : undefined}
+                    className="input rounded-l-none"
                     value={form.phone}
                     onChange={(e) => update("phone", e.target.value)}
                     placeholder="10-digit mobile"
@@ -446,146 +639,32 @@ export default function AddPatientPage() {
                 ) : null}
               </div>
 
-              <Select
-                label="Complication"
-                id="patient-complication"
-                required
-                placeholder="Select the HRP complication"
-                options={COMPLICATION_OPTIONS}
-                value={form.complication}
-                onChange={(e) => update("complication", e.target.value as HrpComplication)}
-                error={errors.complication}
+              {/* ── Multi-select complications picker ───────────────────────── */}
+              <ComplicationsMultiSelect
+                selected={form.complications}
+                onToggle={toggleComplication}
+                error={errors.complications}
               />
 
               {/* ── Hb field: appears only when Anemia is selected ──────────── */}
               {isAnemiaSelected && (
-                <div className="rounded border border-line bg-canvas p-4 space-y-3">
-                  <FormField
-                    label="Haemoglobin (Hb) — g/dL"
-                    id="patient-hb"
-                    required
-                    error={errors.hb}
-                  >
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      step="0.1"
-                      min={1}
-                      max={20}
-                      value={form.hb}
-                      onChange={(e) => {
-                        setForm((prev) => ({ ...prev, hb: e.target.value }));
-                        setErrors((prev) => ({ ...prev, hb: undefined }));
-                      }}
-                      placeholder="e.g. 7.2"
-                      aria-describedby="hb-hint"
-                    />
-                  </FormField>
-                  <p id="hb-hint" className="text-xs text-ink-subtle">
-                    Read from the MCP card or latest lab report
-                  </p>
-
-                  {/* Live anemia grade badge */}
-                  {liveAnemiaGrade && (
-                    <div className="flex flex-wrap items-center gap-2" aria-live="polite">
-                      <span className={`badge ${ANEMIA_GRADE_BADGE[liveAnemiaGrade]}`}>
-                        {ANEMIA_GRADE_LABEL[liveAnemiaGrade]}
-                      </span>
-                      {fcmWillBeIndicated && (
-                        <span className="badge badge-amber">
-                          FCM follow-up required at block / district level
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Reference table */}
-                  <div className="rounded border border-line-soft bg-surface p-3 text-xs text-ink-muted space-y-1">
-                    <p className="font-semibold text-ink">
-                      NHM Anemia Classification (Pregnant Women)
-                    </p>
-                    <p>
-                      <span className="inline-block w-32 font-medium text-triage-red">Severe</span>{" "}
-                      Hb &lt; 7 g/dL — Refer to Sadar Hospital, consider FCM / blood transfusion
-                    </p>
-                    <p>
-                      <span className="inline-block w-32 font-medium text-triage-amber">
-                        Moderate
-                      </span>{" "}
-                      Hb 7–8.9 g/dL — Block helpdesk FCM follow-up required
-                    </p>
-                    <p>
-                      <span className="inline-block w-32 font-medium text-triage-amber">Mild</span>{" "}
-                      Hb 9–10.9 g/dL — Intensify IFA, field monitoring
-                    </p>
-                    <p>
-                      <span className="inline-block w-32 font-medium text-triage-green">
-                        Normal
-                      </span>{" "}
-                      Hb ≥ 11 g/dL
-                    </p>
-                  </div>
-                </div>
+                <AnemiaHbSection
+                  hb={form.hb}
+                  onChangeHb={(val) => {
+                    setForm((prev) => ({ ...prev, hb: val }));
+                    setErrors((prev) => ({ ...prev, hb: undefined }));
+                  }}
+                  error={errors.hb}
+                />
               )}
 
-              <fieldset>
-                <legend className="label">Referring or not?</legend>
-                <div className="mt-2 grid gap-2 sm:grid-cols-2">
-                  <label
-                    className={`flex cursor-pointer items-start gap-2.5 rounded border px-3 py-3 transition-colors ${
-                      form.referred
-                        ? "border-triage-red-solid bg-triage-red-bg"
-                        : "border-line bg-surface hover:bg-canvas"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="referred"
-                      value="yes"
-                      checked={form.referred}
-                      onChange={() => update("referred", true)}
-                      className="mt-0.5 h-4 w-4 text-triage-red-solid focus:ring-triage-red-line"
-                    />
-                    <span>
-                      <span className="block text-sm font-semibold text-ink">
-                        {isBlockRole ? "Refer to Sadar hospital" : "Yes — Refer to CHC/FRU"}
-                      </span>
-                      <span className="block text-xs text-ink-subtle">
-                        {isBlockRole
-                          ? "Escalates to District Sadar Hospital for specialist care"
-                          : "The Block HRP Helpdesk owns the first 15-day check-up"}
-                      </span>
-                    </span>
-                  </label>
-
-                  <label
-                    className={`flex cursor-pointer items-start gap-2.5 rounded border px-3 py-3 transition-colors ${
-                      !form.referred
-                        ? "border-primary bg-primary-light"
-                        : "border-line bg-surface hover:bg-canvas"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="referred"
-                      value="no"
-                      checked={!form.referred}
-                      onChange={() => update("referred", false)}
-                      className="mt-0.5 h-4 w-4 text-primary focus:ring-primary-ring"
-                    />
-                    <span>
-                      <span className="block text-sm font-semibold text-ink">
-                        {isBlockRole ? "Not needed" : "No — Routine Field Management"}
-                      </span>
-                      <span className="block text-xs text-ink-subtle">
-                        {isBlockRole
-                          ? "Managed at block CHC / routine follow-up"
-                          : "Managed at the village HSC cluster"}
-                      </span>
-                    </span>
-                  </label>
-                </div>
-              </fieldset>
+              {/* ── Referral Section: CHC/FRU or DH dropdown on Yes ────────── */}
+              <ReferralSection
+                referred={form.referred}
+                referralFacilityType={form.referralFacilityType}
+                onSetReferred={(ref) => update("referred", ref)}
+                onSetFacilityType={(type) => update("referralFacilityType", type)}
+              />
             </PanelBody>
           </Panel>
 
@@ -598,7 +677,7 @@ export default function AddPatientPage() {
               className="btn btn-primary btn-lg"
               disabled={createMutation.isPending}
             >
-              {createMutation.isPending ? "Saving…" : "Add to HRP register"}
+              {createMutation.isPending ? "Adding..." : "Add to HRP register"}
             </button>
           </div>
         </div>
