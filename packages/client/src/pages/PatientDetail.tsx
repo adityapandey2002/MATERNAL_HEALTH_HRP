@@ -1,4 +1,6 @@
 import {
+  ANEMIA_GRADE_BADGE,
+  ANEMIA_GRADE_LABEL,
   type CreatePatient,
   type DangerSign,
   type FollowUpItem,
@@ -12,6 +14,7 @@ import {
   gestationalAgeWeeks,
   getFollowUpPlan,
   getHrpReasonLabel,
+  getPatientDisplayId,
 } from "@hrp/shared";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
@@ -290,12 +293,14 @@ export default function PatientDetailPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        eyebrow={isNew ? "High-risk register" : "Patient record"}
+        eyebrow={isNew ? "High-risk register" : `Patient record · ${getPatientDisplayId(p.id)}`}
         title={isNew ? "Register new patient" : p.name}
         description={
           isNew
             ? "Enter patient details and risk factors"
-            : `Age ${p.age} · ${p.phone ?? "No phone"} · ${villageLabel(p)}`
+            : `ID: ${getPatientDisplayId(p.id)} · Age ${p.age} · ${p.phone ?? "No phone"} · ${villageLabel(p)}${
+                p.anemiaGrade ? ` · ${ANEMIA_GRADE_LABEL[p.anemiaGrade]}` : ""
+              }`
         }
         actions={
           !isNew && !editing && canWrite ? (

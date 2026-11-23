@@ -1,4 +1,4 @@
-import { type Patient, type Visit, getHrpReasonLabel } from "@hrp/shared";
+import { type Patient, type Visit, getHrpReasonLabel, getPatientDisplayId } from "@hrp/shared";
 import { Link } from "react-router-dom";
 import { bpTone, formatBp, formatHb, gaLabel, hbTone, toneTextClass } from "../lib/clinical";
 import { EmptyState } from "./ui/EmptyState";
@@ -51,12 +51,17 @@ export function PatientTable({
                     <RiskBadge level={patient.riskLevel} size="sm" />
                   </td>
                   <td>
-                    <Link
-                      to={`/patients/${patient.id}`}
-                      className="font-medium text-ink hover:text-primary hover:underline"
-                    >
-                      {patient.name}
-                    </Link>
+                    <div className="flex items-center gap-1.5">
+                      <Link
+                        to={`/patients/${patient.id}`}
+                        className="font-medium text-ink hover:text-primary hover:underline"
+                      >
+                        {patient.name}
+                      </Link>
+                      <span className="badge badge-gray font-mono text-2xs">
+                        {getPatientDisplayId(patient.id)}
+                      </span>
+                    </div>
                     <p className="tnum text-2xs text-ink-subtle">
                       {patient.age} yrs · G{patient.gravida}P{patient.para}
                     </p>
@@ -122,12 +127,17 @@ export function PatientCards({
             <div className="py-3 pl-4 pr-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <Link
-                    to={`/patients/${patient.id}`}
-                    className="block truncate text-sm font-semibold text-ink"
-                  >
-                    {patient.name}
-                  </Link>
+                  <div className="flex items-center gap-1.5">
+                    <Link
+                      to={`/patients/${patient.id}`}
+                      className="block truncate text-sm font-semibold text-ink"
+                    >
+                      {patient.name}
+                    </Link>
+                    <span className="badge badge-gray font-mono text-2xs">
+                      {getPatientDisplayId(patient.id)}
+                    </span>
+                  </div>
                   <p className="tnum mt-0.5 truncate text-2xs text-ink-subtle">
                     {patient.age} yrs · {gaLabel(patient)} · {getHrpReasonLabel(patient.hrpReason)}
                   </p>
