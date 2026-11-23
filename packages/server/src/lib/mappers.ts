@@ -128,7 +128,9 @@ export function mapVisitToRow(
     ifa_given: data.ifaGiven,
     calcium_given: data.calciumGiven,
     albendazole_given: data.albendazoleGiven,
+    fcm_administered: data.fcmAdministered ?? false,
     referred: data.referred,
+    referral_facility_type: data.referralFacilityType ?? null,
     referral_reason: data.referralReason ?? null,
     referral_facility_id: data.referralFacilityId ?? null,
     notes: data.notes ?? null,
@@ -157,7 +159,10 @@ export function mapVisitChanges(data: UpdateVisit): Updateable<DB["visits"]> {
   if (data.ifaGiven !== undefined) row.ifa_given = data.ifaGiven;
   if (data.calciumGiven !== undefined) row.calcium_given = data.calciumGiven;
   if (data.albendazoleGiven !== undefined) row.albendazole_given = data.albendazoleGiven;
+  if (data.fcmAdministered !== undefined) row.fcm_administered = data.fcmAdministered;
   if (data.referred !== undefined) row.referred = data.referred;
+  if (data.referralFacilityType !== undefined)
+    row.referral_facility_type = data.referralFacilityType ?? null;
   if (data.referralReason !== undefined) row.referral_reason = data.referralReason ?? null;
   if (data.referralFacilityId !== undefined)
     row.referral_facility_id = data.referralFacilityId ?? null;

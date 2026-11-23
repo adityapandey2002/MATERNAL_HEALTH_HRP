@@ -94,7 +94,9 @@ export interface Visit {
   ifa_given: Generated<boolean>;
   calcium_given: Generated<boolean>;
   albendazole_given: Generated<boolean>;
+  fcm_administered: Generated<boolean>;
   referred: Generated<boolean>;
+  referral_facility_type: string | null;
   referral_reason: string | null;
   referral_facility_id: string | null;
   notes: string | null;
