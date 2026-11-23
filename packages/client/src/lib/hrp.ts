@@ -1,4 +1,5 @@
 import {
+  type AnemiaGrade,
   HRP_FOLLOW_UP_WINDOW_DAYS,
   type HrpComplication,
   type HrpFollowUpStatus,
@@ -81,6 +82,10 @@ export interface FollowUpRow {
   lastCompletedAt: Date | null;
   lastCompletedByName: string | null;
   lastCompletedByRole: string | null;
+  /** NHM anemia grade for this patient. Drives FCM eligibility indicator. */
+  anemiaGrade: AnemiaGrade | null;
+  /** Whether FCM was administered in the most recent completed contact. */
+  fcmAdministered: boolean | null;
 }
 
 const STATUS_ORDER: Record<HrpFollowUpStatus, number> = {
@@ -111,6 +116,73 @@ function pickRecord(records: FollowUpListItem[]): FollowUpListItem | undefined {
   return active ?? sorted[sorted.length - 1];
 }
 
+function getLatestCompleted(records: FollowUpListItem[]): FollowUpListItem | undefined {
+  return records
+    .filter((r) => r.status === "COMPLETE")
+    .reduce<FollowUpListItem | undefined>((best, candidate) => {
+      if (!best) return candidate;
+      const candidateTime = new Date(candidate.completedAt ?? candidate.updatedAt).getTime();
+      const bestTime = new Date(best.completedAt ?? best.updatedAt).getTime();
+      return candidateTime > bestTime ? candidate : best;
+    }, undefined);
+}
+
+function buildFollowUpRow(
+  patientId: string,
+  patient: Patient | undefined,
+  recordsForPatient: FollowUpListItem[],
+  now: Date
+): FollowUpRow {
+  const record = pickRecord(recordsForPatient);
+  const latestCompleted = getLatestCompleted(recordsForPatient);
+
+  const track =
+    record?.track ??
+    patient?.followUpTrack ??
+    inferHrpTrack({ referred: patient?.referred, riskLevel: patient?.riskLevel });
+  const scheduledDate = record
+    ? new Date(record.scheduledDate)
+    : patient?.followUpScheduledDate
+      ? new Date(patient.followUpScheduledDate)
+      : defaultScheduledDate(track, now);
+  const status = record?.status ?? patient?.followUpStatus ?? "PENDING";
+
+  return {
+    key: record ? `follow-up-${record.id}` : `patient-${patientId}`,
+    patientId,
+    followUpId: record?.id ?? null,
+    patientName: record?.patientName ?? patient?.name ?? "Unknown woman",
+    age: record?.patientAge ?? patient?.age ?? 0,
+    phone: record?.patientPhone ?? patient?.phone ?? null,
+    ashaPhone: patient?.ashaPhone ?? null,
+    village: record?.village ?? patient?.address ?? null,
+    blockName: record?.blockName ?? null,
+    complication: record?.hrpComplication ?? patient?.hrpComplication ?? null,
+    riskLevel: record?.patientRiskLevel ?? patient?.riskLevel ?? "GREEN",
+    track,
+    status,
+    scheduledDate,
+    isBlockStage: track === "BLOCK_15_DAY" && status !== "COMPLETE",
+    lastAttemptAt: record ? new Date(record.updatedAt) : null,
+    assignedToName: record?.assignedToName ?? null,
+    assignedToRole: record?.assignedToRole ?? null,
+    completedByName: record?.completedByName ?? null,
+    completedByRole: record?.completedByRole ?? null,
+    notes: record?.notes ?? null,
+    lastCompletedAt: latestCompleted
+      ? new Date(latestCompleted.completedAt ?? latestCompleted.updatedAt)
+      : null,
+    lastCompletedByName: latestCompleted?.completedByName ?? null,
+    lastCompletedByRole: latestCompleted?.completedByRole ?? null,
+    anemiaGrade:
+      record?.anemiaGrade ??
+      (patient?.anemiaGrade as AnemiaGrade | null) ??
+      (patient?.hrpComplication === "ANEMIA" ? "MODERATE" : null),
+    fcmAdministered:
+      record?.fcmAdministered ?? (record?.notes?.includes("[FCM: Administered]") ? true : null),
+  };
+}
+
 /**
  * Merge the server line list with the patient register.
  *
@@ -138,60 +210,14 @@ export function buildFollowUpLineList(
 
   const rows: FollowUpRow[] = [];
   for (const patientId of patientIds) {
-    const patient = patientById.get(patientId);
-    const recordsForPatient = recordsByPatient.get(patientId) ?? [];
-    const record = pickRecord(recordsForPatient);
-
-    const completedRecords = recordsForPatient.filter((r) => r.status === "COMPLETE");
-    const latestCompleted = completedRecords.reduce<FollowUpListItem | undefined>(
-      (best, candidate) => {
-        if (!best) return candidate;
-        const candidateTime = new Date(candidate.completedAt ?? candidate.updatedAt).getTime();
-        const bestTime = new Date(best.completedAt ?? best.updatedAt).getTime();
-        return candidateTime > bestTime ? candidate : best;
-      },
-      undefined
+    rows.push(
+      buildFollowUpRow(
+        patientId,
+        patientById.get(patientId),
+        recordsByPatient.get(patientId) ?? [],
+        now
+      )
     );
-
-    const track =
-      record?.track ??
-      patient?.followUpTrack ??
-      inferHrpTrack({ referred: patient?.referred, riskLevel: patient?.riskLevel });
-    const scheduledDate = record
-      ? new Date(record.scheduledDate)
-      : patient?.followUpScheduledDate
-        ? new Date(patient.followUpScheduledDate)
-        : defaultScheduledDate(track, now);
-    const status = record?.status ?? patient?.followUpStatus ?? "PENDING";
-
-    rows.push({
-      key: record ? `follow-up-${record.id}` : `patient-${patientId}`,
-      patientId,
-      followUpId: record?.id ?? null,
-      patientName: record?.patientName ?? patient?.name ?? "Unknown woman",
-      age: record?.patientAge ?? patient?.age ?? 0,
-      phone: record?.patientPhone ?? patient?.phone ?? null,
-      ashaPhone: patient?.ashaPhone ?? null,
-      village: record?.village ?? patient?.address ?? null,
-      blockName: record?.blockName ?? null,
-      complication: record?.hrpComplication ?? patient?.hrpComplication ?? null,
-      riskLevel: record?.patientRiskLevel ?? patient?.riskLevel ?? "GREEN",
-      track,
-      status,
-      scheduledDate,
-      isBlockStage: track === "BLOCK_15_DAY" && status !== "COMPLETE",
-      lastAttemptAt: record ? new Date(record.updatedAt) : null,
-      assignedToName: record?.assignedToName ?? null,
-      assignedToRole: record?.assignedToRole ?? null,
-      completedByName: record?.completedByName ?? null,
-      completedByRole: record?.completedByRole ?? null,
-      notes: record?.notes ?? null,
-      lastCompletedAt: latestCompleted
-        ? new Date(latestCompleted.completedAt ?? latestCompleted.updatedAt)
-        : null,
-      lastCompletedByName: latestCompleted?.completedByName ?? null,
-      lastCompletedByRole: latestCompleted?.completedByRole ?? null,
-    });
   }
 
   return rows.sort(

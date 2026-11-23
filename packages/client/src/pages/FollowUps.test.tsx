@@ -38,6 +38,8 @@ function makePatient(overrides: Partial<LocalPatient> = {}): LocalPatient {
     address: "Shivrajpur",
     hrpReason: "HYPERTENSION",
     hrpComplication: "PIH",
+    registrationHb: null,
+    anemiaGrade: null,
     ashaName: null,
     ashaPhone: null,
     referred: false,
@@ -77,6 +79,7 @@ function makeFollowUp(overrides: Partial<LocalFollowUp> = {}): LocalFollowUp {
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     syncStatus: "synced",
+    fcmAdministered: null,
     ...overrides,
   };
 }
