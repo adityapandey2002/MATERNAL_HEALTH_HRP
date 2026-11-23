@@ -578,15 +578,11 @@ function VitalsSection({
               setErrors((prev) => ({ ...prev, hb: undefined }));
             }}
           />
-          {anemiaGrade ? (
+          {anemiaGrade && anemiaGrade !== "NORMAL" ? (
             <span
               className={`badge ${ANEMIA_GRADE_BADGE[anemiaGrade]} text-2xs w-full justify-center`}
             >
               {ANEMIA_GRADE_LABEL[anemiaGrade]}
-            </span>
-          ) : hbNum !== null && hbNum >= 11 ? (
-            <span className="badge badge-green text-2xs w-full justify-center">
-              Normal (≥ 11 g/dL)
             </span>
           ) : null}
           {errors.hb && <p className="text-2xs text-triage-red font-medium">{errors.hb}</p>}

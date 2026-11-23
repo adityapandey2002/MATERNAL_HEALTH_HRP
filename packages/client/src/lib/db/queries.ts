@@ -84,7 +84,15 @@ async function readOrEmpty<T>(what: string, read: () => Promise<T[]>): Promise<T
 export function useLocalPatients() {
   return useLiveQuery(async () => {
     const rows = await readOrEmpty("patients", () => patientRepo.list());
-    return rows.map(toPatient);
+    const session = getCachedSession();
+    // Field workers (ANM / CHO) only see the women they registered.
+    // This mirrors the server-side scoping so the offline list matches the
+    // online list without requiring a re-sync after login.
+    const userId = session?.user?.id;
+    const role = session?.user?.role;
+    const isField = role === "ANM" || role === "CHO";
+    const filtered = isField && userId ? rows.filter((r) => r.registeredBy === userId) : rows;
+    return filtered.map(toPatient);
   }, []);
 }
 
