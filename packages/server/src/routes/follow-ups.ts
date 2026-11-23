@@ -41,12 +41,15 @@ type FollowUpJoinedRow = FollowUpRow & {
   patient_age: number;
   patient_risk_level: "GREEN" | "AMBER" | "RED";
   hrp_complication: string | null;
+  registration_hb?: number | null;
+  anemia_grade?: string | null;
   assigned_to_name: string | null;
   assigned_to_role: string | null;
   completed_by_name: string | null;
   completed_by_role: string | null;
   village: string | null;
   block_name: string | null;
+  fcm_administered?: boolean | null;
 };
 
 /**
@@ -61,13 +64,34 @@ function toFollowUpListItem(row: FollowUpJoinedRow): FollowUpListItem {
     patientPhone: row.patient_phone,
     patientRiskLevel: row.patient_risk_level,
     hrpComplication: (row.hrp_complication ?? null) as FollowUpListItem["hrpComplication"],
+    registrationHb: row.registration_hb ?? null,
+    anemiaGrade: (row.anemia_grade ?? null) as FollowUpListItem["anemiaGrade"],
     village: row.village,
     blockName: row.block_name,
     assignedToName: row.assigned_to_name,
     assignedToRole: row.assigned_to_role,
     completedByName: row.completed_by_name,
     completedByRole: row.completed_by_role,
+    fcmAdministered: row.fcm_administered ?? null,
   };
+}
+
+export function computeFollowUpNotes(
+  currentNotes: string | null | undefined,
+  fcmAdministered: boolean | null | undefined
+): string | null | undefined {
+  if (fcmAdministered === true) {
+    const fcmTag = "[FCM: Administered]";
+    return currentNotes
+      ? currentNotes.includes(fcmTag)
+        ? currentNotes
+        : `${currentNotes} ${fcmTag}`
+      : fcmTag;
+  }
+  if (fcmAdministered === false && currentNotes) {
+    return currentNotes.replace(/\[FCM: Administered\]/g, "").trim() || null;
+  }
+  return currentNotes;
 }
 
 export const followUpRoutes: FastifyPluginAsync = async (app) => {
@@ -436,16 +460,17 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
             : completedAtRaw;
 
       const result = await db.transaction().execute(async (trx) => {
+        const baseNotes = data.notes !== undefined ? data.notes : existing.notes;
+        const finalNotes = computeFollowUpNotes(baseNotes, data.fcmAdministered);
+
         const setClause: Updateable<DB["follow_ups"]> = {
           status: data.status,
           updated_at: now,
+          ...(finalNotes !== existing.notes ? { notes: finalNotes } : {}),
+          ...(data.status === "COMPLETE"
+            ? { completed_at: completedAt, completed_by_user_id: request.actor.userId }
+            : {}),
         };
-
-        if (data.notes !== undefined) setClause.notes = data.notes;
-        if (data.status === "COMPLETE") {
-          setClause.completed_at = completedAt;
-          setClause.completed_by_user_id = request.actor.userId;
-        }
 
         const updated = await trx
           .updateTable("follow_ups")
