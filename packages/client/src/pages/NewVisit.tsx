@@ -190,6 +190,7 @@ export default function NewVisitPage() {
       ifaGiven: supplements.ifaGiven ?? false,
       calciumGiven: supplements.calciumGiven ?? false,
       albendazoleGiven: supplements.albendazoleGiven ?? false,
+      fcmAdministered: false,
       referred,
       referralReason: referred ? referralReason : null,
       referralFacilityId: null,

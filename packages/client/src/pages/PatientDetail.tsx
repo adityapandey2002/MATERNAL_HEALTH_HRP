@@ -683,7 +683,14 @@ function VisitHistory({ visits }: { visits: Visit[] }) {
                 {visit.ifaGiven && <span className="badge badge-gray">IFA</span>}
                 {visit.calciumGiven && <span className="badge badge-gray">Calcium</span>}
                 {visit.albendazoleGiven && <span className="badge badge-gray">Albendazole</span>}
-                {visit.referred && <span className="badge badge-amber">Referred</span>}
+                {visit.fcmAdministered && (
+                  <span className="badge badge-teal">FCM Administered</span>
+                )}
+                {visit.referred && (
+                  <span className="badge badge-purple">
+                    {visit.referralFacilityType === "DH" ? "Ref: Sadar DH" : "Ref: CHC/FRU"}
+                  </span>
+                )}
               </div>
             </li>
           ))}

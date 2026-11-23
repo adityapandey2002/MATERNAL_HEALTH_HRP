@@ -32,6 +32,7 @@ import { PageHeader } from "../ui/PageHeader";
 import { Panel, PanelHeader } from "../ui/Panel";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { StatTile } from "../ui/Stat";
+import { RecordFollowUpVisitModal } from "./RecordFollowUpVisitModal";
 
 type StatusFilter = HrpFollowUpStatus | "ALL";
 type StageFilter = HrpFollowUpTrack | "ALL";
@@ -57,6 +58,7 @@ export default function NodalFollowUpPanel() {
   const [stageFilter, setStageFilter] = useState<StageFilter>("ALL");
   const [villageFilter, setVillageFilter] = useState("ALL");
   const [search, setSearch] = useState("");
+  const [recordModalRow, setRecordModalRow] = useState<FollowUpRow | null>(null);
 
   const {
     data: recordsData,
@@ -155,6 +157,10 @@ export default function NodalFollowUpPanel() {
   });
 
   const setStatus = (row: FollowUpRow, status: HrpFollowUpStatus) => {
+    if (status === "COMPLETE") {
+      setRecordModalRow(row);
+      return;
+    }
     if (!row.followUpId) return;
     statusMutation.mutate({ followUpId: row.followUpId, status });
   };
@@ -306,6 +312,7 @@ export default function NodalFollowUpPanel() {
                   isPending={statusMutation.isPending}
                   onSetStatus={setStatus}
                   onToggleFcm={toggleFcm}
+                  onOpenRecordModal={setRecordModalRow}
                 />
               ))}
             </ul>
@@ -321,7 +328,7 @@ export default function NodalFollowUpPanel() {
                     <th scope="col">Attribution</th>
                     <th scope="col">Due</th>
                     <th scope="col">Last update</th>
-                    <th scope="col">Status</th>
+                    <th scope="col">Status & Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -333,6 +340,7 @@ export default function NodalFollowUpPanel() {
                       isPending={statusMutation.isPending}
                       onSetStatus={setStatus}
                       onToggleFcm={toggleFcm}
+                      onOpenRecordModal={setRecordModalRow}
                     />
                   ))}
                 </tbody>
@@ -341,6 +349,17 @@ export default function NodalFollowUpPanel() {
           </>
         )}
       </Panel>
+
+      <RecordFollowUpVisitModal
+        open={Boolean(recordModalRow)}
+        row={recordModalRow}
+        onClose={() => setRecordModalRow(null)}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ["hrp"] });
+          queryClient.invalidateQueries({ queryKey: ["patients"] });
+          queryClient.invalidateQueries({ queryKey: ["visits"] });
+        }}
+      />
     </div>
   );
 }
@@ -351,12 +370,14 @@ function NodalMobileCard({
   isPending,
   onSetStatus,
   onToggleFcm,
+  onOpenRecordModal,
 }: {
   row: FollowUpRow;
   showBlockColumn: boolean;
   isPending: boolean;
   onSetStatus: (row: FollowUpRow, status: HrpFollowUpStatus) => void;
   onToggleFcm: (row: FollowUpRow, fcm: boolean) => void;
+  onOpenRecordModal: (row: FollowUpRow) => void;
 }) {
   return (
     <li className="px-4 py-3 sm:px-5">
@@ -444,7 +465,7 @@ function NodalMobileCard({
           <select
             className="input min-h-control py-1.5"
             value={row.status}
-            disabled={!row.followUpId || isPending}
+            disabled={isPending}
             onChange={(event) => onSetStatus(row, event.target.value as HrpFollowUpStatus)}
           >
             {HRP_FOLLOW_UP_STATUSES.map((status) => (
@@ -454,6 +475,15 @@ function NodalMobileCard({
             ))}
           </select>
         </label>
+        {row.status !== "COMPLETE" && (
+          <button
+            type="button"
+            className="btn btn-primary btn-sm bg-teal-700 hover:bg-teal-800 text-white"
+            onClick={() => onOpenRecordModal(row)}
+          >
+            Record Visit
+          </button>
+        )}
         <Link
           to={`/patients/${row.patientId}`}
           className="btn btn-secondary btn-sm"
@@ -472,12 +502,14 @@ function NodalDesktopRow({
   isPending,
   onSetStatus,
   onToggleFcm,
+  onOpenRecordModal,
 }: {
   row: FollowUpRow;
   showBlockColumn: boolean;
   isPending: boolean;
   onSetStatus: (row: FollowUpRow, status: HrpFollowUpStatus) => void;
   onToggleFcm: (row: FollowUpRow, fcm: boolean) => void;
+  onOpenRecordModal: (row: FollowUpRow) => void;
 }) {
   return (
     <tr>
@@ -538,19 +570,30 @@ function NodalDesktopRow({
       </td>
       <td>
         <div className="space-y-1.5">
-          <select
-            className="input min-h-control w-auto py-1.5"
-            aria-label={`Follow-up status for ${row.patientName}`}
-            value={row.status}
-            disabled={!row.followUpId || isPending}
-            onChange={(event) => onSetStatus(row, event.target.value as HrpFollowUpStatus)}
-          >
-            {HRP_FOLLOW_UP_STATUSES.map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-1.5">
+            <select
+              className="input min-h-control w-auto py-1.5 text-xs"
+              aria-label={`Follow-up status for ${row.patientName}`}
+              value={row.status}
+              disabled={isPending}
+              onChange={(event) => onSetStatus(row, event.target.value as HrpFollowUpStatus)}
+            >
+              {HRP_FOLLOW_UP_STATUSES.map((status) => (
+                <option key={status.value} value={status.value}>
+                  {status.label}
+                </option>
+              ))}
+            </select>
+            {row.status !== "COMPLETE" && (
+              <button
+                type="button"
+                className="btn btn-primary btn-xs whitespace-nowrap bg-teal-700 hover:bg-teal-800 text-white"
+                onClick={() => onOpenRecordModal(row)}
+              >
+                Record Visit
+              </button>
+            )}
+          </div>
           {isFcmIndicated(row.anemiaGrade, row.complication, row.complications) && (
             <label className="flex items-center gap-1.5 cursor-pointer text-2xs font-medium text-ink bg-primary-light border border-primary-ring rounded px-2 py-0.5">
               <input

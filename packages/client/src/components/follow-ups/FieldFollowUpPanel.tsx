@@ -6,7 +6,7 @@ import {
 } from "@hrp/shared";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLocalFollowUpItems, useLocalPatients } from "../../lib/db/queries";
 import { followUpRepo } from "../../lib/db/repositories";
@@ -32,6 +32,7 @@ import {
 import { PageHeader } from "../ui/PageHeader";
 import { Panel, PanelBody, PanelHeader } from "../ui/Panel";
 import { StatTile } from "../ui/Stat";
+import { RecordFollowUpVisitModal } from "./RecordFollowUpVisitModal";
 
 interface UpdateStatusVariables {
   followUpId: string;
@@ -53,6 +54,7 @@ interface UpdateStatusVariables {
 export default function FieldFollowUpPanel() {
   const patients = useLocalPatients();
   const records = useLocalFollowUpItems();
+  const [recordModalRow, setRecordModalRow] = useState<FollowUpRow | null>(null);
 
   // Refresh the cache when a connection is available; the list renders from
   // Dexie either way, so this never blocks the first paint.
@@ -234,6 +236,7 @@ export default function FieldFollowUpPanel() {
                       row={row}
                       pending={statusMutation.isPending}
                       onStatus={setStatus}
+                      onOpenRecordModal={setRecordModalRow}
                     />
                   </li>
                 ))}
@@ -247,6 +250,12 @@ export default function FieldFollowUpPanel() {
         <SyncIcon className="h-3.5 w-3.5" />
         Changes save on this device and sync to the block line list when the network returns.
       </p>
+
+      <RecordFollowUpVisitModal
+        open={Boolean(recordModalRow)}
+        row={recordModalRow}
+        onClose={() => setRecordModalRow(null)}
+      />
     </div>
   );
 }
@@ -288,10 +297,12 @@ function FieldFollowUpCard({
   row,
   pending,
   onStatus,
+  onOpenRecordModal,
 }: {
   row: FollowUpRow;
   pending: boolean;
   onStatus: (row: FollowUpRow, status: HrpFollowUpStatus) => void;
+  onOpenRecordModal: (row: FollowUpRow) => void;
 }) {
   const motherPhone = row.phone?.replace(/\D/g, "");
   const ashaPhone = row.ashaPhone?.replace(/\D/g, "");
@@ -336,13 +347,13 @@ function FieldFollowUpCard({
         <div className="mt-3 flex flex-wrap gap-2">
           <button
             type="button"
-            className="btn btn-success btn-sm"
-            onClick={() => onStatus(row, "COMPLETE")}
-            disabled={pending || !row.followUpId}
+            className="btn btn-primary btn-sm bg-teal-700 hover:bg-teal-800 text-white"
+            onClick={() => onOpenRecordModal(row)}
+            disabled={pending}
             aria-label={`Mark complete for ${row.patientName}`}
           >
             <CheckIcon className="h-3.5 w-3.5" />
-            Mark complete
+            Complete & Record Visit
           </button>
           <button
             type="button"

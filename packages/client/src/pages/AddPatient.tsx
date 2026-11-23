@@ -25,7 +25,7 @@ import {
 } from "../components/ui/Icons";
 import { api } from "../lib/api";
 import type { LocalPatient } from "../lib/db/local-db";
-import { patientRepo } from "../lib/db/repositories";
+import { followUpRepo, patientRepo } from "../lib/db/repositories";
 import { eddFromLmp, gestationalAgeLabel } from "../lib/hrp";
 import { useUnsavedChangesGuard } from "../lib/native";
 import { useUserRole } from "../lib/session";
@@ -716,6 +716,82 @@ function ReferralSection({
   );
 }
 
+async function createInitialFollowUp(params: {
+  patientId: string;
+  userId: string;
+  referred: boolean;
+  now: string;
+}) {
+  const initialFollowUpId = crypto.randomUUID();
+  const initialTrack = params.referred ? "BLOCK_15_DAY" : "FIELD_15_DAY";
+  const scheduledDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
+  await followUpRepo.upsert({
+    id: initialFollowUpId,
+    patientId: params.patientId,
+    assignedToUserId: params.userId,
+    assignedByUserId: params.userId,
+    level: "ANM",
+    status: "PENDING",
+    track: initialTrack,
+    scheduledDate,
+    notes: null,
+    completedAt: null,
+    completedByUserId: null,
+    fcmAdministered: false,
+    createdAt: params.now,
+    updatedAt: params.now,
+    syncStatus: "pending",
+  });
+}
+
+function buildLocalPatientRecord(
+  data: CreatePatient,
+  id: string,
+  user: { id: string; name?: string | null; facilityId?: string } | null,
+  form: FormState,
+  now: string
+): LocalPatient {
+  const registrationHb = typeof data.registrationHb === "number" ? data.registrationHb : null;
+  const anemiaGrade = anemiaGradeFromHb(registrationHb);
+
+  return {
+    id,
+    abhaId: data.abhaId ?? null,
+    facilityId: user?.facilityId ?? "",
+    registeredBy: user?.id ?? "",
+    anmName: user?.name ?? null,
+    name: data.name,
+    age: data.age,
+    phone: data.phone ?? null,
+    address: data.address ?? null,
+    hrpReason: (data.hrpReason ?? null) as string | null,
+    hrpComplication: (data.hrpComplication ?? null) as string | null,
+    hrpComplications: form.complications,
+    registrationHb,
+    anemiaGrade,
+    ashaName: data.ashaName ?? null,
+    ashaPhone: data.ashaPhone ?? null,
+    referred: data.referred,
+    referralFacilityType: form.referred ? form.referralFacilityType : null,
+    isHrp: data.isHrp ?? true,
+    followUpTrack: null,
+    followUpScheduledDate: null,
+    followUpStatus: data.followUpStatus ?? "PENDING",
+    lmp: data.lmp ? new Date(data.lmp).toISOString() : null,
+    edd: data.edd ? new Date(data.edd).toISOString() : null,
+    gravida: data.gravida ?? 0,
+    para: data.para ?? 0,
+    abortions: data.abortions ?? 0,
+    riskFactors: data.riskFactors ?? [],
+    riskLevel: "AMBER",
+    riskScore: 0,
+    isHighRisk: true,
+    createdAt: now,
+    updatedAt: now,
+    syncStatus: "pending",
+  };
+}
+
 export default function AddPatientPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -764,49 +840,11 @@ export default function AddPatientPage() {
           throw new Error("Sign in once with a connection before adding a case offline.");
         }
       }
-      const facilityId = user?.facilityId ?? "";
-      const anmName = user?.name ?? null;
       const now = new Date().toISOString();
 
-      const registrationHb = typeof data.registrationHb === "number" ? data.registrationHb : null;
-      const anemiaGrade = anemiaGradeFromHb(registrationHb);
+      const localRecord = buildLocalPatientRecord(data, id, user ?? null, form, now);
+      await patientRepo.upsert(localRecord);
 
-      await patientRepo.upsert({
-        id,
-        abhaId: data.abhaId ?? null,
-        facilityId,
-        registeredBy: user?.id ?? "",
-        anmName,
-        name: data.name,
-        age: data.age,
-        phone: data.phone ?? null,
-        address: data.address ?? null,
-        hrpReason: (data.hrpReason ?? null) as string | null,
-        hrpComplication: (data.hrpComplication ?? null) as string | null,
-        hrpComplications: form.complications,
-        registrationHb,
-        anemiaGrade,
-        ashaName: data.ashaName ?? null,
-        ashaPhone: data.ashaPhone ?? null,
-        referred: data.referred,
-        referralFacilityType: form.referred ? form.referralFacilityType : null,
-        isHrp: data.isHrp ?? true,
-        followUpTrack: null,
-        followUpScheduledDate: null,
-        followUpStatus: data.followUpStatus ?? "PENDING",
-        lmp: data.lmp ? new Date(data.lmp).toISOString() : null,
-        edd: data.edd ? new Date(data.edd).toISOString() : null,
-        gravida: data.gravida ?? 0,
-        para: data.para ?? 0,
-        abortions: data.abortions ?? 0,
-        riskFactors: data.riskFactors ?? [],
-        riskLevel: "AMBER",
-        riskScore: 0,
-        isHighRisk: true,
-        createdAt: now,
-        updatedAt: now,
-        syncStatus: "pending",
-      });
       await enqueueOp({
         entityType: "patient",
         entityId: id,
@@ -822,6 +860,14 @@ export default function AddPatientPage() {
         },
         clientUpdatedAt: now,
       });
+
+      await createInitialFollowUp({
+        patientId: id,
+        userId: user?.id ?? "",
+        referred: form.referred,
+        now,
+      });
+
       return id;
     },
     onSuccess: () => {
