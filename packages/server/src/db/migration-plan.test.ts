@@ -88,6 +88,7 @@ describe("migration plan", () => {
       "007_matru_suraksha_roles",
       "008_device_registry",
       "009_repair_facility_paths",
+      "010_anemia_fcm_referral_fields",
     ]);
   });
 });

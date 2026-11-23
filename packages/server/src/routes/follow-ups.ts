@@ -41,8 +41,10 @@ type FollowUpJoinedRow = FollowUpRow & {
   patient_age: number;
   patient_risk_level: "GREEN" | "AMBER" | "RED";
   hrp_complication: string | null;
+  hrp_complications?: unknown;
   registration_hb?: number | null;
   anemia_grade?: string | null;
+  referral_facility_type?: string | null;
   assigned_to_name: string | null;
   assigned_to_role: string | null;
   completed_by_name: string | null;
@@ -64,8 +66,15 @@ function toFollowUpListItem(row: FollowUpJoinedRow): FollowUpListItem {
     patientPhone: row.patient_phone,
     patientRiskLevel: row.patient_risk_level,
     hrpComplication: (row.hrp_complication ?? null) as FollowUpListItem["hrpComplication"],
+    hrpComplications: (Array.isArray(row.hrp_complications)
+      ? row.hrp_complications
+      : row.hrp_complication
+        ? [row.hrp_complication]
+        : []) as FollowUpListItem["hrpComplications"],
     registrationHb: row.registration_hb ?? null,
     anemiaGrade: (row.anemia_grade ?? null) as FollowUpListItem["anemiaGrade"],
+    referralFacilityType: (row.referral_facility_type ??
+      null) as FollowUpListItem["referralFacilityType"],
     village: row.village,
     blockName: row.block_name,
     assignedToName: row.assigned_to_name,
@@ -154,6 +163,10 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
         "patients.age as patient_age",
         "patients.risk_level as patient_risk_level",
         "patients.hrp_complication as hrp_complication",
+        "patients.hrp_complications as hrp_complications",
+        "patients.registration_hb as registration_hb",
+        "patients.anemia_grade as anemia_grade",
+        "patients.referral_facility_type as referral_facility_type",
         "assigned_user.name as assigned_to_name",
         "assigned_user.role as assigned_to_role",
         "completed_user.name as completed_by_name",
@@ -467,6 +480,7 @@ export const followUpRoutes: FastifyPluginAsync = async (app) => {
           status: data.status,
           updated_at: now,
           ...(finalNotes !== existing.notes ? { notes: finalNotes } : {}),
+          ...(data.fcmAdministered !== undefined ? { fcm_administered: data.fcmAdministered } : {}),
           ...(data.status === "COMPLETE"
             ? { completed_at: completedAt, completed_by_user_id: request.actor.userId }
             : {}),

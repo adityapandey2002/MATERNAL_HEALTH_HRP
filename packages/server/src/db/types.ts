@@ -52,6 +52,10 @@ export interface Patient {
   address: string | null;
   hrp_reason: string | null;
   hrp_complication: string | null;
+  hrp_complications: ColumnType<string[], string | undefined, string>;
+  registration_hb: number | null;
+  anemia_grade: string | null;
+  referral_facility_type: string | null;
   asha_name: string | null;
   asha_phone: string | null;
   referred: Generated<boolean>;
@@ -207,6 +211,7 @@ export interface FollowUp {
   completed_at: Date | null;
   completed_by_user_id: string | null;
   notes: string | null;
+  fcm_administered: boolean | null;
   created_at: Generated<Date>;
   updated_at: Generated<Date>;
 }

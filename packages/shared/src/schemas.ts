@@ -267,6 +267,8 @@ export type FollowUp = Omit<z.infer<typeof CreateFollowUpSchema>, "scheduledDate
   createdAt: Date | string;
   updatedAt: Date | string;
   scheduledDate: Date | string;
+  fcmAdministered?: boolean | null;
+  referralFacilityType?: ReferralFacilityType | null;
 };
 
 /**

@@ -44,6 +44,10 @@ export function serializePatient(row: PatientRow, anmName?: string | null): Pati
     address: row.address,
     hrpReason: (row.hrp_reason ?? null) as Patient["hrpReason"],
     hrpComplication: (row.hrp_complication ?? null) as Patient["hrpComplication"],
+    hrpComplications: (row.hrp_complications ?? []) as Patient["hrpComplications"],
+    registrationHb: row.registration_hb ?? null,
+    anemiaGrade: (row.anemia_grade ?? null) as Patient["anemiaGrade"],
+    referralFacilityType: (row.referral_facility_type ?? null) as Patient["referralFacilityType"],
     isHrp: row.is_hrp,
     followUpTrack: row.follow_up_track as Patient["followUpTrack"],
     followUpScheduledDate: row.follow_up_scheduled_date,
@@ -186,6 +190,7 @@ export function serializeFollowUp(row: FollowUpRow): FollowUp {
     completedAt: row.completed_at,
     completedByUserId: row.completed_by_user_id,
     notes: row.notes,
+    fcmAdministered: row.fcm_administered ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

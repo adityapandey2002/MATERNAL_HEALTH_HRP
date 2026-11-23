@@ -54,6 +54,10 @@ export function mapPatientToRow(
     address: data.address ?? null,
     hrp_reason: data.hrpReason ?? null,
     hrp_complication: data.hrpComplication ?? null,
+    hrp_complications: toJson(data.hrpComplications ?? []),
+    registration_hb: data.registrationHb ?? null,
+    anemia_grade: data.anemiaGrade ?? null,
+    referral_facility_type: data.referralFacilityType ?? null,
     asha_name: data.ashaName ?? null,
     asha_phone: data.ashaPhone ?? null,
     referred: data.referred,
@@ -79,6 +83,12 @@ export function mapPatientChanges(data: UpdatePatient): Updateable<DB["patients"
   if (data.abhaId !== undefined) row.abha_id = data.abhaId ?? null;
   if (data.hrpReason !== undefined) row.hrp_reason = data.hrpReason ?? null;
   if (data.hrpComplication !== undefined) row.hrp_complication = data.hrpComplication ?? null;
+  if (data.hrpComplications !== undefined)
+    row.hrp_complications = toJson(data.hrpComplications ?? []);
+  if (data.registrationHb !== undefined) row.registration_hb = data.registrationHb ?? null;
+  if (data.anemiaGrade !== undefined) row.anemia_grade = data.anemiaGrade ?? null;
+  if (data.referralFacilityType !== undefined)
+    row.referral_facility_type = data.referralFacilityType ?? null;
   if (data.isHrp !== undefined) row.is_hrp = data.isHrp;
   if (data.ashaName !== undefined) row.asha_name = data.ashaName ?? null;
   if (data.ashaPhone !== undefined) row.asha_phone = data.ashaPhone ?? null;
