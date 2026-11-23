@@ -59,7 +59,9 @@ export interface LocalVisit {
   weight: number | null;
   dangerSigns: string[];
   supplements: Record<string, boolean>;
+  fcmAdministered?: boolean;
   referred: boolean;
+  referralFacilityType?: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;

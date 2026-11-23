@@ -11,6 +11,7 @@ import type {
   Pagination,
   Patient,
   PatientFilter,
+  RecordFollowUpVisit,
   StaffMember,
   SupervisionAlert,
   SupervisionFilter,
@@ -326,6 +327,11 @@ export const api = {
         }),
       dispatch: (data: DispatchFollowUp) =>
         request<{ data: FollowUpListItem[]; count: number }>("/hrp/follow-ups/dispatch", {
+          method: "POST",
+          body: JSON.stringify(data),
+        }),
+      recordVisit: (data: RecordFollowUpVisit) =>
+        request<{ visit: Visit; followUpId: string | null }>("/hrp/follow-ups/record-visit", {
           method: "POST",
           body: JSON.stringify(data),
         }),
