@@ -54,6 +54,9 @@ export const RiskLevel = z.enum(["GREEN", "AMBER", "RED"]);
 export const HrpFollowUpStatus = z.enum(["COMPLETE", "PENDING", "NOT_REACHABLE"]);
 export type HrpFollowUpStatus = "COMPLETE" | "PENDING" | "NOT_REACHABLE";
 
+export const ReferralFacilityType = z.enum(["CHC_FRU", "DH"]);
+export type ReferralFacilityType = "CHC_FRU" | "DH";
+
 /**
  * Stage of the repeating 15-day follow-up cycle.
  *
@@ -154,14 +157,18 @@ export const PatientSchema = z.object({
   phone: z.string().nullable().optional(),
   address: z.string().nullable().optional(),
   hrpReason: HrpReason.nullable().optional(), // why this pregnancy is high-risk
-  hrpComplication: HrpComplication.nullable().optional(), // HRP complication dropdown (8 values)
-  /** Haemoglobin recorded at registration (g/dL). Required when hrpComplication === ANEMIA. */
+  hrpComplication: HrpComplication.nullable().optional(), // HRP primary complication dropdown (8 values)
+  /** Multi-select complications recorded at registration. */
+  hrpComplications: z.array(HrpComplication).optional(),
+  /** Haemoglobin recorded at registration (g/dL). Required when hrpComplication === ANEMIA or ANEMIA is in complications. */
   registrationHb: z.number().min(1).max(20).nullable().optional(),
   /** Computed from registrationHb. Null when no Hb was recorded. */
   anemiaGrade: AnemiaGrade.nullable().optional(),
   ashaName: z.string().nullable().optional(),
   ashaPhone: z.string().nullable().optional(),
-  referred: z.boolean().default(false), // first cycle is block-owned when referred
+  referred: z.boolean().default(false), // first cycle is block/district-owned when referred
+  /** Facility type referred to: CHC_FRU (Block Helpdesk) or DH (District Sadar Helpdesk). */
+  referralFacilityType: ReferralFacilityType.nullable().optional(),
   isHrp: z.boolean().default(false), // marked as high-risk pregnancy
   // Automated follow-up scheduling (no manual toggle — server-calculated)
   followUpTrack: HrpFollowUpTrack.nullable().optional(),
@@ -298,18 +305,25 @@ export function anemiaGradeFromHb(hb: number | null | undefined): AnemiaGrade | 
 
 /**
  * Returns whether FCM (Ferric Carboxymaltose) administration should be
- * offered at block / district level for the given anemia grade.
- * FCM is indicated for SEVERE and MODERATE anaemia in pregnancy.
+ * offered at block / district level.
+ * FCM is available for EVERY anemia-related patient (severe, moderate, mild, or complication ANEMIA).
  */
-export function isFcmIndicated(grade: AnemiaGrade | null | undefined): boolean {
-  return grade === "SEVERE" || grade === "MODERATE";
+export function isFcmIndicated(
+  grade: AnemiaGrade | null | undefined,
+  complication?: HrpComplication | string | null | undefined,
+  complications?: (HrpComplication | string)[] | null | undefined
+): boolean {
+  if (grade === "SEVERE" || grade === "MODERATE" || grade === "MILD") return true;
+  if (complication === "ANEMIA") return true;
+  if (Array.isArray(complications) && complications.includes("ANEMIA")) return true;
+  return false;
 }
 
 export const ANEMIA_GRADE_LABEL: Record<AnemiaGrade, string> = {
-  SEVERE: "Severe Anemia (Hb < 7 g/dL)",
-  MODERATE: "Moderate Anemia (Hb 7–8.9 g/dL)",
-  MILD: "Mild Anemia (Hb 9–10.9 g/dL)",
-  NORMAL: "Normal (Hb ≥ 11 g/dL)",
+  SEVERE: "Severe Anemic (< 7 g/dL)",
+  MODERATE: "Moderate Anemic (7–8.9 g/dL)",
+  MILD: "Mild Anemic (9–10.9 g/dL)",
+  NORMAL: "Normal (≥ 11 g/dL)",
 };
 
 export const ANEMIA_GRADE_BADGE: Record<AnemiaGrade, string> = {

@@ -9,6 +9,7 @@ import {
   FacilitySchema,
   HrpComplication,
   PatientSchema,
+  ReferralFacilityType,
   ReferralSchema,
   RiskLevel,
   SupervisionAlertSchema,
@@ -279,6 +280,8 @@ export interface FollowUpListItem extends FollowUp {
   patientPhone: string | null;
   patientRiskLevel: RiskLevel;
   hrpComplication: HrpComplication | null;
+  /** Multi-select complications for this patient. */
+  hrpComplications?: HrpComplication[] | null;
   /** Hb recorded at registration — drives anemia badge and FCM eligibility. */
   registrationHb: number | null;
   /** Computed anemia grade for this patient (from registrationHb). */
@@ -286,6 +289,8 @@ export interface FollowUpListItem extends FollowUp {
   village: string | null;
   /** Block the patient's facility belongs to, for district roll-ups. */
   blockName: string | null;
+  /** Referral facility type (CHC_FRU or DH) if referred. */
+  referralFacilityType?: ReferralFacilityType | null;
   assignedToName: string | null;
   assignedToRole: string | null;
   completedByName: string | null;

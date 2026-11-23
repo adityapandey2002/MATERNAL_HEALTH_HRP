@@ -144,6 +144,18 @@ describe("PatientSchema", () => {
     expect(parsed.anemiaGrade).toBe("SEVERE");
   });
 
+  it("accepts hrpComplications array and referralFacilityType", () => {
+    const parsed = PatientSchema.parse({
+      ...valid,
+      hrpComplication: "ANEMIA",
+      hrpComplications: ["ANEMIA", "PIH"],
+      referred: true,
+      referralFacilityType: "DH",
+    });
+    expect(parsed.hrpComplications).toEqual(["ANEMIA", "PIH"]);
+    expect(parsed.referralFacilityType).toBe("DH");
+  });
+
   it("rejects an invalid anemiaGrade", () => {
     expect(PatientSchema.safeParse({ ...valid, anemiaGrade: "CRITICAL" }).success).toBe(false);
   });
@@ -266,14 +278,20 @@ describe("anemiaGradeFromHb", () => {
 });
 
 describe("isFcmIndicated", () => {
-  it("returns true for SEVERE and MODERATE", () => {
+  it("returns true for all anemia grades (SEVERE, MODERATE, MILD)", () => {
     expect(isFcmIndicated("SEVERE")).toBe(true);
     expect(isFcmIndicated("MODERATE")).toBe(true);
+    expect(isFcmIndicated("MILD")).toBe(true);
   });
 
-  it("returns false for MILD, NORMAL, or unrecorded", () => {
-    expect(isFcmIndicated("MILD")).toBe(false);
+  it("returns true when complication or complications includes ANEMIA", () => {
+    expect(isFcmIndicated("NORMAL", "ANEMIA")).toBe(true);
+    expect(isFcmIndicated(null, null, ["ANEMIA", "PIH"])).toBe(true);
+  });
+
+  it("returns false for NORMAL without anemia complication, or unrecorded", () => {
     expect(isFcmIndicated("NORMAL")).toBe(false);
+    expect(isFcmIndicated("NORMAL", "PIH")).toBe(false);
     expect(isFcmIndicated(null)).toBe(false);
     expect(isFcmIndicated(undefined)).toBe(false);
   });
