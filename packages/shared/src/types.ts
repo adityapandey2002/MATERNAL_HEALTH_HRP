@@ -208,8 +208,10 @@ export const VisitSchema = z.object({
   ifaGiven: z.boolean().default(false),
   calciumGiven: z.boolean().default(false),
   albendazoleGiven: z.boolean().default(false),
+  fcmAdministered: z.boolean().optional().default(false),
   // Referral
   referred: z.boolean().default(false),
+  referralFacilityType: ReferralFacilityType.nullable().optional(),
   referralReason: z.string().nullable().optional(),
   referralFacilityId: z.string().uuid().nullable().optional(),
   notes: z.string().nullable().optional(),

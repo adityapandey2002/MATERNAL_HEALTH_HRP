@@ -310,6 +310,31 @@ export const DispatchFollowUpSchema = z.object({
 
 export type DispatchFollowUp = z.infer<typeof DispatchFollowUpSchema>;
 
+export const RecordFollowUpVisitSchema = z.object({
+  patientId: z.string().uuid(),
+  followUpId: z.string().uuid().nullable().optional(),
+  visitDate: DateInput,
+  visitNumber: z.number().int().min(1),
+  gestationalWeeks: z.number().min(0).max(45),
+  bpSystolic: z.number().int().nullable().optional(),
+  bpDiastolic: z.number().int().nullable().optional(),
+  hb: z.number().nullable().optional(),
+  weight: z.number().nullable().optional(),
+  fundalHeight: z.number().nullable().optional(),
+  fetalHeartRate: z.number().int().nullable().optional(),
+  dangerSigns: z.array(DangerSign).default([]),
+  ifaGiven: z.boolean().default(false),
+  calciumGiven: z.boolean().default(false),
+  albendazoleGiven: z.boolean().default(false),
+  fcmAdministered: z.boolean().default(false),
+  referred: z.boolean().default(false),
+  referralFacilityType: ReferralFacilityType.nullable().optional(),
+  referralReason: z.string().nullable().optional(),
+  notes: z.string().nullable().optional(),
+});
+
+export type RecordFollowUpVisit = z.infer<typeof RecordFollowUpVisitSchema>;
+
 /* ============================================================================
  * Staff provisioning — delegated account creation down the hierarchy
  * ============================================================================ */
@@ -398,6 +423,7 @@ export const apiSchemas = {
     filter: FollowUpFilterSchema,
     schedule: ScheduleFollowUpSchema,
     dispatch: DispatchFollowUpSchema,
+    recordVisit: RecordFollowUpVisitSchema,
   },
   nodal: { dashboard: NodalDashboardSchema },
   fieldLevel: {
