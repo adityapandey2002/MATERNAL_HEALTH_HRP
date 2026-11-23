@@ -389,9 +389,20 @@ function NodalMobileCard({
         </div>
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-1.5">
-        {row.complication ? (
-          <span className="text-2xs font-medium text-triage-red">
+        {row.complications && row.complications.length > 0 ? (
+          row.complications.map((comp) => (
+            <span key={comp} className="badge badge-gray text-2xs">
+              {getHrpComplicationLabel(comp)}
+            </span>
+          ))
+        ) : row.complication ? (
+          <span className="badge badge-gray text-2xs">
             {getHrpComplicationLabel(row.complication)}
+          </span>
+        ) : null}
+        {row.referralFacilityType ? (
+          <span className="badge badge-purple text-2xs">
+            {row.referralFacilityType === "DH" ? "Ref: Sadar DH" : "Ref: CHC/FRU"}
           </span>
         ) : null}
         {row.anemiaGrade ? (
@@ -400,7 +411,7 @@ function NodalMobileCard({
           </span>
         ) : null}
       </div>
-      {isFcmIndicated(row.anemiaGrade) && (
+      {isFcmIndicated(row.anemiaGrade, row.complication, row.complications) && (
         <div className="mt-2 flex items-center justify-between rounded border border-primary-ring bg-primary-light px-3 py-1.5">
           <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-ink">
             <input
@@ -483,11 +494,29 @@ function NodalDesktopRow({
           </span>
         </div>
         <p className="tnum text-2xs text-ink-subtle">{row.age} yrs</p>
-        {row.anemiaGrade && (
-          <span className={`badge ${ANEMIA_GRADE_BADGE[row.anemiaGrade]} mt-1 text-2xs`}>
-            {ANEMIA_GRADE_LABEL[row.anemiaGrade]}
-          </span>
-        )}
+        <div className="mt-1 flex flex-wrap gap-1">
+          {row.complications && row.complications.length > 0 ? (
+            row.complications.map((comp) => (
+              <span key={comp} className="badge badge-gray text-2xs">
+                {getHrpComplicationLabel(comp)}
+              </span>
+            ))
+          ) : row.complication ? (
+            <span className="badge badge-gray text-2xs">
+              {getHrpComplicationLabel(row.complication)}
+            </span>
+          ) : null}
+          {row.referralFacilityType ? (
+            <span className="badge badge-purple text-2xs">
+              {row.referralFacilityType === "DH" ? "Ref: Sadar DH" : "Ref: CHC/FRU"}
+            </span>
+          ) : null}
+          {row.anemiaGrade ? (
+            <span className={`badge ${ANEMIA_GRADE_BADGE[row.anemiaGrade]} text-2xs`}>
+              {ANEMIA_GRADE_LABEL[row.anemiaGrade]}
+            </span>
+          ) : null}
+        </div>
       </td>
       <td className="text-ink-muted">{row.village ?? "—"}</td>
       {showBlockColumn ? <td className="text-ink-muted">{row.blockName ?? "—"}</td> : null}
@@ -522,7 +551,7 @@ function NodalDesktopRow({
               </option>
             ))}
           </select>
-          {isFcmIndicated(row.anemiaGrade) && (
+          {isFcmIndicated(row.anemiaGrade, row.complication, row.complications) && (
             <label className="flex items-center gap-1.5 cursor-pointer text-2xs font-medium text-ink bg-primary-light border border-primary-ring rounded px-2 py-0.5">
               <input
                 type="checkbox"

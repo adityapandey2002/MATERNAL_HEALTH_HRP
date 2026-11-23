@@ -128,7 +128,7 @@ describe("NodalFollowUpPanel", () => {
 
     expect(await screen.findAllByText("Sunita Devi")).toHaveLength(2); // desktop + mobile
     expect(screen.getAllByText("MS-2026-111111")).toHaveLength(2);
-    expect(screen.getAllByText("Severe Anemia (Hb < 7 g/dL)")).toHaveLength(2);
+    expect(screen.getAllByText("Severe Anemic (< 7 g/dL)")).toHaveLength(2);
   });
 
   it("renders FCM Administered checkbox for severe anemia and allows toggling", async () => {
@@ -201,5 +201,40 @@ describe("NodalFollowUpPanel", () => {
 
     expect(await screen.findAllByText("Sunita Devi")).toHaveLength(2);
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it("renders FCM Administered checkbox for mild anemia patients as well", async () => {
+    const mildAnemiaPatient: Patient = {
+      ...mockSevereAnemiaPatient,
+      id: "33333333-3333-4333-8333-333333333333",
+      registrationHb: 10.2,
+      anemiaGrade: "MILD",
+    };
+    const mildAnemiaFollowUp: FollowUpListItem = {
+      ...mockFollowUpItem,
+      id: "fu-3",
+      patientId: "33333333-3333-4333-8333-333333333333",
+      registrationHb: 10.2,
+      anemiaGrade: "MILD",
+      fcmAdministered: false,
+    };
+
+    vi.mocked(api.hrp.patients.list).mockResolvedValue({
+      data: [mildAnemiaPatient],
+      total: 1,
+      page: 1,
+      limit: 100,
+    });
+    vi.mocked(api.hrp.followUps.list).mockResolvedValue({
+      data: [mildAnemiaFollowUp],
+      total: 1,
+      page: 1,
+      limit: 100,
+    });
+
+    render(<NodalFollowUpPanel />, { wrapper: createWrapper() });
+
+    const fcmCheckboxes = await screen.findAllByRole("checkbox");
+    expect(fcmCheckboxes.length).toBeGreaterThan(0);
   });
 });
