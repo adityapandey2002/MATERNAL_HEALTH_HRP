@@ -75,6 +75,7 @@ const visit: Visit = {
   ifaGiven: true,
   calciumGiven: true,
   albendazoleGiven: false,
+  fcmAdministered: false,
   referred: false,
   referralReason: null,
   referralFacilityId: null,

@@ -11,7 +11,11 @@ vi.mock("../lib/api", () => ({
   api: {
     auth: { me: vi.fn() },
     hrp: {
-      followUps: { list: vi.fn(), update: vi.fn() },
+      followUps: {
+        list: vi.fn(),
+        update: vi.fn(),
+        recordVisit: vi.fn().mockRejectedValue(new Error("offline in test")),
+      },
       patients: { list: vi.fn() },
     },
     patients: { list: vi.fn() },
@@ -126,6 +130,7 @@ describe("FollowUpsPage", () => {
     render(<FollowUpsPage />, { wrapper: createWrapper() });
 
     fireEvent.click(await screen.findByRole("button", { name: /Mark complete for Urgent Woman/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /Save & Complete Follow-up/i }));
 
     await vi.waitFor(async () => {
       const local = await db.followUps.get(followUp.id);
