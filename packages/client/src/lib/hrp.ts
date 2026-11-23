@@ -61,6 +61,7 @@ export interface FollowUpRow {
   /** Block the woman's facility belongs to; null on block-scoped responses. */
   blockName: string | null;
   complication: HrpComplication | null;
+  complications: HrpComplication[];
   riskLevel: RiskLevel;
   /** Stage of the 15-day cycle: block-owned first contact or field cycle. */
   track: HrpFollowUpTrack;
@@ -86,6 +87,7 @@ export interface FollowUpRow {
   anemiaGrade: AnemiaGrade | null;
   /** Whether FCM was administered in the most recent completed contact. */
   fcmAdministered: boolean | null;
+  referralFacilityType: "CHC_FRU" | "DH" | null;
 }
 
 const STATUS_ORDER: Record<HrpFollowUpStatus, number> = {
@@ -127,6 +129,34 @@ function getLatestCompleted(records: FollowUpListItem[]): FollowUpListItem | und
     }, undefined);
 }
 
+function resolveComplications(
+  record: FollowUpListItem | undefined,
+  patient: Patient | undefined
+): HrpComplication[] {
+  if (record?.hrpComplications && record.hrpComplications.length > 0) {
+    return record.hrpComplications;
+  }
+  if (patient?.hrpComplications && patient.hrpComplications.length > 0) {
+    return patient.hrpComplications;
+  }
+  if (record?.hrpComplication) return [record.hrpComplication];
+  if (patient?.hrpComplication) return [patient.hrpComplication as HrpComplication];
+  return [];
+}
+
+function resolveAnemiaGrade(
+  record: FollowUpListItem | undefined,
+  patient: Patient | undefined,
+  complications: HrpComplication[]
+): AnemiaGrade | null {
+  if (record?.anemiaGrade) return record.anemiaGrade;
+  if (patient?.anemiaGrade) return patient.anemiaGrade as AnemiaGrade;
+  if (complications.includes("ANEMIA") || patient?.hrpComplication === "ANEMIA") {
+    return "MODERATE";
+  }
+  return null;
+}
+
 function buildFollowUpRow(
   patientId: string,
   patient: Patient | undefined,
@@ -146,6 +176,8 @@ function buildFollowUpRow(
       ? new Date(patient.followUpScheduledDate)
       : defaultScheduledDate(track, now);
   const status = record?.status ?? patient?.followUpStatus ?? "PENDING";
+  const complications = resolveComplications(record, patient);
+  const anemiaGrade = resolveAnemiaGrade(record, patient, complications);
 
   return {
     key: record ? `follow-up-${record.id}` : `patient-${patientId}`,
@@ -158,6 +190,7 @@ function buildFollowUpRow(
     village: record?.village ?? patient?.address ?? null,
     blockName: record?.blockName ?? null,
     complication: record?.hrpComplication ?? patient?.hrpComplication ?? null,
+    complications,
     riskLevel: record?.patientRiskLevel ?? patient?.riskLevel ?? "GREEN",
     track,
     status,
@@ -174,12 +207,13 @@ function buildFollowUpRow(
       : null,
     lastCompletedByName: latestCompleted?.completedByName ?? null,
     lastCompletedByRole: latestCompleted?.completedByRole ?? null,
-    anemiaGrade:
-      record?.anemiaGrade ??
-      (patient?.anemiaGrade as AnemiaGrade | null) ??
-      (patient?.hrpComplication === "ANEMIA" ? "MODERATE" : null),
+    anemiaGrade,
     fcmAdministered:
       record?.fcmAdministered ?? (record?.notes?.includes("[FCM: Administered]") ? true : null),
+    referralFacilityType: (record?.referralFacilityType ??
+      (patient as { referralFacilityType?: "CHC_FRU" | "DH" | null } | undefined)
+        ?.referralFacilityType ??
+      null) as "CHC_FRU" | "DH" | null,
   };
 }
 
