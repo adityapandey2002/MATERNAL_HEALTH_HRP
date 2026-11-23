@@ -15,6 +15,7 @@ import { assertCan } from "../authz/policy.js";
 import {
   type ActorScope,
   facilityScopePredicate,
+  isFieldRole,
   referralVisibilityPredicate,
 } from "../authz/scope.js";
 import { db } from "../db/client.js";
@@ -549,6 +550,7 @@ export const syncRoutes: FastifyPluginAsync = async (app) => {
       .innerJoin("facilities", "facilities.id", "patients.facility_id")
       .selectAll("patients")
       .where(facilityScopePredicate(actor, "facilities.path"))
+      .$if(isFieldRole(actor.role), (qb) => qb.where("patients.registered_by", "=", actor.userId))
       .execute();
     const syncedVisits = await db
       .selectFrom("visits")
@@ -592,6 +594,7 @@ export const syncRoutes: FastifyPluginAsync = async (app) => {
       .innerJoin("facilities", "facilities.id", "patients.facility_id")
       .selectAll("patients")
       .where(facilityScopePredicate(actor, "facilities.path"))
+      .$if(isFieldRole(actor.role), (qb) => qb.where("patients.registered_by", "=", actor.userId))
       .where("patients.updated_at", ">", sinceDate)
       .execute();
     const visits = await db

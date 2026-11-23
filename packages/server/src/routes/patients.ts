@@ -8,6 +8,7 @@ import {
   assertRequestedScope,
   createDbActorLookup,
   facilityScopePredicate,
+  isFieldRole,
 } from "../authz/scope.js";
 import { db } from "../db/client.js";
 import { mapPatientChanges, mapPatientToRow, toJson } from "../lib/mappers.js";
@@ -41,6 +42,13 @@ export const patientRoutes: FastifyPluginAsync = async (app) => {
       .innerJoin("facilities", "facilities.id", "patients.facility_id")
       .leftJoin("users as anm", "anm.id", "patients.registered_by")
       .where(facilityScopePredicate(actor, "facilities.path"));
+
+    // Field workers (ANM / CHO) only see the women they registered themselves.
+    // Each ANM covers her own sub-centre catchment area; a colleague's patients
+    // at the same HWC are out of scope for a field device.
+    if (isFieldRole(actor.role)) {
+      base = base.where("patients.registered_by", "=", actor.userId);
+    }
     const isHighRisk = toBool(query.isHighRisk);
     const riskLevel = oneOf(query.riskLevel, RISK_LEVELS);
 
